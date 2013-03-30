@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# Skip remote check by default
+SKIPREMOTE=0
+
+# Issue count
+ISSUECOUNT=0
+
+if [ ! $# -eq 0 ]; then
+   if [ $# -eq 1 ]; then
+      if [ "$1" = "--skipremote" ]; then
+         SKIPREMOTE=1
+      else
+         BIN=`basename $0`
+         echo "Usage: ./$BIN [--remote] "
+         exit 1
+      fi
+   else
+      BIN=`basename $0`
+      echo "Usage: ./$BIN [--remote] "
+      exit 1
+   fi
+fi
+
+OIFS="$IFS"
+IFS=$'\n'
+# for i in $(ls); do
+   # if [ -d $i ]; then
+   #    cd $i
+
+      if [ ! -d ".git" ]; then
+		  echo "Not in a local git repository"
+		  exit 1
+         # cd ..
+         # continue
+      fi
+
+      BRANCH=`git branch | grep "^*" | awk '{print $2}'`
+
+      # echo "-----------------------------------"
+      # echo "-- Checking [$i] on branch [$BRANCH]"
+      # echo "-----------------------------------"
+
+      check1=`git status | sed "s/${BRANCH}/BRANCH/g" | cksum | awk '{print$1}'`
+      if [ "$check1" -ne "651766463" ]; then
+         echo "GIT STATUS: YOU HAVE LOCAL CHANGES"
+         git status
+         echo ""
+         ((ISSUECOUNT++))
+      else
+         echo "GIT STATUS: OK"
+      fi
+
+      if [ "$SKIPREMOTE" -eq "0" ]; then
+         hash1=`git log --pretty=oneline origin/$BRANCH -n 1 | awk '{print $1}'`
+         hash2=`git ls-remote origin $BRANCH | awk '{print $1}'`
+         if [ "$hash1" = "$hash2" ]; then
+            echo "LOCAL BRANCH STATUS: OK"
+         else
+            echo "LOCAL BRANCH STATUS: OUT OF DATE, PLEASE PULL FROM REMOTES"
+            echo "LOCAL COMMIT: $hash1"
+            echo "REMOTE COMMIT: $hash2"
+            echo ""
+            ((ISSUECOUNT++))
+         fi
+      fi
+
+      check3=`git log origin/$BRANCH..HEAD | wc -l`
+      if [ "$check3" -ne "0" ]; then
+         echo "REMOTE BRANCH STATUS: OUT OF DATE, PLEASE PUSH TO REMOTES"
+         git log origin/$BRANCH..HEAD
+         echo ""
+         ((ISSUECOUNT++))
+      else
+         echo "REMOTE BRANCH STATUS: OK"
+      fi
+
+      echo "-----------------------------------"
+      echo ""
+
+   #    cd ..
+   # fi
+# done
+IFS="$OIFS"
+
+echo "ISSUE COUNT: $ISSUECOUNT"
