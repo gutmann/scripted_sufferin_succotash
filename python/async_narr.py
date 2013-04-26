@@ -348,6 +348,11 @@ def write_data(data,month,years,endpts,varname,res,output_dir="async_output/"):
             outputdata=data[startpt:stoppt,:,:]
         startpt=stoppt
         filename=output_dir+"BCSAR_"+varname+"_"+res+"_"+str(year)+"_"+month_prefix+str(month)# +".nc"
+        if (varname=="tasmax") or (varname=="tasmin"):
+            reasonable_max=outputdata[outputdata<70].max()
+            outputdata[(outputdata<10000)&(outputdata>reasonable_max)]=reasonable_max
+            print(reasonable_max)
+        
         swim_io.write(filename,outputdata,varname=varname)
     
 
