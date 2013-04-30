@@ -434,7 +434,7 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP"):
         training_search=e0_search
         subset=[0,None,0,None] #no subset, =CONUS
         
-    output_search="*20*.nc" #for all runs (should also do *.nc?)
+    # output_search="*20*.nc" #for 20C
     output_search="*.nc" #for all runs (should also do *.nc?)
     # subset=[lon0,lon1,lat0,lat1]
     # subset=[240,245,250,255] #small/fast testing subset on 4km or 6km
@@ -499,7 +499,7 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP"):
             print("  Applying async regression")
             t1=time.time()
             narr=read_data(outputfiles,month,read_narr_file,geo,load_narr_var,pad_length=0,subset=subset,startdate=startdate)
-            output=async.apply_async(narr.data,regression,vmax=obsmax*2,isPrecip=(narr_var=="prate"),verbose=True)
+            output=async.apply_async(narr.data,regression,vmax=obsmax*1.2,isPrecip=(narr_var=="prate"),verbose=True)
         
             prefix='0' if month<10 else ''
             picklefile=open("_".join(["SAR",forcing,exp,res,narr_var,prefix+str(month)])+".pickle",'wb')
