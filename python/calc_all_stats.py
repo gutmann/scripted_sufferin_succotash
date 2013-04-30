@@ -192,6 +192,9 @@ def calc_dates(files,ntimes):
     return Bunch(year=dates[:,0],month=dates[:,1],day=dates[:,2])
 
 def calc_stats(files,v,output_base,info,extra):
+   """Calculate primary statistics for a given meteorologic dataset"""
+    
+    # parse the extra list into a meaningful datastructure
     metadata=Bunch(output_base=extra[3]+output_base,
                    resolution=info[3],
                    distributionname=extra[0],
@@ -200,8 +203,8 @@ def calc_stats(files,v,output_base,info,extra):
                    year_starts=calc_year_start_dates(files),
                    period=365.25)
 
-    print(metadata.year_starts)
     print("Loading Data")
+    # load data from files assumes you can store all data in memory
     if v=="pr":
         data=load_data(files,v,extra,metadata.resolution,minval=0,maxval=300)
     else:
@@ -268,8 +271,8 @@ def calc_stats(files,v,output_base,info,extra):
             newdata2=[olddata[curtimes,...] for olddata in alldata2]
             temp_stats(newnames,newdata,newdata2,metadata)
 
-
 def mk_all_dirs(dirname):
+    """Loop over all subdirectories in dirname and create any missing directories"""
     subdirs=dirname.split("/")
     for curdir in subdirs:
         if os.path.isfile(curdir):
@@ -296,7 +299,7 @@ if __name__ == '__main__':
                     default=["pr"], help="variable to test ([pr],tasmax)")
         parser.add_argument('-bc',dest="BC",nargs="?",action='store',help="Bias Corrected, or not [BC],nobc ",
                     default=["BC"])#,""])
-        bd="/glade/scratch/gutmann/usbr/hucdata/"
+        bd="../../../hucdata/"
         parser.add_argument('-huc',dest="huc",nargs="?",action='store',help="HUC file names [default= all]",
                     default=[bd+"HUC02/huc2_",bd+"HUC04/huc4_",bd+"HUC08/huc8_"])#,bd+"HUC12/huc12_"])
         parser.add_argument('-out',dest="outputdir",nargs="?",action='store',
@@ -334,9 +337,9 @@ if __name__ == '__main__':
         runstat=(not runobs) and (not runforcing) and (not runwrf)
         
         if args.BC=="nobc":args.BC=""
-        geosubset=[25,53,-124.7,-67]
-        # geosubset=[35,43,-113,-101]
-        # geosubset=[35,43,-112.8,-101.7]
+        geosubset=[25,53,-124.7,-67] #CONUS
+        # geosubset=[35,43,-112.8,-101.7] # subdomain
+        
         # driver.drive requires lists to iterate over, but CLI args will be individual
         #  elements.  However, default values are all lists, so we don't want to make them
         # lists of lists so we have to test to see if they are a list already first...
@@ -357,25 +360,28 @@ if __name__ == '__main__':
             print("Running Forcing Only")
             georeffile="../obs/maurer.125/pr/nldas_met_update.obs.daily.pr.2000.nc"
             sys.stdout.flush()
-            
+        
+        # 
         if runwrf:
             geosubset=[35,43,-112.8,-101.7]
-            files=glob.glob("/glade/u/home/gutmann/scratch/wrfoutput/4km/added*")
+            files=glob.glob("../wrf/4km/added*")
             files.sort()
             calc_stats(files,"pr","wrf",[0,0,0,"12km"],["gamma",pr_threshold,geosubset,outputdir,hucfile,None])
             os._exit(0)
-            
-        driver.drive(calc_stats,
-                    yearsearch=args.yearsearch[0],
-                    obs=runobs,stat=runstat,runforce=runforcing,
-                    extra=[distribution,pr_threshold,geosubset,outputdir,hucfile,georeffile],
-                    methods=args.methods,
-                    BCs=args.BC,
-                    models=args.models,
-                    resolutions=args.resolution,
-                    variables=args.variable,
-                    extendedmethods=False)
+        
+        # driver iterates over all combinations of methods/variables/forcing/resolutions and calls calc_stats for each
+        driver.drive(calc_stats, #function to call
+                    yearsearch=args.yearsearch[0], #subset of years to run specified as a glob expression
+                    obs=runobs,stat=runstat,runforce=runforcing, # options to run either SD methods, observations or forcing
+                    extra=[distribution,pr_threshold,geosubset,outputdir,hucfile,georeffile], #passed to calc_stats
+                    methods=args.methods,   # list of SD methods to run
+                    BCs=args.BC,            # list of BC/noBC
+                    models=args.models,     # list of forcing models ([NCEP,NARR])
+                    resolutions=args.resolution,# list of resolutions ([6km,12km])
+                    variables=args.variable,    # list of variables ([pr,tasmax,tasmin])
+                    extendedmethods=False)  #extendedmethods includes hot,dry,wet,cold experiments (don't use)
                     
+    # overarching error handling to print out something useful if it crashes
     except Exception as e:
         print("Error Unexpected Exception")
         print(e)
