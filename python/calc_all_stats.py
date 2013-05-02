@@ -192,7 +192,7 @@ def calc_dates(files,ntimes):
     return Bunch(year=dates[:,0],month=dates[:,1],day=dates[:,2])
 
 def calc_stats(files,v,output_base,info,extra):
-   """Calculate primary statistics for a given meteorologic dataset"""
+    """Calculate primary statistics for a given meteorologic dataset"""
     
     # parse the extra list into a meaningful datastructure
     metadata=Bunch(output_base=extra[3]+output_base,
@@ -299,7 +299,7 @@ if __name__ == '__main__':
                     default=["pr"], help="variable to test ([pr],tasmax)")
         parser.add_argument('-bc',dest="BC",nargs="?",action='store',help="Bias Corrected, or not [BC],nobc ",
                     default=["BC"])#,""])
-        bd="../../../hucdata/"
+        bd="/d2/gutmann/usbr/hucdata/"
         parser.add_argument('-huc',dest="huc",nargs="?",action='store',help="HUC file names [default= all]",
                     default=[bd+"HUC02/huc2_",bd+"HUC04/huc4_",bd+"HUC08/huc8_"])#,bd+"HUC12/huc12_"])
         parser.add_argument('-out',dest="outputdir",nargs="?",action='store',

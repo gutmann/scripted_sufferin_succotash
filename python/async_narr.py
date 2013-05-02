@@ -1,4 +1,5 @@
-#!/usr/bin/env python
+#!/opt/python/bin/python
+###!/usr/bin/env python
 import glob
 import time
 import cPickle
@@ -374,7 +375,7 @@ def mk_all_dirs(dirname):
 
 def async_narr(var=None,exp="e0",res="12km",forcing="NCEP"):
     """Perform an Asynchronous regression on NARR data"""
-    base_dir="/glade/scratch/gutmann/usbr/stat_data/"
+    base_dir="/d2/gutmann/usbr/stat_data/"
     # note you also have to add "nldas" between the / and the * after obsextra
     narr_dir=base_dir+"forcing/narr/"
     narr_extra=""
@@ -382,7 +383,7 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP"):
     ncep_extra="*gauss*"
 
     if res[-2:]!="km":res+="km"
-    output_dir="/".join(["SAR"+exp,forcing.lower(),var])
+    output_dir="/".join(["SAR3"+exp,forcing.lower(),var])
     mk_all_dirs(output_dir)
     output_dir+="/"
     if forcing=="NCEP":
@@ -521,11 +522,13 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP"):
         old_files=glob.glob(output_dir+"BCSAR*"+res+"*.nc")
         old_files.sort()
         for f in old_files:
+            print(f)
             os.remove(f)
         # then rename "added" files back to the original filenames
         new_files=glob.glob(output_dir+"added*"+res+"*.nc")
         new_files.sort()
         for o,n in zip(old_files,new_files):
+            print(n,o)
             os.rename(n,o)
             
         

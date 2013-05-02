@@ -300,15 +300,16 @@ def apply_plr(x,plr,vmax=1E3,vmin=-40,precip=True):
         if i==0:
             cur=np.where(x<plr[1,i])
         elif i==n-1:
-            cur=np.where(x>plr[0,i])
+            cur=np.where(x>=plr[0,i])
         else:
-            cur=np.where((x>plr[0,i])&(x<plr[1,i]))
+            cur=np.where((x>=plr[0,i])&(x<plr[1,i]))
         # apply the regression slope and offset values
         output[cur]=x[cur]*plr[2,i]+plr[3,i]
     # if these are precip data, need to reverse the log transform
     if precip:
         output=np.exp(output)
         correct_the_top(output,np.exp(vmax))
+        output[x<-4]=0
         output[output<0.1]=0
     else:
         correct_the_top(output,vmax,scale=10.0)
@@ -342,7 +343,7 @@ def apply_async(data,async,vmax=1E10,vmin=-40,isPrecip=True,verbose=True):
         x=data[:,plr[1],plr[2]]
         # if precip then transform to a log scale
         if isPrecip:
-            x[x<1E-5]=1E-5
+            x[x<1E-20]=1E-20
             x=np.log(x)
         vmax=plr[0][-1,-1]
         vmin=plr[0][-2,0]
