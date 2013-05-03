@@ -273,6 +273,7 @@ def calc_stats(files,v,output_base,info,extra):
 
 def mk_all_dirs(dirname):
     """Loop over all subdirectories in dirname and create any missing directories"""
+    original_dir=os.getcwd()
     subdirs=dirname.split("/")
     for curdir in subdirs:
         if os.path.isfile(curdir):
@@ -283,8 +284,9 @@ def mk_all_dirs(dirname):
             except Exception as e:
                 print(e)
         os.chdir(curdir)
-    for i in range(len(subdirs)):
-        os.chdir("../")
+
+    os.chdir(original_dir)
+
 
 if __name__ == '__main__':
     try:
@@ -368,6 +370,7 @@ if __name__ == '__main__':
             files.sort()
             calc_stats(files,"pr","wrf",[0,0,0,"12km"],["gamma",pr_threshold,geosubset,outputdir,hucfile,None])
             os._exit(0)
+        
         
         # driver iterates over all combinations of methods/variables/forcing/resolutions and calls calc_stats for each
         driver.drive(calc_stats, #function to call

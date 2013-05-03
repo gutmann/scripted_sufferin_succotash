@@ -1,4 +1,4 @@
-import glob
+import glob,os
 import copy
 
 class RunCollector(object):
