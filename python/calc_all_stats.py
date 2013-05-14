@@ -58,6 +58,7 @@ def load_data(files,varname,extra,res,minval=-100,maxval=500):
     huclist=[]
     for data in reader:
         shp=data[0].shape
+        data=np.ma.array(data,mask=( (~np.isfinite(data)) | (data>1E10)))
         outputdata.append(data[0].reshape((1,shp[0],shp[1])))
     outputdata=np.concatenate(outputdata,axis=0)
     reader.close()
@@ -151,18 +152,18 @@ def precip_stats(names,data,info):
         hist=np.vstack(stats.histogram(d))
         io.write(out+"_histogram",hist)
         
-        if re.match(".*annual",n):
-            for ndays in info.nday_lengths:
-                data2test=d[ndays:,...].copy()
-                for i in range(ndays):
-                    data2test+=d[i:-(ndays-i),...]
-                print("extremes "+str(ndays+1))
-                extremes=stats.extremes(data2test,dist_name=info.distributionname)
-                if extremes!=None:
-                    for i in range(extremes.shape[0]):
-                        cur=extremes[i,...]
-                        print(cur[cur>0].mean())
-                    io.write(out+"_extremes_nday"+str(ndays+1),extremes)
+        # if re.match(".*annual",n):
+        #     for ndays in info.nday_lengths:
+        #         data2test=d[ndays:,...].copy()
+        #         for i in range(ndays):
+        #             data2test+=d[i:-(ndays-i),...]
+        #         print("extremes "+str(ndays+1))
+        #         extremes=stats.extremes(data2test,dist_name=info.distributionname)
+        #         if extremes!=None:
+        #             for i in range(extremes.shape[0]):
+        #                 cur=extremes[i,...]
+        #                 print(cur[cur>0].mean())
+        #             io.write(out+"_extremes_nday"+str(ndays+1),extremes)
 
 def cleanup(data,minval=-999,maxval=1e5):
     sz=data.shape
@@ -227,7 +228,6 @@ def calc_stats(files,v,output_base,info,extra):
                 a1[tmp]=a2[tmp]
                 a2[tmp]=bada1
         
-    
     dates=calc_dates(files,alldata[0].shape[0])
     
     # ---------- Calculate Annual values --------------
@@ -301,7 +301,7 @@ if __name__ == '__main__':
                     default=["pr"], help="variable to test ([pr],tasmax)")
         parser.add_argument('-bc',dest="BC",nargs="?",action='store',help="Bias Corrected, or not [BC],nobc ",
                     default=["BC"])#,""])
-        bd="/d2/gutmann/usbr/hucdata/"
+        bd="/glade/scratch/gutmann/usbr/hucdata/"
         parser.add_argument('-huc',dest="huc",nargs="?",action='store',help="HUC file names [default= all]",
                     default=[bd+"HUC02/huc2_",bd+"HUC04/huc4_",bd+"HUC08/huc8_"])#,bd+"HUC12/huc12_"])
         parser.add_argument('-out',dest="outputdir",nargs="?",action='store',
@@ -313,6 +313,8 @@ if __name__ == '__main__':
                 default="gamma", help='name of extreme distribution ([gamma],weibull,exponential)', dest='distribution')
         parser.add_argument ('-pr_threshold', nargs="?", action='store', dest='prthresh',
                 default="0.0", help='Threshold to use when calculating wet day status')
+        parser.add_argument ('--runsub', action='store_true',
+                default=False, help='Run subdomain only [False]', dest='runsub')
         parser.add_argument ('--runobs', action='store_true',
                 default=False, help='Run observations only [False]', dest='runobs')
         parser.add_argument ('--runwrf', action='store_true',
@@ -340,7 +342,8 @@ if __name__ == '__main__':
         
         if args.BC=="nobc":args.BC=""
         geosubset=[25,53,-124.7,-67] #CONUS
-        # geosubset=[35,43,-112.8,-101.7] # subdomain
+        if args.runsub:
+            geosubset=[35,43,-112.8,-101.7] # subdomain
         
         # driver.drive requires lists to iterate over, but CLI args will be individual
         #  elements.  However, default values are all lists, so we don't want to make them
