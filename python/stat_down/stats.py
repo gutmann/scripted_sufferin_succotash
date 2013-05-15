@@ -52,7 +52,9 @@ def interannual(data,yearstarts,fun=None):
         else:
             endpt=yearstarts[i+1]
         annual_vals[i,...]=fun(data[startpt:endpt,...],axis=0)
-    
+
+    annual_vals=np.ma.array(annual_vals,mask=~np.isfinite(annual_vals))
+        
     return(np.std(annual_vals,axis=0))
 
 def histogram(data,precip=True):

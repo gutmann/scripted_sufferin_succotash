@@ -18,7 +18,7 @@ parser.add_argument('-model',dest="models",nargs="?",action='store',
 parser.add_argument('-res',dest="resolution",nargs="?",action='store',
             default="12km",help="resolution to run ([12km],6km)")
 parser.add_argument('-exp',dest="experiment",nargs="?",action='store',
-            default="e0",help="experiment to test ([e0],e1,conus)")
+            default="conus",help="experiment to test (e0,e1,[conus])")
 parser.add_argument('-pr',dest="pr_threshold",nargs="?",action='store',
             default="0",help="precipitation threshold used ([0],1)")
 parser.add_argument ('--plotmaps', action='store_true',
@@ -55,14 +55,15 @@ if thisres=="6km":
     else:
         SDbase="-narr-pr-BC6km"
 
-ob2="../obs19ce0/"+obs_base
-ob2="../wrf/wrf"
+# ob2="../obs19c/"+obs_base
+ob2=obs_base
+# ob2="../wrf/wrf"
 
 extremes=["extremes_nday1","extremes_nday2","extremes_nday3",
           "extremes_nday4","extremes_nday5"]
 objectives=["dryspell","interannual","MAP","wetfrac","wetspell"]
 objectives=["MAP","wetfrac","dryspell","interannual","wetspell"]
-methods=["CAe0","CA","SARe0","SDe0","SDmon"]
+methods=["CAe0","CA","SAR","SDe0","SDmon"]
 scales=["full_res","huc8","huc4","huc2"]
 times=["annual","month01","month02","month03","month04","month05",
        "month06","month07","month08","month09","month10","month11",
@@ -74,7 +75,7 @@ if experiment=="conus":
 #            "month06","month07","month08","month09","month10","month11",
 #            "month12","season1","season2","season3","season4"]
 if experiment=="e1":
-    methods=["CAe1","CA","SARe1","SDe1","SDmon"]
+    methods=["CAe1","CA","SAR","SDe1","SDmon"]
     # scales=["full_res"]
     # times=["annual"]# ,"month01","month02","month03","month04","month05",
 #            "month06","month07","month08","month09","month10","month11",
@@ -83,11 +84,11 @@ if experiment=="e1":
 
 all_mapscales=dict(dryspell=[0.,10.],interannual=[0.,400.],MAP=[0.,1400.],wetfrac=[0.0,1.0],wetspell=[0.,30.0])
 if experiment=="conus":
-    all_mapscales=dict(dryspell=[0.,10.],interannual=[0.,500.],MAP=[0.,2000.],wetfrac=[0.0,1.0],wetspell=[0.,30.0])
+    all_mapscales=dict(dryspell=[0.,10.],interannual=[0.,500.],MAP=[0.,1000.],wetfrac=[0.0,1.0],wetspell=[0.,30.0])
 
-methodnames=dict(CAe0="BCCAr",CA="BCCA",SARe0="SAR",SDe0="BCSDd",SDmon="BCSDm",
-                 CAe1="BCCAr",SARe1="SAR",SDe1="BCSDd",
-                 SAR="SAR",SD="BCSDd",SDmon_c="BCSDm")
+methodnames=dict(CAe0="BCCAr",CA="BCCA",SARe0="AR",SDe0="BCSDd",SDmon="BCSDm",
+                 CAe1="BCCAr",SARe1="AR",SDe1="BCSDd",
+                 SAR="AR",SD="BCSDd",SDmon_c="BCSDm")
 
 def map_vis(data,title=[],vmin=None,vmax=None,barlabel=None,cmap=None,outputdir=None):
     # print("visualizing : "+title)
@@ -98,6 +99,7 @@ def map_vis(data,title=[],vmin=None,vmax=None,barlabel=None,cmap=None,outputdir=
     else:
         plotdata=data
     plt.clf()
+    # plt.figure(figsize=(3,3),dpi=200)
     ny,nx=plotdata.shape
     geo=[35,43,-113,-101]
     if experiment=="conus":geo=[25,52.7,-124.7,-67]
@@ -134,23 +136,25 @@ def plot_vscale(data,plotname,yrange=None,plotcol=0,legend_loc=2,legend_ncol=1,o
         sdm=3;sdd=2;sar=1;cac=0
         methods=["CA","SAR","SD","SDmon_c"]
         varpos=[sdm,sdd,sar,cac]
-        names=["BCSDm","BCSDd","SAR","BCCA"]
+        names=["BCSDm","BCSDd","AR","BCCA"]
         colors=["red","darkred","green","blue"]
     else:
         sdm=4;sdd=3;sar=2;cac=1;car=0
         varpos=[sdm,sdd,sar,cac,car]
-        names=["BCSDm","BCSDd","SAR","BCCA","BCCAr"]
+        names=["BCSDm","BCSDd","AR","BCCA","BCCAr"]
         colors=["red","darkred","green","blue","skyblue"]
     nscales=len(scales)
     
     plt.clf();
+    plt.figure(figsize=(5.5,5),dpi=200)
+    
     ax=plt.gca()
     for v,n,c in zip(varpos,names,colors):
         ax.plot(data[v*nscales:(v+1)*nscales,plotcol],label=n,color=c,linewidth=2)
     if obs!=None:
         ax.plot(obs[0:nscales,plotcol],'-o',label="obs",color="k",linewidth=3)
     if obs2!=None:
-        ax.plot(obs2[0:nscales,plotcol],'--x',label="WRF",color="k",linewidth=2)
+        ax.plot(obs2[0:nscales,plotcol],'--x',label="obs19c",color="k",linewidth=2)
     
     ax.xaxis.set_ticks([])
     if yrange!=None:
@@ -158,7 +162,7 @@ def plot_vscale(data,plotname,yrange=None,plotcol=0,legend_loc=2,legend_ncol=1,o
     else:
         xaxis_location=data.min()
     for i in range(nscales):
-        ax.text(i-0.1,xaxis_location,scales[i].replace("huc","huc ").replace("_"," "),rotation=45)
+        ax.text(i-0.4,xaxis_location,scales[i].replace("huc","huc ").replace("_"," "),rotation=45)
     if yrange!=None:
         plt.ylim(yrange[0],yrange[1])
     plt.xlim(-0.5,nscales-0.5)
@@ -168,44 +172,48 @@ def plot_vscale(data,plotname,yrange=None,plotcol=0,legend_loc=2,legend_ncol=1,o
     plt.legend(loc=legend_loc,ncol=legend_ncol)
     plt.draw()
     plotname="_".join([plotname,experiment,model_base,thisres])
-    plt.savefig(plotname.replace(" ","_")+"_comp_scale.png")
+    plt.savefig(plotname.replace(" ","_")+"_comp_scale.png",dpi=200)
     
-def plot_vseason(data,plotname,yrange=None,plotrow=0,multiplier=1.0,legend_ncol=1,obs=None,obs2=None,ylabel="Bias"):
+def plot_vseason(data,plotname,yrange=None,plotrow=0,multiplier=1.0,legend_loc=2,legend_ncol=1,obs=None,obs2=None,ylabel="Bias"):
     if experiment=="conus":
         sdm=3;sdd=2;sar=1;cac=0
         methods=["CA","SAR","SD","SDmon_c"]
         varpos=[sdm,sdd,sar,cac]
-        names=["BCSDm","BCSDd","SAR","BCCA"]
+        names=["BCSDm","BCSDd","AR","BCCA"]
         colors=["red","darkred","green","blue"]
     else:
         sdm=4;sdd=3;sar=2;cac=1;car=0
         varpos=[sdm,sdd,sar,cac,car]
-        names=["BCSDm","BCSDd","SAR","BCCA","BCCAr"]
+        names=["BCSDm","BCSDd","AR","BCCA","BCCAr"]
         # colors=["red","magenta","green","blue","cyan"]
         colors=["red","darkred","green","blue","skyblue"]
     nscales=len(scales)
     xlabels=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
     
     plt.clf();
+    plt.figure(figsize=(6.5,5),dpi=200)
     ax=plt.gca()
     for v,n,c in zip(varpos,names,colors):
         annual_value=str(data[v*nscales+plotrow,0]).split(".")
         if len(annual_value)>1:
             annual_value[1]=annual_value[1][:2]
         annual_value=".".join(annual_value)
-        ax.plot(data[v*nscales+plotrow,1:13]/multiplier,label=n+" yr="+annual_value,color=c,linewidth=2)
+        # ax.plot(data[v*nscales+plotrow,1:13]/multiplier,label=n+" yr="+annual_value,color=c,linewidth=2)
+        ax.plot(data[v*nscales+plotrow,1:13]/multiplier,label=n,color=c,linewidth=2)
     if obs!=None:
         annual_value=str(obs[0+plotrow,0]).split(".")
         if len(annual_value)>1:
             annual_value[1]=annual_value[1][:2]
         annual_value=".".join(annual_value)
-        ax.plot(obs[0+plotrow,1:13]/multiplier,'-o',label="obs yr="+annual_value,color="k",linewidth=3)
+        # ax.plot(obs[0+plotrow,1:13]/multiplier,'-o',label="obs yr="+annual_value,color="k",linewidth=3)
+        ax.plot(obs[0+plotrow,1:13]/multiplier,'-o',label="obs",color="k",linewidth=3)
     if obs2!=None:
         annual_value=str(obs2[0+plotrow,0]).split(".")
         if len(annual_value)>1:
             annual_value[1]=annual_value[1][:2]
         annual_value=".".join(annual_value)
-        ax.plot(obs2[0+plotrow,1:13]/multiplier,'--x',label="WRF yr="+annual_value,color="k",linewidth=2)
+        ax.plot(obs2[0+plotrow,1:13]/multiplier,'--x',label="obs19c",color="k",linewidth=2)
+        # ax.plot(obs2[0+plotrow,1:13]/multiplier,'--x',label="obs19c yr="+annual_value,color="k",linewidth=2)
     
     ax.xaxis.set_ticks([])
     if yrange!=None:
@@ -213,17 +221,17 @@ def plot_vseason(data,plotname,yrange=None,plotrow=0,multiplier=1.0,legend_ncol=
     else:
         xaxis_location=data.min()
     for i in range(len(xlabels)):
-        ax.text(i-0.1,xaxis_location,xlabels[i],rotation=45)
+        ax.text(i-0.4,xaxis_location,xlabels[i],rotation=45)
     if yrange!=None:
         plt.ylim(yrange[0],yrange[1])
     plt.xlim(-0.5,12-0.5)
     plt.ylabel(ylabel)
     ax.plot([-0.5,12-0.5],[0,0],linestyle=":",color="black")
     plt.title(titleize(plotname))
-    plt.legend(loc=2,ncol=legend_ncol)
+    plt.legend(loc=legend_loc,ncol=legend_ncol)
     plt.draw()
     plotname="_".join([plotname,experiment,model_base,thisres])
-    plt.savefig(plotname.replace(" ","_")+"_comp_season.png")
+    plt.savefig(plotname.replace(" ","_")+"_comp_season.png",dpi=200)
 
 
 def make_plot(data,minmax,name,obj,cmap=None):
@@ -306,15 +314,15 @@ def extreme_plot(data,minmax,name,cmap=None):
 def plot_histograms(obbase,sdbase,scale,time):
     obj="histogram"
     methods=["CAe0","CA","SARe0","SDe0","SDmon"]
-    names=dict(SDmon="BCSDm",SDe0="BCSDd",SARe0="SAR",CA="BCCA",CAe0="BCCAr")
+    names=dict(SDmon="BCSDm",SDe0="BCSDd",SARe0="AR",CA="BCCA",CAe0="BCCAr")
     colors=dict(SDmon="red",SDe0="darkred",SARe0="green",CA="blue",CAe0="skyblue")
     if experiment=="e1":
         methods=["CAe1","CA","SARe1","SDe1","SDmon"]
-        names=dict(SDmon="BCSDm",SDe1="BCSDd",SARe1="SAR",CA="BCCA",CAe1="BCCAr")
+        names=dict(SDmon="BCSDm",SDe1="BCSDd",SARe1="AR",CA="BCCA",CAe1="BCCAr")
         colors=dict(SDmon="red",SDe1="darkred",SARe1="green",CA="blue",CAe1="skyblue")
     if experiment=="conus":
         methods=["CA","SAR","SD","SDmon_c"]
-        names=dict(SDmon="BCSDm",SD="BCSDd",SAR="SAR",CA="BCCA",CAe1="BCCAr",SDmon_c="BCSDm")
+        names=dict(SDmon="BCSDm",SD="BCSDd",SAR="AR",CA="BCCA",CAe1="BCCAr",SDmon_c="BCSDm")
         colors=dict(SDmon="red",SD="darkred",SAR="green",CA="blue",CAe1="skyblue",SDmon_c="red")
 
     obs=io.read_nc("_".join([obbase,scale,time,obj])+".nc").data
@@ -439,13 +447,14 @@ if __name__ == '__main__':
                         traceback.print_exc()
     
         bias+=fullobs
+        fullobs2=None
         if obj=="dryspell":
             minmax=[0,6]
             # plot_vscale(bias,"dryspell",[-6,4],legend_ncol=2)
             # plot_vseason(bias,"dryspell",[-6,4],legend_ncol=2)
             if experiment=="conus":
                 plot_vscale(bias,"dryspell",[0,8],legend_ncol=1,legend_loc=1,obs=fullobs,obs2=fullobs2,ylabel="Days")
-                plot_vseason(bias,"dryspell",[0,15],legend_ncol=2,obs=fullobs,obs2=fullobs2,ylabel="Days")
+                plot_vseason(bias,"dryspell",[0,15],legend_ncol=1,obs=fullobs,obs2=fullobs2,ylabel="Days")
             else:
                 if pr_threshold==1:
                     plot_vscale(bias,"dryspell",[5,12],legend_ncol=1,legend_loc=1,obs=fullobs,obs2=fullobs2,ylabel="Days")
@@ -462,8 +471,8 @@ if __name__ == '__main__':
                 plot_vscale(bias,"wetspell",[0,5],obs=fullobs,obs2=fullobs2,ylabel="Days")
                 plot_vseason(bias,"wetspell",[0,10],obs=fullobs,obs2=fullobs2,ylabel="Days")
             else:
-                plot_vscale(bias,"wetspell",[0,50],obs=fullobs,obs2=fullobs2,ylabel="Days")
-                plot_vseason(bias,"wetspell",[0,40],obs=fullobs,obs2=fullobs2,ylabel="Days")
+                plot_vscale(bias,"wetspell",[0,250],obs=fullobs,obs2=fullobs2,ylabel="Days")
+                plot_vseason(bias,"wetspell",[0,12],obs=fullobs,obs2=fullobs2,ylabel="Days")
                 
         if obj=="wetfrac":
             minmax=[0.05,0.6]
@@ -474,7 +483,7 @@ if __name__ == '__main__':
                 plot_vseason(bias,"wetfrac",[0.0,0.8],obs=fullobs,obs2=fullobs2,legend_ncol=2,ylabel="")
             else:
                 plot_vscale(bias,"wetfrac",[0.1,1.0],obs=fullobs,obs2=fullobs2,legend_loc=4,ylabel="")
-                plot_vseason(bias,"wetfrac",[0.2,1.3],obs=fullobs,obs2=fullobs2,legend_ncol=2,ylabel="")
+                plot_vseason(bias,"wetfrac",[0.0,1.0],obs=fullobs,obs2=fullobs2,legend_loc=8,legend_ncol=2,ylabel="")
                 
         if obj=="MAP":
             minmax=[20,150]
@@ -483,7 +492,7 @@ if __name__ == '__main__':
             # plot_vseason(bias,"MAP",[0,100],obs=fullobs,obs2=fullobs2,multiplier=4.,legend_ncol=2,ylabel="mm")
             if experiment=="conus":
                 plot_vscale(bias,"MAP",[500,1200],obs=fullobs,obs2=fullobs2,legend_ncol=3,ylabel="mm")
-                plot_vseason(bias,"MAP",[0,150],obs=fullobs,obs2=fullobs2,legend_ncol=2,ylabel="mm")
+                plot_vseason(bias,"MAP",[30,120],obs=fullobs,obs2=fullobs2,legend_ncol=2,ylabel="mm")
             else:
                 plot_vscale(bias,"MAP",[250,600],obs=fullobs,obs2=fullobs2,legend_ncol=3,ylabel="mm")
                 plot_vseason(bias,"MAP",[0,100],obs=fullobs,obs2=fullobs2,legend_ncol=2,ylabel="mm")
@@ -494,7 +503,7 @@ if __name__ == '__main__':
             # plot_vseason(bias,"interannual",[0,50],obs=fullobs,obs2=fullobs2,multiplier=2.,legend_ncol=2,ylabel="mm")
             if experiment=="conus":
                 plot_vscale(bias,"interannual",[50,250],obs=fullobs,obs2=fullobs2,legend_ncol=2,ylabel="mm")
-                plot_vseason(bias,"interannual",[0,80],obs=fullobs,obs2=fullobs2,legend_ncol=2,ylabel="mm")
+                plot_vseason(bias,"interannual",[10,60],obs=fullobs,obs2=fullobs2,legend_ncol=2,ylabel="mm")
             else:
                 plot_vscale(bias,"interannual",[50,150],obs=fullobs,obs2=fullobs2,legend_ncol=2,ylabel="mm")
                 plot_vseason(bias,"interannual",[0,50],obs=fullobs,obs2=fullobs2,legend_ncol=2,ylabel="mm")
@@ -516,10 +525,7 @@ if __name__ == '__main__':
         for j in range(len(scales)):
             obs=io.read_nc("_".join([obs_base,scales[j],"annual",obj])+".nc").data
             try:
-                print("HELLO")
                 file=glob("_".join([ob2,scales[j],"annual",obj])+".nc")
-                print("HELLO")
-                print("HI:",file)
                 print("_".join([ob2,scales[j],"annual",obj])+".nc")
                 if file:
                     obs2=io.read_nc("_".join([ob2,scales[j],"annual",obj])+".nc").data
@@ -579,11 +585,12 @@ if __name__ == '__main__':
     extreme_plot(RMS,minmax,"RMS",cmap=cm.Reds)
     minmax[0]=-minmax[1]
     extreme_plot(bias,minmax,"bias",cmap=cm.seismic)
+    fullobs2=None
     # plot_vscale(bias*100,"Percent Error Extremes",[-100,100],plotcol=2)
     if experiment=="conus":
         plot_vscale(bias*fullobs+fullobs,"Extremes",[0,200],legend_loc=1,plotcol=2,obs=fullobs,ylabel="mm/day 50yr return")
     else:
-        plot_vscale(bias*fullobs+fullobs,"Extremes",[0,100],legend_loc=1,plotcol=2,obs=fullobs,obs2=fullobs2,ylabel="mm/day 50yr return")
+        plot_vscale(bias*fullobs+fullobs,"Extremes",[0,120],legend_loc=1,legend_ncol=2,plotcol=2,obs=fullobs,obs2=fullobs2,ylabel="mm/day 50yr return")
 
 
 
