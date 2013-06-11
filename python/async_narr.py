@@ -4,6 +4,7 @@ import glob
 import time
 import cPickle
 import os,re,sys
+import gc
 import argparse,traceback
 
 import numpy as np
@@ -60,7 +61,7 @@ def read_geo_latlon(geo_file=None,subset=None,mask=False):
     else:
         output=(lon[ymin:ymax,xmin:xmax],lat[ymin:ymax,xmin:xmax])
     
-    if mask:
+    if type(mask)==str:
         d=swim_io.read_nc(geo_file,mask).data[0,...]
         d=d[ymin:ymax,xmin:xmax]
         try:
@@ -91,7 +92,7 @@ def bilin_weights(yi,y,xi,x):
     f2=1-f1# (y6-yi)/(y6-y5)
     return np.array([x1*f2,x0*f2,x3*f1,x2*f1])
 
-def load_geoLUT(lat1,lon1,georef,subset=None,mask=False):
+def load_geoLUT(lat1,lon1,georef,subset=None,mask=False,omask=False):
     '''Create a Geographic Look Up Table
     
     lat/lon inputs should be grids of latitude and longitude
@@ -115,10 +116,13 @@ def load_geoLUT(lat1,lon1,georef,subset=None,mask=False):
     if len(lon1.shape)==1:
         lon1,lat1=np.meshgrid(lon1,lat1)
         N1=lat1.shape
-        
-    dxinc=np.sign(lon1[1,1]-lon1[0,0]).astype('i')
-    dyinc=np.sign(lat1[1,1]-lat1[0,0]).astype('i')
+    
+    cx=round(N1[1]/2)
+    cy=round(N1[0]/2)
+    dxinc=np.sign(lon1[cy+1,cx+1]-lon1[cy,cx]).astype('i')
+    dyinc=np.sign(lat1[cy+1,cx+1]-lat1[cy,cx]).astype('i')
 
+    print(N1,N)
     # loop over y
     for i in range(N[1]):
         # find the first positions so the rest can be done faster relative to it
@@ -189,6 +193,40 @@ def load_geoLUT(lat1,lon1,georef,subset=None,mask=False):
                     y[3]=max(min(newy-dyinc,winsz[0]-1),0)
             # finally compute the weights for each of the four surrounding points for a bilinear interpolation
             weights=bilin_weights(lat2[j,i],latwin[y,x],lon2[j,i],lonwin[y,x])
+            if type(mask)==np.ndarray:
+                if np.max(x+x0)>=mask.shape[1]:
+                    tmp=np.where((x+x0)>=mask.shape[1])
+                    x[tmp]=mask.shape[1]-x0-1
+                if np.max(y+y0)>=mask.shape[0]:
+                    tmp=np.where((y+y0)>=mask.shape[0])
+                    y[tmp]=mask.shape[0]-y0-1
+                weights[mask[y+y0,x+x0]]=0
+            weights[weights<0]=0
+            # if there were some non-masked points, normalize by the sum of all non-masked points
+            # otherwise we will set some weights to 0 without increasing the other weights
+            if np.max(weights)>0:
+                weights/=np.sum(weights)
+            else:
+                if type(omask)==np.ndarray:
+                    if not omask[j,i]:
+                        sub_y0=max(lasty-(winhalfsize+3),0)
+                        sub_y1=min(lasty+(winhalfsize+3),N1[0])
+                        sub_x0=max(lastx-(winhalfsize+3),0)
+                        sub_x1=min(lastx+(winhalfsize+3),N1[1])
+                        tmp=np.where(mask[sub_y0:sub_y1,sub_x0:sub_x1]==False)
+                        if len(tmp[0])>0:
+                            latwin=lat1[sub_y0:sub_y1,sub_x0:sub_x1]
+                            lonwin=lon1[sub_y0:sub_y1,sub_x0:sub_x1]
+                            dists=(latwin-lat2[j,i])**2+(lonwin-lon2[j,i])**2
+
+                            gooddists=dists[tmp]
+                            (newy,newx)=np.where(dists==gooddists[gooddists.argmin()])
+                            x[:]=0
+                            y[:]=0
+                            x[0]=newx+sub_x0-x0
+                            y[0]=newy+sub_y0-y0
+                            weights[:]=[1,0,0,0]
+            
             # store the current results in the output array
             geoLUT[j,i,:,0]=y+y0
             geoLUT[j,i,:,1]=x+x0
@@ -239,7 +277,7 @@ def find_times(alltimes,month,t0,pad_length=15):
         
     
 def read_narr_file(filename,month,geo,loadvar="prate",pad_length=15,subset=None,startdate=[1800,1,1,0,0.,0.]):
-    d=swim_io.read_nc(filename,var=loadvar,returnNCvar=True)
+    d=swim_io.read_nc(filename,var=loadvar)#,returnNCvar=True)
     t=swim_io.read_nc(filename,var="time").data
     lat=swim_io.read_nc(filename,var="lat").data
     lon=swim_io.read_nc(filename,var="lon").data
@@ -260,7 +298,7 @@ def read_narr_file(filename,month,geo,loadvar="prate",pad_length=15,subset=None,
         output=convert2daily(output,t[thismonth]/24.0)
         print(output.shape)
     output=regrid(output,lat,lon,geo,subymin,subxmin)
-    d.ncfile.close()
+    # d.ncfile.close()
     return output
 
 def read_obs_file(filename,month,geo,loadvar="pr",pad_length=15,subset=None,startdate=[1940,1,1,0,0.,0.]):
@@ -371,16 +409,32 @@ def mk_all_dirs(dirname):
     for i in range(len(subdirs)):
         os.chdir("../")
 
+def read_mask(filename,load_var):
+    d=swim_io.read_nc(filename,load_var,returnNCvar=True)
+    data=d.data[0,...]
+    d.ncfile.close()
+    if type(data.mask)==bool:
+        return False
+    else:
+        return data.mask
 
-
-def async_narr(var=None,exp="e0",res="12km",forcing="NCEP"):
-    """Perform an Asynchronous regression on NARR data"""
+def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
+    """Perform an Asynchronous regression on NARR or NCEP data"""
     base_dir="/d2/gutmann/usbr/stat_data/"
     # note you also have to add "nldas" between the / and the * after obsextra
     narr_dir=base_dir+"forcing/narr/"
     narr_extra=""
     ncep_dir=base_dir+"forcing/ncep/"
     ncep_extra="*gauss*"
+
+    if runmonth==None:
+        startmonth=1
+        endmonth=13
+        runmonth=''
+    else:
+        startmonth=int(runmonth)
+        endmonth=int(runmonth)+1
+        
 
     if res[-2:]!="km":res+="km"
     output_dir="/".join(["SAR3"+exp,forcing.lower(),var])
@@ -455,7 +509,6 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP"):
         for cur_search in training_search:
             narrfiles.extend(glob.glob(narr_dir+narr_var_dir+narr_var+extra+cur_search))
         narrfiles.sort()
-        # print(narrfiles)
         outputfiles=glob.glob(narr_dir+narr_var_dir+narr_var+extra+output_search)
         outputfiles.sort()
         obs_files=[]
@@ -464,16 +517,16 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP"):
             obs_files.extend(glob.glob(obs_dir+obs_var+obsextra+obs_var+cur_search))
         obs_files.sort()
         geo_ref_file=obs_files[0]
-        (lon,lat)=read_geo_latlon(narrfiles[0],mask=load_narr_var)
-        # lat=swim_io.read_nc(narrfiles[0],var="lat").data
-        # lon=swim_io.read_nc(narrfiles[0],var="lon").data
+        (lon,lat)=read_geo_latlon(narrfiles[0])#,mask=load_narr_var)
 
         print("Creating Geographic Look Up Table")
         t1=time.time()
-        geo=load_geoLUT(lat,lon,geo_ref_file,subset=subset)
+        mask=read_mask(narrfiles[0],load_narr_var)
+        omask=read_mask(obs_files[0],obs_var)
+        geo=load_geoLUT(lat,lon,geo_ref_file,subset=subset,mask=mask,omask=omask)
         print("   "+str((time.time()-t1)/60)+" minutes")
         
-        for month in range(1,13):
+        for month in range(startmonth,endmonth):
             print("Month: "+str(month))
         
             print("  Loading "+forcing+" data")
@@ -491,7 +544,6 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP"):
             t1=time.time()
             # just in case one data set is longer than the other
             tmin=min(obs.data.shape[0],narr.data.shape[0])
-            print(obs.data.shape[0],narr.data.shape[0])
             obsmax=obs.data.max()
             regression=async.develop_async(hires=obs.data[:tmin,...],lowres=narr.data[:tmin,...],
                     isPrecip=(narr_var=="prate"),verbose=True,even_xy=False)
@@ -501,6 +553,9 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP"):
             t1=time.time()
             narr=read_data(outputfiles,month,read_narr_file,geo,load_narr_var,pad_length=0,subset=subset,startdate=startdate)
             output=async.apply_async(narr.data,regression,vmax=obsmax*1.2,isPrecip=(narr_var=="prate"),verbose=True)
+            if type(omask)==np.ndarray:
+                for thistime in range(output.shape[0]):
+                    output[thistime,:,:][omask]=-9999
         
             prefix='0' if month<10 else ''
             picklefile=open("_".join(["SAR",forcing,exp,res,narr_var,prefix+str(month)])+".pickle",'wb')
@@ -513,23 +568,31 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP"):
             if forcing=="NCEP":
                 resextra="_gauss"
             write_data(output,month,narr.dates,narr.lengths,obs_var,res+resextra,output_dir=output_dir)
+            
+            # trying to get rid of a weird memory leak
+            # cleanup large variables at the end of each month of processing. 
+            del narr
+            del output
+            del obs
+            gc.collect()
         
-        # add the lat and lon variables to the orignal files (should also add time?)
-        nc_addvars.main(output_dir+"BCSAR*"+res+"*.nc",copy_from_file=obs_files[0],
-                        ranges=[[subset[0],subset[1]],[subset[2],subset[3]]],
-                        vars2copy=["lon","lat"])
-        # next delete the old files
-        old_files=glob.glob(output_dir+"BCSAR*"+res+"*.nc")
-        old_files.sort()
-        for f in old_files:
-            print(f)
-            os.remove(f)
-        # then rename "added" files back to the original filenames
-        new_files=glob.glob(output_dir+"added*"+res+"*.nc")
-        new_files.sort()
-        for o,n in zip(old_files,new_files):
-            print(n,o)
-            os.rename(n,o)
+        if runmonth==None:
+            # add the lat and lon variables to the orignal files (should also add time?)
+            nc_addvars.main(output_dir+"BCSAR*"+res+"*.nc",copy_from_file=obs_files[0],
+                            ranges=[[subset[0],subset[1]],[subset[2],subset[3]]],
+                            vars2copy=["lon","lat"])
+            # next delete the old files
+            old_files=glob.glob(output_dir+"BCSAR*"+res+"*.nc")
+            old_files.sort()
+            for f in old_files:
+                print(f)
+                os.remove(f)
+            # then rename "added" files back to the original filenames
+            new_files=glob.glob(output_dir+"added*"+res+"*.nc")
+            new_files.sort()
+            for o,n in zip(old_files,new_files):
+                print(n,o)
+                os.rename(n,o)
             
         
     
@@ -541,13 +604,14 @@ if __name__ == '__main__':
         parser.add_argument('exp',action='store',nargs="?",help="Chose an experiment [e0,e1,conus,wet,dry,hot,cold]",default="e0")
         parser.add_argument('res',action='store',nargs="?",help="Chose a resolution [4km, 6km, 12km]",default="12km")
         parser.add_argument('forcing',action='store',nargs="?",help="Chose a forcing model [NCEP, NARR]",default="NCEP")
+        parser.add_argument('month',action='store',nargs="?",help="Only run this month",default=None)
         parser.add_argument('-v', '--version',action='version',
                 version='async_narr.py 1.0')
         parser.add_argument ('--verbose', action='store_true',
                 default=False, help='verbose output', dest='verbose')
         args = parser.parse_args()
     
-        exit_code = async_narr(args.var,args.exp,args.res,args.forcing)
+        exit_code = async_narr(args.var,args.exp,args.res,args.forcing,args.month)
         if exit_code is None:
             exit_code = 0
         sys.exit(exit_code)

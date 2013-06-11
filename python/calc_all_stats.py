@@ -301,7 +301,8 @@ if __name__ == '__main__':
                     default=["pr"], help="variable to test ([pr],tasmax)")
         parser.add_argument('-bc',dest="BC",nargs="?",action='store',help="Bias Corrected, or not [BC],nobc ",
                     default=["BC"])#,""])
-        bd="/glade/scratch/gutmann/usbr/hucdata/"
+        # bd="/glade/scratch/gutmann/usbr/hucdata/"
+        bd="/d2/gutmann/usbr/hucdata/"
         parser.add_argument('-huc',dest="huc",nargs="?",action='store',help="HUC file names [default= all]",
                     default=[bd+"HUC02/huc2_",bd+"HUC04/huc4_",bd+"HUC08/huc8_"])#,bd+"HUC12/huc12_"])
         parser.add_argument('-out',dest="outputdir",nargs="?",action='store',
