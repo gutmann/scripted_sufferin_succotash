@@ -9,9 +9,10 @@ def norm(lat,lon):
 
 def agg_lut(lathi,lonhi,latlo,lonlo):
     # outputlut=np.zeros((lathi.shape[0],lathi.shape[1],2))-9999
-    outputlut=np.zeros((latlo.shape[0],latlo.shape[1],2),dtype=list)
+    outputlut=np.empty((latlo.shape[0],latlo.shape[1],2),dtype=list)
     nx=lathi.shape[1]
     ny=lathi.shape[0]
+
     maxdist=((latlo[0,0]-latlo[1,1])**2 + (lonlo[0,0]-lonlo[1,1])**2)/1.9
     
     for i in range(ny):
@@ -29,9 +30,14 @@ def agg_lut(lathi,lonhi,latlo,lonlo):
             yoff,xoff=np.unravel_index(windists.argmin(),windists.shape)
             x=xoff+xmin
             y=yoff+ymin
+            if not outputlut[y,x,0]:
+                outputlut[y,x,0]=list()
+                outputlut[y,x,1]=list()
+            
             if windists[yoff,xoff]<maxdist:
-                outputlut[i,j,:]=[y,x]
-                # print(y,x,windists[yoff,xoff],maxdist)
+                outputlut[y,x,0].append(i)
+                outputlut[y,x,1].append(j)
+                
     return outputlut
             
 def aggdata(lut,data):
@@ -67,9 +73,9 @@ def agg(data1,lat,lon,geo_lut=None):
     lat,lon=norm(lat,lon)
     lat1,lon1=norm(data1.lat,data1.lon)
     
-    # if geo_lut==None:geo_lut=agg_lut(lat1,lon1,lat,lon)
+    if geo_lut==None:geo_lut=agg_lut(lat1,lon1,lat,lon)
     # return (geo_lut, aggdata(geo_lut,data1.data))
 
-    if geo_lut==None:geo_lut=regrid.load_geoLUT(lat1,lon1,lat,lon)
+    # if geo_lut==None:geo_lut=regrid.load_geoLUT(lat1,lon1,lat,lon)
     
     return (geo_lut, regrid.regrid_hi2low(data1,geoLUT=geo_lut))
