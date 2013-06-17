@@ -1,16 +1,18 @@
 import numpy as np
 
+from stat_down import regrid_hi2low as regrid
+
 def norm(lat,lon):
     if len(lat.shape)==1:
         lon,lat=np.meshgrid(lon,lat)
     return lat,lon
 
 def agg_lut(lathi,lonhi,latlo,lonlo):
-    outputlut=np.zeros((lathi.shape[0],lathi.shape[1],2))-9999
+    # outputlut=np.zeros((lathi.shape[0],lathi.shape[1],2))-9999
+    outputlut=np.zeros((latlo.shape[0],latlo.shape[1],2),dtype=list)
     nx=lathi.shape[1]
     ny=lathi.shape[0]
     maxdist=((latlo[0,0]-latlo[1,1])**2 + (lonlo[0,0]-lonlo[1,1])**2)/1.9
-    
     
     for i in range(ny):
         dists=(latlo-lathi[i,0])**2+(lonlo-lonhi[i,0])**2
@@ -33,8 +35,6 @@ def agg_lut(lathi,lonhi,latlo,lonlo):
     return outputlut
             
 def aggdata(lut,data):
-    arg
-
 
     xmins=lut[:,:,1].max(axis=0)
     ymins=lut[:,:,0].max(axis=1)
@@ -61,11 +61,15 @@ def aggdata(lut,data):
     n[n==0]=-1
     return outputdata/n
     
-
+# def load_geoLUT(lat1,lon1,lat2,lon2):
+# def regrid_hi2low(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,FillValue=1E20):
 def agg(data1,lat,lon,geo_lut=None):
     lat,lon=norm(lat,lon)
     lat1,lon1=norm(data1.lat,data1.lon)
     
-    if geo_lut==None:geo_lut=agg_lut(lat1,lon1,lat,lon)
+    # if geo_lut==None:geo_lut=agg_lut(lat1,lon1,lat,lon)
+    # return (geo_lut, aggdata(geo_lut,data1.data))
+
+    if geo_lut==None:geo_lut=regrid.load_geoLUT(lat1,lon1,lat,lon)
     
-    return (geo_lut, aggdata(geo_lut,data1.data))
+    return (geo_lut, regrid.regrid_hi2low(data1,geoLUT=geo_lut))

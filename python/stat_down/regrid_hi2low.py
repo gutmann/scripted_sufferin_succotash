@@ -8,6 +8,7 @@ def load_geoLUT(lat1,lon1,lat2,lon2):
     N2=lat2.shape
     geoLUT=np.empty((N2[0],N2[1],2),dtype=list)
     for i in range(N1[0]):
+        print(i,N1[0])
         for j in range(N1[1]):
             dists=(lat1[i,j]-lat2)**2+(lon1[i,j]-lon2)**2
             (newy,newx)=np.unravel_index(dists.argmin(), dists.shape)
