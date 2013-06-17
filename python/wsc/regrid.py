@@ -15,7 +15,7 @@ def agg_lut(lathi,lonhi,latlo,lonlo):
     for i in range(ny):
         dists=(latlo-lathi[i,0])**2+(lonlo-lonhi[i,0])**2
         y,x=np.unravel_index(dists.argmin(),dists.shape)
-        print(i,ny,y,x,lathi[i,0],lonhi[i,0],latlo[y,x],lonlo[y,x])
+        # print(i,ny,y,x,lathi[i,0],lonhi[i,0],latlo[y,x],lonlo[y,x])
         for j in range(nx):
             xmax=min(nx,x+3)
             xmin=max(0,x-3)
@@ -33,7 +33,10 @@ def agg_lut(lathi,lonhi,latlo,lonlo):
     return outputlut
             
 def aggdata(lut,data):
-    xmins=lut[:,:,0].max(axis=0)
+    arg
+
+
+    xmins=lut[:,:,1].max(axis=0)
     ymins=lut[:,:,0].max(axis=1)
     
     tmp=np.where(xmins>0)[0]
@@ -46,7 +49,7 @@ def aggdata(lut,data):
     lasty=tmp[-1]
     newny=lasty-firsty+2
 
-    print(newny,newnx)
+    # print(newny,newnx)
     outputdata=np.zeros((data.shape[0],newny,newnx))
     n=np.zeros((1,newny,newnx))
     for i in range(data.shape[1]):
@@ -59,10 +62,10 @@ def aggdata(lut,data):
     return outputdata/n
     
 
-def agg(data1,lat,lon):
+def agg(data1,lat,lon,geo_lut=None):
     lat,lon=norm(lat,lon)
     lat1,lon1=norm(data1.lat,data1.lon)
     
-    geo_lut=agg_lut(lat1,lon1,lat,lon)
+    if geo_lut==None:geo_lut=agg_lut(lat1,lon1,lat,lon)
     
-    return  geo_lut #aggdata(geo_lut,data1.data))
+    return (geo_lut, aggdata(geo_lut,data1.data))
