@@ -4,9 +4,12 @@ import numpy as np
 from bunch import Bunch
 
 def load_geoLUT(lat1,lon1,lat2,lon2):
+    """lat/lon 1 = high resolution , 2 = low resolution"""
     N1=lat1.shape
     N2=lat2.shape
     geoLUT=np.empty((N2[0],N2[1],2),dtype=list)
+    maxlat_dist=np.abs(lat2[1,0]-lat2[0,0])/1.95
+    maxlon_dist=np.abs(lon2[0,1]-lon2[0,0])/1.95
     for i in range(N1[0]):
         for j in range(N1[1]):
             dists=(lat1[i,j]-lat2)**2+(lon1[i,j]-lon2)**2
@@ -14,11 +17,15 @@ def load_geoLUT(lat1,lon1,lat2,lon2):
             if not geoLUT[newy,newx,0]:
                 geoLUT[newy,newx,0]=list()
                 geoLUT[newy,newx,1]=list()
-            geoLUT[newy,newx,0].append(i)
-            geoLUT[newy,newx,1].append(j)
+            
+            if ((np.abs(lat1[i,j]-lat2[newy,newx])<=maxlat_dist)
+                and (np.abs(lon1[i,j]-lon2[newy,newx])<=maxlon_dist)):
+                geoLUT[newy,newx,0].append(i)
+                geoLUT[newy,newx,1].append(j)
+        
     return geoLUT
 
-def regrid_hi2low(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,FillValue=1E20):
+def regrid_hi2low(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,FillValue=1E20,fast=True):
     """docstring for regrid_hi2low"""
     if geoLUT==None:
         if len(lat2.shape)==1:
@@ -39,24 +46,37 @@ def regrid_hi2low(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,FillV
     # NOTE, this might be speed up substantially by inlining C code... 
     # except that geoLUT is an array of variable length lists... 
     # not sure how weave handles that would probably have to convert to a larger array first
-    for i in range(N2[0]):
-        if (i%25)==0:
-            print(i,end=" ")
-            sys.stdout.flush()
+    if fast:
         for j in range(N2[1]):
+            if (j%10)==0:
+                print(round(j/float(N2[1])*100),end="% ")
+                sys.stdout.flush()
             for k in range(N2[2]):
                 if geoLUT[j,k,0]:
-                    curdata=data[i,geoLUT[j,k,0],geoLUT[j,k,1]]
-                    tmp=np.where(curdata<1E15)
-                    if len(tmp[0])>0:
-                        outputdata[i,j,k]=curdata[curdata<1E15].mean()
+                    curdata=data[:,geoLUT[j,k,0],geoLUT[j,k,1]]
+                    outputdata[:,j,k]=curdata.mean(axis=1)
+                else:
+                    outputdata[:,j,k]=FillValue
+    else:
+        for i in range(N2[0]):
+            if (i%25)==0:
+                print(round(i/float(N2[0])*100),end=" ")
+                sys.stdout.flush()
+            for j in range(N2[1]):
+                for k in range(N2[2]):
+                    if geoLUT[j,k,0]:
+                        curdata=data[i,geoLUT[j,k,0],geoLUT[j,k,1]]
+                        tmp=np.where(curdata<1E15)
+                        if len(tmp[0])>0:
+                            outputdata[i,j,k]=curdata[curdata<1E15].mean()
+                        else:
+                            outputdata[i,j,k]=FillValue
+                        
                     else:
                         outputdata[i,j,k]=FillValue
-                        
-                else:
-                    outputdata[i,j,k]=FillValue
-                
+    print("100.0")    
     if twoD:
+        print("2D")
         outputdata=outputdata.reshape(outputdata.shape[1:])
             
     return Bunch(data=outputdata,geo=geoLUT)
