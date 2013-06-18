@@ -78,4 +78,4 @@ def agg(data1,lat,lon,geo_lut=None):
 
     # if geo_lut==None:geo_lut=regrid.load_geoLUT(lat1,lon1,lat,lon)
     
-    return (geo_lut, regrid.regrid_hi2low(data1,geoLUT=geo_lut))
+    return (geo_lut, regrid.regrid_hi2low(data1.data,geoLUT=geo_lut))

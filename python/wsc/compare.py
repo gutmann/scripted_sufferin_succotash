@@ -32,7 +32,7 @@ def all():
     for s,r in zip(snodasdata,recondata):
         rlut,thisdata=regrid.agg(r,s.lat[latsub[0]:latsub[1]],s.lon[lonsub[0]:lonsub[1]],geo_lut=rlut)
         
-        rstat.append(recon.stats(thisdata))
+        rstat.append(recon.stats(thisdata.data))
         sstat.append(snodas.stats(s.data[:,latsub[0]:latsub[1],lonsub[0]:lonsub[1]]))
         
     return (rstat,sstat)

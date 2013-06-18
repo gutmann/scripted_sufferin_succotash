@@ -48,6 +48,7 @@ def regrid_hi2low(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,FillV
     # except that geoLUT is an array of variable length lists... 
     # not sure how weave handles that would probably have to convert to a larger array first
     if fast:
+        print("fast")
         for j in range(N2[1]):
             if (j%10)==0:
                 print(round(j/float(N2[1])*100),end="% ")
@@ -55,10 +56,12 @@ def regrid_hi2low(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,FillV
             for k in range(N2[2]):
                 if geoLUT[j,k,0]:
                     curdata=data[:,geoLUT[j,k,0],geoLUT[j,k,1]]
+                    curdata=np.ma.array(curdata,mask=(curdata==FillValue))
                     outputdata[:,j,k]=curdata.mean(axis=1)
                 else:
                     outputdata[:,j,k]=FillValue
     else:
+        print("slow")
         for i in range(N2[0]):
             if (i%25)==0:
                 print(round(i/float(N2[0])*100),end=" ")
