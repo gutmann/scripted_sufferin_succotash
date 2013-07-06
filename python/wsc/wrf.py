@@ -1,7 +1,7 @@
 import datetime
 import numpy as np
 from stat_down import myio
-
+from bunch import Bunch
 
 def stats(data):
     """Calculate the rate of melt from peak to 0
@@ -15,8 +15,8 @@ def stats(data):
     """
     melt_date=np.zeros(data.shape[1:])+999
     peak_date=np.zeros(data.shape[1:])-1
-    peak_swe=max_swe(data)
-    peak_date=np.argmax(data,axis=0) # returns first time it hits max
+    peak_swe=max_swe(data[:180,...])
+    peak_date=np.argmax(data[:180,...],axis=0) # returns first time it hits max
     melt_date=np.argmin(data,axis=0) # returns first time it hits min (0)
     
     # not sure what to do if it predicts that SWE never gets to zero...
@@ -49,6 +49,6 @@ def load(filename, startyear=2000,startdate=None):
     if startdate==None:startdate=datetime.datetime(startyear,10,1,0)
     ntimes=data.shape[0]
     
-    dates=[startdate+datetime.timedelta(i) for i in range(ntimes)]
+    dates=np.array([startdate+datetime.timedelta(i) for i in range(ntimes)])
     
     return Bunch(data=data,lat=lat,lon=lon,dates=dates)
