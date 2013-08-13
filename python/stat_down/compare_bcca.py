@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from glob import glob
+import gc
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,9 +9,9 @@ import swim_io
 import date_fun
 from bunch import Bunch
 
-bcca_search="ccsm/*.nc"
-obs_search="obs/*.nc"
-sar_search="SAR/*.nc"
+bcca_search=["ccsm/*.nc"]
+obs_search=["obs/*.nc"]
+sar_search=["SAR/*.nc"]
 
 def wet_frac(data):
     """Calculate wet day fraction over the first array axis"""
@@ -22,24 +23,44 @@ def wet_frac(data):
     
     return nwet/float(data.shape[0])
 
-def calc_stats(bcca,obs,sar):
-    """calculate basic statistics comparing to obs in annual means, Wet-day fraction, 99%"""
-    bcca_stats=Bunch(); obs_stats=Bunch(); sar_stats=Bunch()
+def calc_stats(data,mask=None):
+    """calculate basic statistics, annual means, Wet-day fraction, (99%,other...)
     
-    mask=obs[0,...]>9000
-    bcca_stats.mean=np.ma.array(np.mean(bcca,axis=0)*365.25,mask=mask)
-    obs_stats.mean=np.ma.array(np.mean(obs,axis=0)*365.25,mask=mask)
-    sar_stats.mean=np.ma.array(np.mean(sar,axis=0)*365.25,mask=mask)
+    should use stat_down.stats
+    """
+    stats=Bunch()
+    
+    if mask==None:
+        mask=data[0,...]>9000
+    stats.mean=np.ma.array(np.mean(data,axis=0)*365.25,mask=mask)
+    # stdval=np.ma.array(np.std(data,axis=0),mask=mask)
+    stats.wetfrac=np.ma.array(wet_frac(data,axis=0),mask=mask)
 
-    # bcca_stats.std=np.ma.array(np.std(bcca,axis=0),mask=mask)
-    # obs_stats.std=np.ma.array(np.std(obs,axis=0),mask=mask)
-    # sar_stats.std=np.ma.array(np.std(sar,axis=0),mask=mask)
+    return stats
     
-    bcca_stats.wetfrac=np.ma.array(wet_frac(bcca),mask=mask)
-    obs_stats.wetfrac=np.ma.array(wet_frac(obs),mask=mask)
-    sar_stats.wetfrac=np.ma.array(wet_frac(sar),mask=mask)
+def load_stats(filesearch,varname):
+    """load varname from a host of files subset to a reasonable region"""
+    filenames=glob(filesearch[0])
+    for i in range(1,len(filesearch)):
+        filenames.extend(filesearch[i])
+    filenames.sort()
+    d1=swim_io.read_nc(filenames[0],varname).data
+    outputdata=np.zeros((d1.shape[0],d1.shape[1],314),dtype=np.float32)
+    outputdata[:]=d1[:,:,:314]
+    for f in filenames[1:]:
+        d1=swim_io.read_nc(filenames[0],varname).data
+        newoutputdata=np.zeros((outputdata.shape[0]+d1.shape[0],outputdata.shape[1],outputdata.shape[2]),dtype=np.float32)
+        newoutputdata[:outputdata.shape[0],...]=outputdata
+        newoutputdata[outputdata.shape[0]:,...]=d1[:,:,:314]
+        outputdata=newoutputdata
+        gc.collect()
     
-    return Bunch(bcca=bcca_stats,obs=obs_stats,sar=sar_stats)
+    stats=calc_stats(outputdata)
+    del outputdata
+    gc.collect()
+    return stats
+        
+        
     
 def vis_stats(stats,filename="annual.png"):
     """visualize statistics"""
@@ -80,15 +101,17 @@ def vis_stats(stats,filename="annual.png"):
 def main():
     """"Compare BCCA, ARBBCA, obs"""
     print("Loading BCCA")
-    bcca=np.concatenate(swim_io.read_files(bcca_search,"pr"))
+    bcca_stats=load_stats(bcca_search,"pr")
     print("Loading Obs")
-    obs=np.concatenate(swim_io.read_files(obs_search,"Prec"))
+    obs=load_stats(obs_search,"Prec")
     print("Loading AR-BCCA")
-    sar=np.concatenate(swim_io.read_files(sar_search,"Prec"))
-    dates=date_fun.mjd2date(np.arange(bcca.shape[0])+date_fun.date2mjd(1940,1,1,0,0))
+    sar=load_stats(sar_search,"Prec")
     
-    print("Calculating Statistics")
-    stats=calc_stats(bcca,obs,sar)
+    # dates=date_fun.mjd2date(np.arange(bcca.shape[0])+date_fun.date2mjd(1940,1,1,0,0))
+    
+    stats=Bunch(bcca=bcca_stats,obs=obs,sar=sar)
+    # print("Calculating Statistics")
+    # stats=calc_stats(bcca,obs,sar)
     print("Visualizing...")
     vis_stats(stats)
 

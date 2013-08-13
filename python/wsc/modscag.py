@@ -134,7 +134,7 @@ def load(filename,startyear=2008):
     ntimes=d.size/nlon/nlat #366
     dates=[startdate+datetime.timedelta(i) for i in range(ntimes)]
     
-    dateselectfile="/".join(filename.split("/")[:-1])+"dateselect.txt"
+    dateselectfile="/".join(filename.split("/")[:-1])+"/dateselect.txt"
     gooddates=read_good_days(dateselectfile)
     
     # fill(data)

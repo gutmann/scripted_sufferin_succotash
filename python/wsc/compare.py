@@ -20,51 +20,70 @@ def load_wrf(years):
                             lat=all_data.lat,lon=all_data.lon,dates=all_data.dates[curstart:curend+1]))
     return wrfdata
 
-def compare_sca():
-     wrf_data=load_wrf([2008])
-     modsca=modscag.load("MODSCAG/fsca2008.dat")
-     sca_grid=scadata.data
-     wsca=wrf.sca(wrf_data[0].data[:,latsub[0]:latsub[1],lonsub[0]:lonsub[1]]/1000.0)
-
-     geo=wrf_data[0]
-     sca_lut=None
-     latsub=np.where((geo.lat>=comparison_domain.lat[0]) &
-                     (geo.lat<=comparison_domain.lat[1]))[0]
-     latsub=[latsub.min(),latsub.max()]
-     lonsub=np.where((geo.lon>=comparison_domain.lon[0]) &
-                     (geo.lon<=comparison_domain.lon[1]))[1]
-     lonsub=[lonsub.min(),lonsub.max()]
-     
-     sca_lut,scadata=regrid.agg(modsca,
-                    geo.lat[latsub[0]:latsub[1],lonsub[0]:lonsub[1]],
-                    geo.lon[latsub[0]:latsub[1],lonsub[0]:lonsub[1]],
-                    geo_lut=sca_lut)
-
-     for i in range(len(modsca.gooddates.indices):                           
-         plt.clf()
-         plt.subplot(121)
-         plt.imshow(wsca[modsca.gooddates.indices[i],:,:],vmax=1.1)
-         plt.title(modsca.gooddates.dates[i])
-         plt.subplot(122)
-         plt.imshow(sca_grid[modsca.gooddates.indices[i],:,:],vmax=1.1)
-         plt.title(modsca.gooddates.dates[i])
-         plt.draw()
-         plt.savefig("SCA_comparison_{0:03}.png".format(i))
-
-
-     thresholds=[0.1,0.5,0.9]
-     for t1 in thresholds:
-         wrf_mid_z=np.zeros(len(modsca.gooddates.indices))
-         sca_mid_z=np.zeros(len(modsca.gooddates.indices))
-         for i in range(len(modsca.gooddates.indices)):
-             wrf_pts=np.where((wsca[modsca.gooddates.indices[i],:,:]>=t1-0.05)&
-                              (wsca[modsca.gooddates.indices[i],:,:]<=t1+0.05))
-             if len(wrf_pts[0])>0:
-                 wrf_mid_z[i]=zsub[wrf_pts].mean()
-             sca_pts=np.where((sca_grid[modsca.gooddates.indices[i],:,:]>=t1-0.05)&
-                              (sca_grid[modsca.gooddates.indices[i],:,:]<=t1+0.05))
-             if len(sca_pts[0])>0:
-                 sca_mid_z[i]=zsub[sca_pts].mean()
+def sca():
+    """Compare SCA between MODSCAG and WRF
+    
+    Assumes a directory structure of 
+        wrf/SWE_daily.nc
+        MODSCAG/fsca2008.dat
+                dateselect.txt
+    """
+    wrfdata=load_wrf([2008])
+    modsca=modscag.load("MODSCAG/fsca2008.dat")
+    
+    geo=wrfdata[0]
+    latsub=np.where((geo.lat>=comparison_domain.lat[0]) & (geo.lat<=comparison_domain.lat[1]))[0]
+    latsub=[latsub.min(),latsub.max()]
+    lonsub=np.where((geo.lon>=comparison_domain.lon[0]) & (geo.lon<=comparison_domain.lon[1]))[1]
+    lonsub=[lonsub.min(),lonsub.max()]
+    
+    sca_lut=None
+    sca_lut,scadata=regrid.agg(modsca,
+                                geo.lat[latsub[0]:latsub[1],lonsub[0]:lonsub[1]],
+                                geo.lon[latsub[0]:latsub[1],lonsub[0]:lonsub[1]],
+                                geo_lut=sca_lut)
+                                
+    wsca=wrf.sca(wrfdata[0].data[:,latsub[0]:latsub[1],lonsub[0]:lonsub[1]]/1000.0)
+                                
+    for i in range(len(modsca.gooddates.indices)):
+        plt.clf()
+        plt.subplot(121)
+        plt.imshow(wsca[modsca.gooddates.indices[i],:,:],vmax=1.1)
+        plt.title(modsca.gooddates.dates[i]);
+        plt.subplot(122)
+        plt.imshow(sca_grid[modsca.gooddates.indices[i],:,:],vmax=1.1)
+        plt.title(modsca.gooddates.dates[i]);
+        plt.draw()
+        plt.savefig("SCA_comparison_{0:03}.png".format(i))
+    
+    z=swim_io.read_nc("wrf/4km_wrf_output.nc","HGT").data
+    zsub=z[0,latsub[0]:latsub[1],lonsub[0]:lonsub[1]]
+    
+    thresholds=[0.1,0.5,0.9]
+    for t1 in thresholds:
+        wrf_mid_z=np.zeros(len(modsca.gooddates.indices))
+        sca_mid_z=np.zeros(len(modsca.gooddates.indices))
+        for i in range(len(modsca.gooddates.indices)):
+            wrf_pts=np.where((wsca[modsca.gooddates.indices[i],:,:]>=t1-0.05)&(wsca[modsca.gooddates.indices[i],:,:]<=t1+0.05))
+            if len(wrf_pts[0])>0:
+                wrf_mid_z[i]=zsub[wrf_pts].mean()
+            sca_pts=np.where((sca_grid[modsca.gooddates.indices[i],:,:]>=t1-0.05)&(sca_grid[modsca.gooddates.indices[i],:,:]<=t1+0.05))
+            if len(sca_pts[0])>0:
+                sca_mid_z[i]=zsub[sca_pts].mean()
+    
+        plt.clf()
+        plt.plot(modsca.gooddates.dates,wrf_mid_z,'.',label="WRF")
+        plt.plot(modsca.gooddates.dates,sca_mid_z,'.',label="MODSCAG")
+        plt.title("Mean elevation at {0}% SCA".format(t1*100))
+        plt.legend(loc=4)
+        plt.ylim(1500,4000)
+        plt.draw()
+        plt.savefig("z_sca_{}.png".format(t1*100))
+    
+        
+            
+    
+    
 
 def all():
     """Compare all SWE products"""
