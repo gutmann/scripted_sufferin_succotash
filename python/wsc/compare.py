@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import datetime
 from glob import glob
 
@@ -28,7 +29,9 @@ def sca():
         MODSCAG/fsca2008.dat
                 dateselect.txt
     """
+    print("Loading WRF data")
     wrfdata=load_wrf([2008])
+    print("Loading MODSCAG data")
     modsca=modscag.load("MODSCAG/fsca2008.dat")
     
     geo=wrfdata[0]
@@ -37,6 +40,7 @@ def sca():
     lonsub=np.where((geo.lon>=comparison_domain.lon[0]) & (geo.lon<=comparison_domain.lon[1]))[1]
     lonsub=[lonsub.min(),lonsub.max()]
     
+    print("Regridding...")
     sca_lut=None
     sca_lut,scadata=regrid.agg(modsca,
                                 geo.lat[latsub[0]:latsub[1],lonsub[0]:lonsub[1]],
@@ -44,21 +48,36 @@ def sca():
                                 geo_lut=sca_lut)
                                 
     wsca=wrf.sca(wrfdata[0].data[:,latsub[0]:latsub[1],lonsub[0]:lonsub[1]]/1000.0)
-                                
+    
+    print("visualizing good images")
     for i in range(len(modsca.gooddates.indices)):
         plt.clf()
         plt.subplot(121)
         plt.imshow(wsca[modsca.gooddates.indices[i],:,:],vmax=1.1)
         plt.title(modsca.gooddates.dates[i]);
         plt.subplot(122)
-        plt.imshow(sca_grid[modsca.gooddates.indices[i],:,:],vmax=1.1)
+        plt.imshow(scadata.data[modsca.gooddates.indices[i],:,:],vmax=1.1)
         plt.title(modsca.gooddates.dates[i]);
         plt.draw()
         plt.savefig("SCA_comparison_{0:03}.png".format(i))
+
+    print("visualizing all images")
+    for i in range(wsca.shape[0]):
+        plt.clf()
+        plt.subplot(121)
+        plt.imshow(wsca[i,:,:],vmax=1.1)
+        plt.title(modsca.dates[i]);
+        plt.subplot(122)
+        plt.imshow(scadata.data[i,:,:],vmax=1.1)
+        plt.title(modsca.dates[i]);
+        plt.draw()
+        plt.savefig("complete_SCA_comparison_{0:03}.png".format(i))
+
     
     z=swim_io.read_nc("wrf/4km_wrf_output.nc","HGT").data
     zsub=z[0,latsub[0]:latsub[1],lonsub[0]:lonsub[1]]
-    
+
+    print("visualizing sca=f(z)")
     thresholds=[0.1,0.5,0.9]
     for t1 in thresholds:
         wrf_mid_z=np.zeros(len(modsca.gooddates.indices))
@@ -131,3 +150,6 @@ def all():
     
     
     return (rstat,sstat,wstat)
+
+if __name__ == '__main__':
+    sca()
