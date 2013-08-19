@@ -34,11 +34,16 @@ def max_swe(data):
     return data.max(axis=0)
 
 
+def sca(data,maxSWE=0.08):
+    tmp=np.where((data>0)&(data<maxSWE))
+    sca=np.zeros(data.shape)
+    sca[data>0.08]=1
+    if len(tmp[0])>0:
+        sca[tmp]=1-(np.exp(-2.6*data[tmp]/maxSWE)-(data[tmp]/maxSWE)*np.exp(-2.6))
+    return sca    
 
 def load(filename, startyear=2000,startdate=None):
     """Load WRF SWE data from a file
-    
-    
     """
     wrf_dir="/".join(filename.split("/")[:-1])
     geo_file=wrf_dir+"/4km_wrf_output.nc"

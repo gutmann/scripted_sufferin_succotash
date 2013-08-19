@@ -2,14 +2,24 @@
 from scipy.weave import converters
 from scipy import weave
 import numpy as np
+# def smoothit(data,window):
+#   sz=data.shape
+#   outputdata=np.zeros(data.shape)
+#   for i in range(sz[0]):
+#     for j in range(sz[1]):
+#       outputdata[i,j]=np.mean(data[max(0,i-window):min(sz[0],i+window),max(0,j-window):min(sz[1],j+window)])
+#       
+#   return outputdata
+
 # surprisingly, this only cuts runtime in half compared to three python for loops around an np.mean
 # could be re-written to updated the mean each window j-step instead of recomputing it entirely...
+
 def smooth(data,windowsize):
     data2=data.copy()
     nz,nx,ny = data.shape
 
     code = """
-            #line 10 "fast_mean.py"
+            #line 22 "fast_mean.py"
             double tmp, n;
             n=windowsize*windowsize;
             for (int k=0;k<nz;k++){
@@ -55,7 +65,7 @@ def fast_smooth(data,windowsize):
     nz,nx,ny = data.shape
 
     code = """
-            #line 58 "fast_mean.py"
+            #line 68 "fast_mean.py"
             double n,cursum,lastsum,nextsum;
             int j;
             n=(windowsize*2+1)*(windowsize*2+1);

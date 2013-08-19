@@ -45,7 +45,7 @@ def main():
     """docstring for main"""
     files=glob("output/swim*")
     files.sort()
-    startdate=datetime.datetime(2006,1,1,0,0)
+    startdate=datetime.datetime(2005,9,1,0,0)
     dates=[startdate+datetime.timedelta(i/24.0) for i in range(len(files))]
     plt_data(data=None,files=files,dates=dates)
 
