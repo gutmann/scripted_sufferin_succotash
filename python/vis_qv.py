@@ -18,14 +18,16 @@ def plt_data(data,files,dates):
     minval=0.0005
     period=365.25
     offset=20
-    max_range=0.0055
+    max_range=0.005
     max_mean=0.0095
     
-    for i in range(len(files)):
+    for i in range(len(files[:480])):
         plt.clf();
         data=io.read_nc(files[i],"qv").data
         doy=date_fun.datetime2mjd([dates[i]])-date_fun.date2mjd(dates[i].year,1,1,0,0)
-        maxval=np.cos((doy-offset)/period)*max_range+max_mean
+        print(doy, dates[i])
+        maxval=np.cos((doy-offset-period/2)/period*2*np.pi)*max_range+max_mean
+        print(maxval)
         plt.imshow(data[:,0,:],vmin=minval,vmax=maxval,cmap=plt.cm.Blues)
         # else:
         #     plt.imshow(data[i][:,0,:],vmin=minval,vmax=maxval+i*maxvalslope,cmap=plt.cm.Blues)
