@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+
+# Note, this file is only minor tweaks from calc_all_stats.py specific to WRF data
+# for questions read calc_all_stats
+
 import argparse
 import traceback
 import sys
