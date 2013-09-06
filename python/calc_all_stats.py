@@ -15,22 +15,42 @@ from nc_reader import NC_Reader
 from bunch import Bunch
 
 def load_huc_data(hucfilename,geosubset):
+    """Load a grid of HUC data from hucfilename within geosubset bounds"""
+    
+    # use the NC_Reader class to facilitate subseting from lat/lon data
     hucreader=NC_Reader(None,filelist=[hucfilename],
                     geo_subset=geosubset,
                     readvars=["data"],ntimes=1,
                     latvar="lat",lonvar="lon")
+    # just read the first element from the reader
     hucdata=hucreader.next()[0]
+    # close the reader now that we are done with it. 
     hucreader.close()
     return hucdata
 
 
 def load_data(files,varname,extra,res,minval=-100,maxval=500):
+    """Load data for varname in from all files matching the geographic area defined in extra
+    
+    files = a list of filenames to load
+    varname = the name of the variable to load from those files
+    extra = an arbitrary list of information
+        [2]=geographic subset to use  (e.g. [latmin,latmax,lonmin,lonmax])
+            geosubset=[25,53,-124.7,-67] #CONUS
+            geosubset=[35,43,-112.8,-101.7] # subdomain
+        [4]=hucfile to aggregate to (e.g. huc2 data on a grid)
+        [5]=geographic file to match lat/lon from (e.g. WRF grid vs Maurer grid)
+    
+    Returns a structure containing the gridded dataset and the HUC aggregated data if appropriate    
+    """
     
     hucfilename=extra[4]
     geosubset=extra[2]
     geo_matchfile=extra[5]
     files.sort()
+    # if we don't have a geomatchfile then use nearest neighbor resampling
     usenn=(geo_matchfile==None)
+    # use the NC_Reader class to facilitate grid matching and subsetting as necessary
     reader=NC_Reader(None,filelist=files,
                     nn=usenn, bilin=(not usenn),
                     geo_subset=geosubset,
@@ -38,9 +58,12 @@ def load_data(files,varname,extra,res,minval=-100,maxval=500):
                     readvars=[varname],ntimes=365,
                     latvar="lat",lonvar="lon",
                     glatvar="lat",glonvar="lon")
+                    
+    # load huc data before actually reading the data in
     outputdata=[]
     hucnames=[]
     if hucfilename:
+        # if there are more than one hucfile to match iterate over them
         if type(hucfilename==list):
             hucdata=[]
             for f in hucfilename:
@@ -48,23 +71,26 @@ def load_data(files,varname,extra,res,minval=-100,maxval=500):
                     f+=res+".nc"
                 hucdata.append(load_huc_data(f,geosubset))
                 hucnames.append(f.split('/')[-1].split("_")[0])
+        # else just load this hucfile
         else:
             hucdata=[load_huc_data(hucfilename,geosubset)]
             f=hucfilename
             if f[-3:]!=".nc":
                 f+=res+".nc"
             hucnames.append(f.split('/')[-1].split("_")[0])
-        
-    huclist=[]
+    
+    # now read the data in from the reader
     for data in reader:
         shp=data[0].shape
         data=np.ma.array(data,mask=( (~np.isfinite(data)) | (data>1E10)))
         outputdata.append(data[0].reshape((1,shp[0],shp[1])))
     outputdata=np.concatenate(outputdata,axis=0)
     reader.close()
+    
     # remove any possible bad values (e.g. -9999)
     cleanup(outputdata,minval=minval,maxval=maxval)
 
+    # finally aggreate to HUC shapes if necessary
     aggoutdata=[]
     huclist=[]
     if hucfilename:
@@ -81,9 +107,18 @@ def load_data(files,varname,extra,res,minval=-100,maxval=500):
             huclist.append(aggdata.hucs)
         
     print(outputdata.shape)
+    # return a structure containing the data on the original grid (data) 
+    # and the huc shapes (aggdata) as well as the corresponding list of hucs
     return Bunch(data=outputdata,aggdata=aggoutdata,hucs=huclist,hucnames=hucnames)
 
 def calc_year_start_dates(filenames):
+    """Calculate the starting points of each year for all files in filenames
+    
+    based on the filename, calculate the year of the first file and go from there. 
+    A better way to do this would be to read the actual time data from the files (if/when it exists)
+    or at least read the number of data points in each file, but that is tricky with monthly vs annual files. """
+    
+    # just a stupid catch for WRF data that start in Oct. 1 instead of Jan 1
     if re.match("added_regridded_daily_.*",filenames[0].split("/")[-1]):
         year1=np.float(filenames[0].split(".")[-2][-4:])
         wrfoffset=92
@@ -99,6 +134,16 @@ def calc_year_start_dates(filenames):
     return np.floor(np.arange((year1%4.0)/4,365*len(filenames),365.25))
 
 def temp_stats(names,data1,data2,info):
+    """Calculate temperature statistics
+    
+    names = a list of dataset names
+    data1 = a list of tmax datasets
+    data2 = a list of tmin datasets
+    info = a structure with 
+            output_base = output filename 'prefix' 
+                if it includes 'annual' then additional annual statistics are calculated
+            year_starts = indicies into tmin/tmax for the starting point of each year
+                    used to calculate e.g. internanual variability, growing season length, etc"""
     for n,tmax,tmin in zip(names,data1,data2):
         out=info.output_base+"_"+n
         tave=(tmax+tmin)/2
@@ -129,6 +174,21 @@ def temp_stats(names,data1,data2,info):
             io.write(out+"_frostdays",frostdays)
 
 def precip_stats(names,data,info):
+    """Calculate precipitation statistics
+    
+    names = a list of dataset names
+    data = a list of precipitation datasets
+    info = a structure with 
+            output_base = output filename 'prefix' 
+                if it includes 'annual' then additional annual statistics are calculated
+            year_starts = indicies into tmin/tmax for the starting point of each year
+                    used to calculate e.g. internanual variability, growing season length, etc
+            precip_threshold = minimum threshold to count as a wet day (e.g. 0, 1, 0.1mm)
+            period = length of time period being evaluated in days e.g. for annual=365.25 for monthly~=30
+         for extreme events:
+            nday_lengths = list of days in aggregation periods for extreme events e.g. 1,2,3 day total
+            distributionname = a string for the type of distribution function to use calculating extreme event
+                'gamma', 'exponential', or 'weibull' """
     for n,d in zip(names,data):
         out=info.output_base+"_"+n
         print(out)
@@ -152,6 +212,9 @@ def precip_stats(names,data,info):
         hist=np.vstack(stats.histogram(d))
         io.write(out+"_histogram",hist)
         
+        print("WARNING: NOT CALCULATING EXTREME EVENTS")
+        print("WARNING: NOT CALCULATING EXTREME EVENTS")
+        # commented out for now because extreme events take a long time to calculate
         # if re.match(".*annual",n):
         #     for ndays in info.nday_lengths:
         #         data2test=d[ndays:,...].copy()
@@ -173,19 +236,29 @@ def cleanup(data,minval=-999,maxval=1e5):
             data[i,tmp[0],tmp[1]]=data[i-1,tmp[0],tmp[1]]
     
 def calc_dates(files,ntimes):
+    """Calcualte the corresponding dates for a given dataset
+    
+    Kind of a hack around multiple file / time / date structures
+    """
+    # for WRF data
     if re.match("added_regridded_daily_.*",files[0].split("/")[-1]):
         year1=np.float(files[0].split(".")[-2][-4:])
         mjd1=date_fun.date2mjd(year1-1,10,1,12,0,0)
         mjd=mjd1+np.arange(ntimes)
         dates=date_fun.mjd2date(mjd)
         return Bunch(year=dates[:,0],month=dates[:,1],day=dates[:,2])
+    # for one set of SD data
     try:
         year1=files[0].split(".")[-2]
         if len(year1)>4:
             year1=year1.split("_")[-2]
         year1=float(year1)-1
+    # for another set of SD data
     except IndexError:
         year1=files[0].split(".")[-3]
+    
+    # once we have the starting year, calculate all other years as modified julian day
+    # and convert back to Year, Month, Day dates
     year1=int(year1)
     mjd1=date_fun.date2mjd(year1,1,1,12,0,0)
     mjd=mjd1+np.arange(ntimes)
@@ -205,22 +278,30 @@ def calc_stats(files,v,output_base,info,extra):
                    period=365.25)
 
     print("Loading Data")
-    # load data from files assumes you can store all data in memory
+    # load data from files *assumes you can store all data in memory*
+    # specifies different valid ranges for different variables
     if v=="pr":
         data=load_data(files,v,extra,metadata.resolution,minval=0,maxval=300)
     else:
         data=load_data(files,v,extra,metadata.resolution,minval=-60,maxval=100)
+    # convert data structures to lists so that HUC and full_res can be processed together
     alldata=data.aggdata
     alldata.append(data.data)
     allnames=data.hucnames
     allnames.append("full_res")
     if v=="tasmax":
+        # if we just loaded tmax we also need to load tmin
+        # first convert filenames
         files2=[f.replace("tasmax","tasmin") for f in files]
         files2=[f.replace("tmax","tmin") for f in files2]
+        # now load data2 (tmin)
         data2=load_data(files2,"tasmin",extra,metadata.resolution,minval=-60,maxval=100)
+        # similarly aggregate full_res and HUC datasets
         alldata2=data2.aggdata
         alldata2.append(data2.data)
+        
         # enforce Tmax>Tmin if not reverse them
+        # this may actually make data look better than they are, but it is common practice. 
         for a1,a2 in zip(alldata,alldata2):
             tmp=np.where(a1<a2)
             if len(tmp[0])>0:
@@ -240,6 +321,7 @@ def calc_stats(files,v,output_base,info,extra):
     # ---------- Calculate Monthly values --------------
     monthlength=[31,28.25,31,30,31,30,31,31,30,31,30,31]
     for month in range(12):
+        # subset data to the current month we are processing
         curtimes=np.where(dates.month==month+1)[0]
         newnames=[oldname+"_month{0:02}".format(month+1) for oldname in allnames]
         newdata=[olddata[curtimes,...] for olddata in alldata]
