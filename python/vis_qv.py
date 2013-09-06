@@ -25,9 +25,9 @@ def plt_data(data,files,dates):
         plt.clf();
         data=io.read_nc(files[i],"qv").data
         doy=date_fun.datetime2mjd([dates[i]])-date_fun.date2mjd(dates[i].year,1,1,0,0)
-        print(doy, dates[i])
+        print(dates[i])
         maxval=np.cos((doy-offset-period/2)/period*2*np.pi)*max_range+max_mean
-        print(maxval)
+        # print(maxval)
         plt.imshow(data[:,0,:],vmin=minval,vmax=maxval,cmap=plt.cm.Blues)
         # else:
         #     plt.imshow(data[i][:,0,:],vmin=minval,vmax=maxval+i*maxvalslope,cmap=plt.cm.Blues)
