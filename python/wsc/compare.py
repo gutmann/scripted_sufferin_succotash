@@ -110,7 +110,7 @@ def all():
     
     print("Loading WRF data")
     wrfdata=load_wrf(years)
-    junk=wrf.stats(wrfdata[0].data)
+    # junk=wrf.stats(wrfdata[0].data)
     snodasdata=[]
     recondata=[]
     print("Loading recon and snodas data")
