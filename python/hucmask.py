@@ -13,9 +13,9 @@ from stat_down import myio as io
 
 def load_shapes(filename):
     """Read in all Shape Records from a given shapefile"""
-	shp=shapefile.Reader(filename)
-	shprecs=shp.shapeRecords()
-	return shprecs
+    shp=shapefile.Reader(filename)
+    shprecs=shp.shapeRecords()
+    return shprecs
 
 def load_geo(filename,latvar=None,lonvar=None):
     """Load Geographic (lat/lon coords) from a netCDF file
@@ -60,14 +60,14 @@ def write_file(filename,data,lat,lon):
     io.write(filename,data.astype("d"),dtype='d',lat=lat,lon=lon)
 
 
-def mark_poly(data,poly,lat,lon,code_position):
+def mark_poly(data,poly,lat,lon,code_position,divider):
     """find all data points that are in a given polygon and mark them with the current HUC
     data = grid to mark
     poly = a shapefile polygon dataset
     lat,lon = 2d grids of latitude and longitude
     code_position = index into the polygon record info that stores the HUC code
     """
-    polynumber=poly.record[code_position]
+    polynumber=int(np.floor(poly.record[code_position]/divider))
     # the bounding box to VASTLY speed up calculations
     bbox=poly.shape.bbox
     # we need to search each part independantly
@@ -86,7 +86,8 @@ def mark_poly(data,poly,lat,lon,code_position):
         # mark those points with this HUC code
         data[inbox[0][internalpoints],inbox[1][internalpoints]]=polynumber
 
-def main(geo_file,poly_file,outputfilename):
+def main(geo_file,poly_file,outputfilename,hucdivider=1):
+    print(hucdivider)
     print("Loading Shapefile")
     shapes=load_shapes(poly_file)
     print("Loading Geographic data")
@@ -101,7 +102,7 @@ def main(geo_file,poly_file,outputfilename):
         print("Progress={0}/{1}       ".format(i, len(shapes)),end="\r")
         sys.stdout.flush()
         # here is where we do the actual work
-        mark_poly(outputdata,shapes[i],lat,lon,code_position)
+        mark_poly(outputdata,shapes[i],lat,lon,code_position,hucdivider)
     print("\nFinished")
     write_file(outputfilename,outputdata,lat,lon)
     
@@ -109,11 +110,21 @@ if __name__ == '__main__':
     # stupidly simple commandline processing,
     # use argparse if we need more options in the future. 
     try:
-        main(sys.argv[1],sys.argv[2],sys.argv[3])
+        if len(sys.argv)==4:
+            main(sys.argv[1],sys.argv[2],sys.argv[3])
+        elif len(sys.argv)==5:
+            main(sys.argv[1],sys.argv[2],sys.argv[3],int(sys.argv[4]))
+        elif len(sys.argv)==2:
+            if (sys.argv[1]=="-h") or (sys.argv[1]=="--help"):
+                raise(Exception)
+            else:
+                raise(KeyError)
+        else:
+            raise(KeyError)
     except Exception as e:
         print(e)
         print("USAGE:")
-        print("""  hucmask.py <rasterfilename.nc> <shapefilename.shp> <outputfilename>
+        print("""  hucmask.py <rasterfilename.nc> <shapefilename.shp> <outputfilename> [divisor]
         
         rasterfile must have lat/lon, latitude/longitude, or XLAT/XLONG variables
         shapefile needs an associated dbf file in the same directory
