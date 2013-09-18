@@ -127,6 +127,10 @@ def _write4d(NCfile,data,varname="data",units=None,dtype='f',dims=('t','z','y','
 
 
 def addvar(NCfile,data,varname,dims,dtype='f',attributes=None):
+    for i,d in enumerate(dims):
+        if not(d in NCfile.dimensions):
+            NCfile.create_dimension(d,data.shape[i])
+            
     NCfile.create_variable(varname,dtype,dims)
     NCfile.variables[varname][:]=data.astype(dtype)
     if attributes:

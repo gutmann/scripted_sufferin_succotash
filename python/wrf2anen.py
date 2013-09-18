@@ -21,6 +21,8 @@ elif res==36:
 
 def write_file(filename,inputnc,variable):
     """write data from data structure into file"""
+    filename.replace("4km","hires")
+    filename.replace("36km","lores")
     NCfile=Nio.open_file(filename,"w",format="nc")
     # create all dimensions we need
     NCfile.create_dimension('Time', None)
@@ -159,6 +161,10 @@ def main(variable,output_location="./",filestart=0,fileend=None,verbose=False):
         ntimes=nc_data.variables[variable].shape[0]
         # read the main data in
         curdata[i:i+ntimes,...]=nc_data.variables[variable][:,:nz,y1:y2,x1:x2]
+        if res==36:
+            if f!=files[-1]:
+                ntimes-=1
+            
         # times/character arrays are awkward to read, there is probably a better way? 
         for t in range(ntimes):
             times[i+t]="".join(nc_data.variables["Times"][t,:])
@@ -235,7 +241,7 @@ if __name__ == '__main__':
         else:
             # this hadn't really been debugged... it might work? 
             # process nfiles at a time still takes a while but memory requirements are lower and you can see output as you go
-            # but you have to cat the output files together at the end. 
+            # but you have to nccat the output files together at the end. 
             exit_code=1
             total_files=len(glob(wrf_location+wrfsearch))
             for i in range(0,total_files,nfiles):
