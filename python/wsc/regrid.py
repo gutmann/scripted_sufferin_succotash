@@ -9,6 +9,7 @@ def norm(lat,lon):
 
 def agg_lut(lathi,lonhi,latlo,lonlo):
     # outputlut=np.zeros((lathi.shape[0],lathi.shape[1],2))-9999
+    print("Computing Geographic Look Up Table")
     outputlut=np.empty((latlo.shape[0],latlo.shape[1],2),dtype=list)
     nx=lathi.shape[1]
     ny=lathi.shape[0]

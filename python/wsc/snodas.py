@@ -3,6 +3,8 @@ import datetime
 import numpy as np
 from bunch import Bunch
 
+FILLVALUE=-9999
+
 def stats(data):
     """Calculate the rate of melt from peak to 0
     
@@ -27,11 +29,31 @@ def stats(data):
     melt_time[melt_time<=0]=1
     
     return Bunch(rate=peak_swe/melt_time,peak=peak_swe,melt_time=melt_time,melt_date=melt_date)
-        
+    
 
 def max_swe(data):
     """Calculate the maximum SWE at each point"""
     return data.max(axis=0)
+
+def fill_first(data):
+    """Fill in the first time slice in data with the first non-missing value"""
+    tmp=np.where(data[0,...]==FILLVALUE)
+    for y,x in zip(tmp[0],tmp[1]):
+        good_values=np.where(data[:,y,x]!=FILLVALUE)
+        if len(good_values[0])>0:
+            data[0,y,x]=data[good_values[0][0],y,x]
+    
+
+def fill_missing(data):
+    """Fill in missing (-9999) data using previous value"""
+    
+    print("Filling in missing values")
+    fill_first(data)
+    for i in range(1,data.shape[0]):
+        tmp=np.where(data[i,...]==FILLVALUE)
+        if len(tmp[0])>0:
+            data[i,...][tmp]=data[i-1,...][tmp]
+
 
 
 # Assumes the following .ctl file
@@ -45,7 +67,7 @@ def max_swe(data):
 # VARS 1
 # swe 0 99 Snow Water Equivalant (Unit: meter); Snapshot at 0600UTC; Arbitrarily assigned to 0000UTC of the same day.
 # ENDVARS
-def load(filename,startyear=2004,startdate=None):
+def load(filename,startyear=2004,startdate=None,fill=True):
     """Load a SNODAS SWE file
     
     Assumes a flat binary file as described above, but calculates the number of days present
@@ -67,5 +89,10 @@ def load(filename,startyear=2004,startdate=None):
     ntimes=ntimes=d.size/nlon/nlat
     dates=[startdate+datetime.timedelta(i) for i in range(ntimes)]
     
-    return Bunch(data=d.reshape((ntimes,nlat,nlon)),lat=lat,lon=lon,dates=dates)
+    d=d.reshape((ntimes,nlat,nlon))
+    
+    if fill:
+        fill_missing(d)
+    
+    return Bunch(data=d,lat=lat,lon=lon,dates=dates)
     

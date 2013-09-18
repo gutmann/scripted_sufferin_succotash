@@ -43,12 +43,11 @@ def regrid_hi2low(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,FillV
     N=data.shape
     outputdata=np.empty((N[0],geoLUT.shape[0],geoLUT.shape[1]))
     N2=outputdata.shape
-    print("processing...")
+    print("Regridding...")
     # NOTE, this might be speed up substantially by inlining C code... 
     # except that geoLUT is an array of variable length lists... 
     # not sure how weave handles that would probably have to convert to a larger array first
     if fast:
-        print("fast")
         for j in range(N2[1]):
             if (j%10)==0:
                 print(round(j/float(N2[1])*100),end="% ")
@@ -61,7 +60,6 @@ def regrid_hi2low(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,FillV
                 else:
                     outputdata[:,j,k]=FillValue
     else:
-        print("slow")
         for i in range(N2[0]):
             if (i%25)==0:
                 print(round(i/float(N2[0])*100),end=" ")
