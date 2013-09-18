@@ -1,0 +1,6 @@
+#!/bin/bash
+lsload >testfileload_data 
+grep `hostname` testfileload_data
+head -1 testfileload_data 
+grep yslogin testfileload_data 
+rm testfileload_data

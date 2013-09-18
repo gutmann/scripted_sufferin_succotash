@@ -85,6 +85,7 @@ def _write1d(NCfile,data,varname="data",units=None,dtype='f',dims=('x',),attribu
 
 def _write2d(NCfile,data,varname="data",units=None,dtype='f',dims=('y','x'),attributes=None):
     (ny,nx)=data.shape
+    if dims[0]=="time":ny=0
     NCfile.create_dimension(dims[1], nx)
     NCfile.create_dimension(dims[0], ny)
     NCfile.create_variable(varname,dtype,dims)
@@ -97,6 +98,7 @@ def _write2d(NCfile,data,varname="data",units=None,dtype='f',dims=('y','x'),attr
 
 def _write3d(NCfile,data,varname="data",units=None,dtype='f',dims=('z','y','x'),attributes=None):
     (nz,ny,nx)=data.shape
+    if dims[0]=="time":nz=0
     NCfile.create_dimension(dims[2], nx)
     NCfile.create_dimension(dims[1], ny)
     NCfile.create_dimension(dims[0], nz)
@@ -110,6 +112,7 @@ def _write3d(NCfile,data,varname="data",units=None,dtype='f',dims=('z','y','x'),
 
 def _write4d(NCfile,data,varname="data",units=None,dtype='f',dims=('t','z','y','x'),attributes=None):
     (nt,nz,ny,nx)=data.shape
+    if dims[0]=="time":nt=0
     NCfile.create_dimension(dims[3], nx)
     NCfile.create_dimension(dims[2], ny)
     NCfile.create_dimension(dims[1], nz)
@@ -124,6 +127,10 @@ def _write4d(NCfile,data,varname="data",units=None,dtype='f',dims=('t','z','y','
 
 
 def addvar(NCfile,data,varname,dims,dtype='f',attributes=None):
+    for i,d in enumerate(dims):
+        if not(d in NCfile.dimensions):
+            NCfile.create_dimension(d,data.shape[i])
+            
     NCfile.create_variable(varname,dtype,dims)
     NCfile.variables[varname][:]=data.astype(dtype)
     if attributes:

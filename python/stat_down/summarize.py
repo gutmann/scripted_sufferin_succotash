@@ -68,6 +68,9 @@ scales=["full_res","huc8","huc4","huc2"]
 times=["annual","month01","month02","month03","month04","month05",
        "month06","month07","month08","month09","month10","month11",
        "month12","season1","season2","season3","season4"]
+times=["annual"]#,"month01","month02","month03","month04","month05",
+       # "month06","month07","month08","month09","month10","month11",
+       # "month12","season1","season2","season3","season4"]
 if experiment=="conus":
     methods=["CA","SAR","SD","SDmon_c"]
     # scales=["full_res"]
@@ -339,13 +342,13 @@ def plot_histograms(obbase,sdbase,scale,time):
     plt.xscale("log")
     plt.ylim(1,1E6)
     if experiment=="conus":
-        plt.ylim(1,1E7)
+        plt.ylim(1,1E8)
     if re.match(".*huc2.*",scale):
         plt.ylim(1,3e3)
     if re.match(".*huc4.*",scale):
-        plt.ylim(1,1e4)
-    if re.match(".*huc8.*",scale):
         plt.ylim(1,1e5)
+    if re.match(".*huc8.*",scale):
+        plt.ylim(1,1e6)
     plt.xlim(1E-2,400)
     plt.legend(loc=3,ncol=2)
     name="_".join(["hists",scale,time,experiment,model_base,thisres])
@@ -453,8 +456,12 @@ if __name__ == '__main__':
             # plot_vscale(bias,"dryspell",[-6,4],legend_ncol=2)
             # plot_vseason(bias,"dryspell",[-6,4],legend_ncol=2)
             if experiment=="conus":
-                plot_vscale(bias,"dryspell",[0,8],legend_ncol=1,legend_loc=1,obs=fullobs,obs2=fullobs2,ylabel="Days")
-                plot_vseason(bias,"dryspell",[0,15],legend_ncol=1,obs=fullobs,obs2=fullobs2,ylabel="Days")
+                if pr_threshold==1:
+                    plot_vscale(bias,"dryspell",[0,15],legend_ncol=1,legend_loc=1,obs=fullobs,obs2=fullobs2,ylabel="Days")
+                    plot_vseason(bias,"dryspell",[0,25],legend_ncol=1,obs=fullobs,obs2=fullobs2,ylabel="Days")
+                else:
+                    plot_vscale(bias,"dryspell",[0,8],legend_ncol=1,legend_loc=1,obs=fullobs,obs2=fullobs2,ylabel="Days")
+                    plot_vseason(bias,"dryspell",[0,15],legend_ncol=1,obs=fullobs,obs2=fullobs2,ylabel="Days")
             else:
                 if pr_threshold==1:
                     plot_vscale(bias,"dryspell",[5,12],legend_ncol=1,legend_loc=1,obs=fullobs,obs2=fullobs2,ylabel="Days")
