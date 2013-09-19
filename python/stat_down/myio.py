@@ -130,7 +130,7 @@ def addvar(NCfile,data,varname,dims,dtype='f',attributes=None):
     for i,d in enumerate(dims):
         if not(d in NCfile.dimensions):
             NCfile.create_dimension(d,data.shape[i])
-            
+    
     NCfile.create_variable(varname,dtype,dims)
     NCfile.variables[varname][:]=data.astype(dtype)
     if attributes:
@@ -139,7 +139,31 @@ def addvar(NCfile,data,varname,dims,dtype='f',attributes=None):
 
 def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes=None,
           lat=None,lon=None,extravars=None):
-    """write(filename,data,dtype='f',varname="data",dims=None,units=None,lat=None,lon=None,extravars=None)"""
+    """write a netcdf file 
+    
+    filename = name of output netcdf file (.nc will be appended automatically)
+    data = data to write to file
+    dtype = data type of data (see below)
+    varname = name of variable to create in the netcdf file
+    units = units for the data
+    lat = a latitude variable to add (here for legacy reasons, use extravars)
+    lon = ditto    
+    attribues: bunch/dictionary with key/values pairs to be added as attributes
+    extravars is a list of variables to add
+        each variable is a bunch or other class with attribues:
+            data = data to write
+            name = name of variable
+            dims = dimensions to use: i.e. [[[[t],z],y],x] matching dimensions in primary data
+            dtype= data type of output variable
+                'd': 64 bit float
+                'f': 32 bit float
+                'l': long
+                'i': 32 bit integer
+                'h': 16 bit integer
+                'b': 8 bit integer
+                'S1': character
+            attribues: bunch/dictionary with key/values pairs to be added as attributes
+    """
     history = 'Created : ' + time.ctime() +'\nusing simple io.write by:'+os.environ['USER']
     NCfile=Nio.open_file(filename,mode="w",format="nc",history=history)
     if len(data.shape)==1:
@@ -161,15 +185,15 @@ def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes
     
     if lat!=None:
         if len(lat.shape)>1:
-            NCfile.create_variable("lat",'f',dims[-2:])
+            NCfile.create_variable("lat",'f',(dims[-2],dims[-1]))
         else:
-            NCfile.create_variable("lat",'f',dims[-1:])
+            NCfile.create_variable("lat",'f',(dims[-2],))
         NCfile.variables["lat"][:]=lat.astype('f')
     if lon!=None:
         if len(lon.shape)>1:
-            NCfile.create_variable("lon",'f',dims[-2:])
+            NCfile.create_variable("lon",'f',(dims[-2],dims[-1]))
         else:
-            NCfile.create_variable("lon",'f',dims[-1:])
+            NCfile.create_variable("lon",'f',(dims[-1],))
         NCfile.variables["lon"][:]=lon.astype('f')
     
     if extravars:
