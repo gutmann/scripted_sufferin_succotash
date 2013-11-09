@@ -1,0 +1,17 @@
+#!/bin/sh
+
+for y in 20*; do
+	cd $y
+	for m in ??; do
+		cd $m
+		echo $y/$m
+		
+		for fname in *.jpg; do
+			NAME=`basename $fname .jpg`
+			echo $NAME
+			convert $NAME.jpg $NAME.png
+		done
+		cd ../
+	done
+	cd ../
+done
