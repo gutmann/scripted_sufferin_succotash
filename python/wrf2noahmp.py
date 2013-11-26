@@ -1,18 +1,16 @@
 #!/usr/bin/env python
 import glob,os,shutil
+import datetime
+
 import numpy as np
 
-import swim_io as io
+import swim_io
 import units
 from bunch import Bunch
 
 wrf_directory="/glade/p/ral/RHAP/asd000/HW2010.2/"
 
-lat=40.000
-lon=-105.1
-
 template_file="template.dat"
-output_file="met_data_"+str(lat)+"_"+str(lon)".dat"
 wrf_file_search=wrf_directory+"ctrl/wrfout/wrfout*"
 wrf_geo_grid_file=wrf_directory+"geo_em.d01-4km.nc"
 
@@ -100,13 +98,14 @@ def replace_in_file(filename,searchstring,outputstring):
 def date_from_filename(filename):
     """docstring for date_from_filename"""
     # filename format=wrfout_d01_2008-12-19_00:00:00.nc
-    fileparts=filename.split("-")
+    fileparts=filename.split("/")[-1]
+    fileparts=fileparts.split("-")
     year=fileparts[0][-4:]
     month=fileparts[1]
     day=fileparts[2][:2]
     return year+month+day
     
-def get_latlon(filename,lat,lon,latvar="XLAT",lonvar="XLONG"):
+def get_latlon_pos(filename,lat,lon,latvar="XLAT",lonvar="XLONG"):
     """subset out the time dimention from lat and lon variables"""
     latdata=swim_io.read_nc(filename,latvar,returnNCvar=True)
     latgrid=latdata.data[0,...]
@@ -118,7 +117,7 @@ def get_latlon(filename,lat,lon,latvar="XLAT",lonvar="XLONG"):
     dists=(latgrid-lat)**2 + (longrid-lon)**2
     y,x=np.unravel_index(np.argmin(dists),dists.shape)
     
-    return y,x
+    return int(y),int(x)
     
 
 def get_var_from_file_at_pos(variable,level,lat,lon,filename,latvar="XLAT",lonvar="XLONG"):
@@ -134,11 +133,11 @@ def get_var_from_file_at_pos(variable,level,lat,lon,filename,latvar="XLAT",lonva
     
     vardata=swim_io.read_nc(filename,variable,returnNCvar=True)
     if level>0:
-        results=vardata.data[0,level-1,y,x]
+        outputdata=vardata.data[0,level-1,y,x]
     else:
-        results=vardata.data[0,y,x]
+        outputdata=vardata.data[0,y,x]
     vardata.ncfile.close()
-    return results
+    return outputdata
 
     
 def load_parameters(geogrid_file,wrf_filesearch,lat,lon):
@@ -196,7 +195,7 @@ def get_timeseries(files,varname,y,x):
     
     # read data from first file to get the number of time steps per file 
     # (ideally this should be allowed to vary... it sort of is) but we don't test for overflow
-    data=swim_io.read_nc(files][0],varname,returnNCvar=True)
+    data=swim_io.read_nc(files[0],varname,returnNCvar=True)
     # get data at pos
     initdata=data.data[:,y,x]
     # close the netcdf file
@@ -212,7 +211,7 @@ def get_timeseries(files,varname,y,x):
     # loop over files storing the rest of the data
     for i in range(1,len(files)):
         # open file for this variable
-        data=swim_io.read_nc(files][0],varname,returnNCvar=True)
+        data=swim_io.read_nc(files[i],varname,returnNCvar=True)
         # store this time series
         outputdata[curpos:curpos+data.data.shape[0]]=data.data[:,y,x]
         curpos+=data.data.shape[0]
@@ -220,40 +219,57 @@ def get_timeseries(files,varname,y,x):
         data.ncfile.close()
         
     return outputdata[:curpos]
-        
-    
 
+def calc_times(filesearch):
+    files=glob.glob(filesearch)
+    files.sort()
+    t1=date_from_filename(files[0])
+    d1=datetime.datetime(int(t1[:4]),int(t1[4:6]),int(t1[6:8]),0,0)
+    dates=[d1+datetime.timedelta(i/24.0) for i in range(len(files)*24)]
+    return dates
 
-def read_times(files,varname):
-    dates=np.concatenate(swim_io.read_files(files,varname))
-    alldates=[]
-    for i in range(dates.shape[0]):
-        alldates.append("".join(dates[i][:16]))
-        alldates[i].replace("-"," ")
-        alldates[i].replace("_"," ")
-        alldates[i].replace(":"," ")
+def read_times(filesearch,varname): #THIS IS INCREDIBLY INEFFICIENT... not sure why Nio can't read string arrays fast!
+    return calc_times(filesearch)
     
-    return alldates
+    # dates=np.concatenate(swim_io.read_files(filesearch,varname))
+    # alldates=[]
+    # for i in range(dates.shape[0]):
+    #     alldates.append("".join(dates[i][:16]))
+    #     alldates[i].replace("-"," ")
+    #     alldates[i].replace("_"," ")
+    #     alldates[i].replace(":"," ")
+    # 
+    # return alldates
     
-def load_forcing_data(filesearch,lat,lon):
+def load_forcing_data(filesearch,lat,lon,data=None):
     """Load a time series of WRF forcing data for the lat/lon position given"""
     files=glob.glob(filesearch)
     files.sort()
-    y,x=get_latlon(files[0],lat,lon)
+    y,x=get_latlon_pos(files[0],lat,lon)
+    print(y,x)
     
+    print("u")
     u=get_timeseries(files,"U10",y,x)
+    print("v")
     v=get_timeseries(files,"V10",y,x)
     windspeed=np.sqrt(u**2+v**2)
+    print("t")
     t=get_timeseries(files,"T2",y,x)
+    print("p")
     p=get_timeseries(files,"PSFC",y,x)/100.0
+    print("q")
     q=get_timeseries(files,"Q2",y,x)
     rh=units.mr2rh(t,p,q)*100.0
+    print("precip")
     precip=get_timeseries(files,"RAINNC",y,x)/3600.0
     precip[1:]=precip[1:]-precip[:-1]
+    print("sw")
     sw=get_timeseries(files,"SWDOWN",y,x)
+    print("lw")
     lw=get_timeseries(files,"GLW",y,x)
     
-    times=read_times(file,"Times")
+    print("times")
+    times=read_times(filesearch,"Times")
 
     return Bunch(wind=windspeed,winddir=windspeed*0, t=t,rh=rh,p=p,precip=precip,sw=sw,lw=lw,times=times)
     
@@ -266,7 +282,8 @@ def write_forcing(filename,forcing):
     
 #   UTC date/time        windspeed       wind dir         temperature      humidity        pressure           shortwave      longwave       precipitation
 #  1998 01 01 06 30     5.6300001144   178.0000000000   263.9499816895    86.0999984741  1002.0000000000     0.0000000000   281.0000000000     0.0000000000
-    formatstring="{0.times[_i_]  0.wind[_i_] 0.winddir[_i_] 0.t[_i_] 0.rh[_i_] 0.p[_i_] 0.sw[_i_] 0.lw[_i_] 0.precip[_i_]}"
+    formatstring="{0.times[_i_]}  {0.wind[_i_]:15.9} {0.winddir[_i_]:15.9} {0.t[_i_]:15.9} {0.rh[_i_]:15.9} "\
+                    "{0.p[_i_]:15.9} {0.sw[_i_]:15.9} {0.lw[_i_]:15.9} {0.precip[_i_]:15.9}\n"
     for i in range(forcing.wind.size):
         curformat=formatstring.replace("_i_",str(i))
         outfile.write(curformat.format(forcing))
@@ -279,15 +296,35 @@ def write_outputfile(template,outputfile,parameters,forcing):
     """docstring for write_outputfile"""
     shutil.copyfile(template,outputfile)
     for s in searchstrings:
-        replace_in_file(outputfile,s,parameters[s[2:-2]])
+        replace_in_file(outputfile,s,str(parameters[s[2:-2]]))
     write_forcing(outputfile,forcing)
     
 
-def main():
+def run_for_lat_lon(lat,lon):
     """Write a noahmp Simple Driver input file from WRF geogrid and outputfiles"""
-    parameters=load_parameters(wrf_geo_grid_file,lat,lon)
+    output_file="met_data_"+str(lat)+"_"+str(lon)+".dat"
+    parameters=load_parameters(wrf_geo_grid_file,wrf_file_search,lat,lon)
     forcing=load_forcing_data(wrf_file_search,lat,lon)
     write_outputfile(template_file, output_file, parameters,forcing)
+    
+def main():
+    run_for_lat_lon(40.0+2.0/60.0, -105.0-33.0/60.0)
+    
+    basefile=glob.glob(wrf_file_search)[0]
+    xlat=swim_io.read_nc(basefile,"XLAT").data[0,...]
+    xlon=swim_io.read_nc(basefile,"XLONG").data[0,...]
+    for lat,lon in zip(xlat,xlon):
+        run_for_lat_lon(lat,lon)
+    
+    
 
+## TESTING:
+# import wrf2noahmp
+# reload(wrf2noahmp)
+# from wrf2noahmp import *
+# dates=calc_times(wrf_file_search)
+# write_outputfile(template_file, output_file, parameters,forcing)
+# forcing=load_forcing_data(wrf_file_search,lat,lon)
+# parameters=load_parameters(wrf_geo_grid_file,wrf_file_search,lat,lon)
 if __name__ == '__main__':
     main()
