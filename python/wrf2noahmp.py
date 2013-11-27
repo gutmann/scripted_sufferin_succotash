@@ -120,7 +120,7 @@ def get_latlon_pos(filename,lat,lon,latvar="XLAT",lonvar="XLONG"):
     return int(y),int(x)
     
 
-def get_var_from_file_at_pos(variable,level,lat,lon,filename,latvar="XLAT",lonvar="XLONG"):
+def get_var_from_file_at_pos(variable,level,lat,lon,y=None,x=None,filename="",latvar="XLAT",lonvar="XLONG"):
     """Read data from a file with assumptions about variable grid
     return data at matching lat,lon
     
@@ -129,7 +129,8 @@ def get_var_from_file_at_pos(variable,level,lat,lon,filename,latvar="XLAT",lonva
         
     if level==0 assume levels dim doesn't exist    
     """
-    y,x=get_latlon_pos(filename,lat,lon,latvar=latvar,lonvar=lonvar)
+    if y==None:
+        y,x=get_latlon_pos(filename,lat,lon,latvar=latvar,lonvar=lonvar)
     
     vardata=swim_io.read_nc(filename,variable,returnNCvar=True)
     if level>0:
@@ -140,7 +141,7 @@ def get_var_from_file_at_pos(variable,level,lat,lon,filename,latvar="XLAT",lonva
     return outputdata
 
     
-def load_parameters(geogrid_file,wrf_filesearch,lat,lon):
+def load_parameters(geogrid_file,wrf_filesearch,lat,lon,y=None,x=None):
     """Read noahmp parameters from a wrf geogrid (netcdf) file
     
     Reads/Stores/calculates: 
@@ -162,27 +163,27 @@ def load_parameters(geogrid_file,wrf_filesearch,lat,lon):
     parameters["LONGITUDE"] = lon
     for i in range(1,5):
         # TSLB:description = "SOIL TEMPERATURE" ; K
-        parameters["TSOIL"+str(i)]=get_var_from_file_at_pos("TSLB",level=i,lat=lat,lon=lon,filename=files[0])
+        parameters["TSOIL"+str(i)]=get_var_from_file_at_pos("TSLB",level=i,lat=lat,lon=lon,y=y,x=x,filename=files[0])
         # SMOIS:description = "SOIL MOISTURE" ; m3/m3
-        parameters["MSOIL"+str(i)]=get_var_from_file_at_pos("SMOIS",level=i,lat=lat,lon=lon,filename=files[0])
+        parameters["MSOIL"+str(i)]=get_var_from_file_at_pos("SMOIS",level=i,lat=lat,lon=lon,y=y,x=x,filename=files[0])
         # SH2O:description = "SOIL LIQUID WATER" ; m3/m3
-        parameters["LSOIL"+str(i)]=get_var_from_file_at_pos("SH2O",level=i,lat=lat,lon=lon,filename=files[0])
+        parameters["LSOIL"+str(i)]=get_var_from_file_at_pos("SH2O",level=i,lat=lat,lon=lon,y=y,x=x,filename=files[0])
         
     # TSK:description = "SURFACE SKIN TEMPERATURE" ; K
-    parameters["SKINTEMP"]=get_var_from_file_at_pos("TSK",level=0,lat=lat,lon=lon,filename=files[0])
+    parameters["SKINTEMP"]=get_var_from_file_at_pos("TSK",level=0,lat=lat,lon=lon,y=y,x=x,filename=files[0])
     # SOILTEMP:description = "Annual mean deep soil temperature" ; K
-    parameters["DEEPSOILTEMP"]=get_var_from_file_at_pos("SOILTEMP",level=0,lat=lat,lon=lon,
+    parameters["DEEPSOILTEMP"]=get_var_from_file_at_pos("SOILTEMP",level=0,lat=lat,lon=lon,y=y,x=x,
                                                         filename=geogrid_file,latvar="XLAT_M",lonvar="XLONG_M")
     # IVGTYP:description = "DOMINANT VEGETATION CATEGORY" ; []
-    parameters["VEGTYPE"]=get_var_from_file_at_pos("IVGTYP",level=0,lat=lat,lon=lon,filename=files[0])
+    parameters["VEGTYPE"]=get_var_from_file_at_pos("IVGTYP",level=0,lat=lat,lon=lon,y=y,x=x,filename=files[0])
     # ISLTYP:description = "DOMINANT SOIL CATEGORY" ; []
-    parameters["SOILTYPE"]=get_var_from_file_at_pos("ISLTYP",level=0,lat=lat,lon=lon,filename=files[0])
+    parameters["SOILTYPE"]=get_var_from_file_at_pos("ISLTYP",level=0,lat=lat,lon=lon,y=y,x=x,filename=files[0])
     # SLOPECAT:description = "Dominant category" ; []
-    parameters["SLOPETYPE"]=get_var_from_file_at_pos("SLOPECAT",level=0,lat=lat,lon=lon,
+    parameters["SLOPETYPE"]=get_var_from_file_at_pos("SLOPECAT",level=0,lat=lat,lon=lon,y=y,x=x,
                                                         filename=geogrid_file,latvar="XLAT_M",lonvar="XLONG_M")
     maxgf=0.0
     for i in range(1,13):
-        gf=get_var_from_file_at_pos("GREENFRAC",level=i,lat=lat,lon=lon,
+        gf=get_var_from_file_at_pos("GREENFRAC",level=i,lat=lat,lon=lon,y=y,x=x,
                                     filename=geogrid_file,latvar="XLAT_M",lonvar="XLONG_M")
         maxgf=max(gf,maxgf)
         
@@ -225,7 +226,7 @@ def calc_times(filesearch):
     files.sort()
     t1=date_from_filename(files[0])
     d1=datetime.datetime(int(t1[:4]),int(t1[4:6]),int(t1[6:8]),0,0)
-    dates=[d1+datetime.timedelta(i/24.0) for i in range(len(files)*24)]
+    dates=[str(d1+datetime.timedelta(i/24.0)).replace("-"," ").replace(":"," ")[:-2] for i in range(len(files)*24)]
     return dates
 
 def read_times(filesearch,varname): #THIS IS INCREDIBLY INEFFICIENT... not sure why Nio can't read string arrays fast!
@@ -272,13 +273,33 @@ def load_forcing_data(filesearch,lat,lon,data=None):
     times=read_times(filesearch,"Times")
 
     return Bunch(wind=windspeed,winddir=windspeed*0, t=t,rh=rh,p=p,precip=precip,sw=sw,lw=lw,times=times)
+
+def read_forcing_step(filename,lastforcing=None):
+    """Load a time series of WRF forcing data for the lat/lon position given"""
+    
+    u=swim_io.read_nc(filename,"U10").data
+    v=swim_io.read_nc(filename,"V10").data
+    windspeed=np.sqrt(u**2+v**2)
+    t=swim_io.read_nc(filename,"T2").data
+    p=swim_io.read_nc(filename,"PSFC").data/100.0
+    q=swim_io.read_nc(filename,"Q2").data
+    rh=units.mr2rh(t,p,q)*100.0
+    precip=swim_io.read_nc(filename,"RAINNC").data/3600.0
+    rawprecip=precip.copy()
+    if lastforcing:
+        precip-=lastforcing.rawprecip[-1,:,:]
+    precip[1:,:,:]=precip[1:,:,:]-precip[:-1,:,:]
+    sw=swim_io.read_nc(filename,"SWDOWN").data
+    lw=swim_io.read_nc(filename,"GLW").data
+    times=read_times(filename,"Times")
+
+    return Bunch(wind=windspeed,winddir=windspeed*0, t=t,rh=rh,p=p,precip=precip,
+                sw=sw,lw=lw,times=times,rawprecip=rawprecip)
+
+
     
 def write_forcing(filename,forcing):
-    infile=open(filename)
-    outfile=open(filename+".temp","wu")
-    for l in infile:
-        outfile.write(l)
-    infile.close()
+    outfile=open(filename,"au")
     
 #   UTC date/time        windspeed       wind dir         temperature      humidity        pressure           shortwave      longwave       precipitation
 #  1998 01 01 06 30     5.6300001144   178.0000000000   263.9499816895    86.0999984741  1002.0000000000     0.0000000000   281.0000000000     0.0000000000
@@ -288,8 +309,21 @@ def write_forcing(filename,forcing):
         curformat=formatstring.replace("_i_",str(i))
         outfile.write(curformat.format(forcing))
     outfile.close
-    os.rename(filename+".temp",filename)
-        
+
+def append_forcing(filename,forcing,y,x):
+    outfile=open(filename,"au")
+    
+#   UTC date/time        windspeed       wind dir         temperature      humidity        pressure           shortwave      longwave       precipitation
+#  1998 01 01 06 30     5.6300001144   178.0000000000   263.9499816895    86.0999984741  1002.0000000000     0.0000000000   281.0000000000     0.0000000000
+    xystring="["+str(y)+"]["+str(x)+"]"
+    formatstring="{0.times[_i_]}  {0.wind[_i_]_xy_:15.9} {0.winddir[_i_]_xy_:15.9} {0.t[_i_]_xy_:15.9} {0.rh[_i_]_xy_:15.9} "\
+                    "{0.p[_i_]_xy_:15.9} {0.sw[_i_]_xy_:15.9} {0.lw[_i_]_xy_:15.9} {0.precip[_i_]_xy_:15.9}\n"
+    formatstring=formatstring.replace("_xy_",xystring)
+    
+    for i in range(forcing.wind.shape[0]):
+        curformat=formatstring.replace("_i_",str(i))
+        outfile.write(curformat.format(forcing))
+    outfile.close
     
 
 def write_outputfile(template,outputfile,parameters,forcing):
@@ -298,6 +332,12 @@ def write_outputfile(template,outputfile,parameters,forcing):
     for s in searchstrings:
         replace_in_file(outputfile,s,str(parameters[s[2:-2]]))
     write_forcing(outputfile,forcing)
+
+def setup_base_file(template,outputfile,parameters):
+    """docstring for write_outputfile"""
+    shutil.copyfile(template,outputfile)
+    for s in searchstrings:
+        replace_in_file(outputfile,s,str(parameters[s[2:-2]]))
     
 
 def run_for_lat_lon(lat,lon):
@@ -306,17 +346,46 @@ def run_for_lat_lon(lat,lon):
     parameters=load_parameters(wrf_geo_grid_file,wrf_file_search,lat,lon)
     forcing=load_forcing_data(wrf_file_search,lat,lon)
     write_outputfile(template_file, output_file, parameters,forcing)
-    
-def main():
-    run_for_lat_lon(40.0+2.0/60.0, -105.0-33.0/60.0)
-    
-    basefile=glob.glob(wrf_file_search)[0]
+
+def run_for_grid():
+    files=glob.glob(wrf_file_search)
+    files.sort()
+    files=files[318:418]
+    basefile=files[0]
     xlat=swim_io.read_nc(basefile,"XLAT").data[0,...]
     xlon=swim_io.read_nc(basefile,"XLONG").data[0,...]
-    for lat,lon in zip(xlat,xlon):
-        run_for_lat_lon(lat,lon)
-    
-    
+    xlat=xlat[30:210,100:220]
+    xlon=xlon[30:210,100:220]
+    outputfiles=[]
+    positions=[]
+    parameters=[]
+    for lat,lon in zip(xlat.flat,xlon.flat):
+        y,x=get_latlon_pos(basefile,lat,lon)
+        print(y,x)
+        positions.append((y,x))
+        outputfiles.append("met_grid_data_"+str(lat)+"_"+str(lon)+".dat")
+        # parameters.append(load_parameters(wrf_geo_grid_file,wrf_file_search,lat,lon,y,x))
+        # setup_base_file(template_file,outputfiles[-1],parameters[-1])
+        
+    lastforcing=None
+    for f in files:
+        print(f)
+        forcing=read_forcing_step(f,lastforcing)
+        for pos,outf in zip(positions,outputfiles):
+            append_forcing(outf,forcing,pos[0],pos[1])
+        lastforcing=forcing
+
+def main():
+    run_for_grid()
+    # run_for_lat_lon(40.0+2.0/60.0, -105.0-33.0/60.0)
+    # 
+    # basefile=glob.glob(wrf_file_search)[0]
+    # xlat=swim_io.read_nc(basefile,"XLAT").data[0,...]
+    # xlon=swim_io.read_nc(basefile,"XLONG").data[0,...]
+    # for lat,lon in zip(xlat.flat,xlon.flat):
+    #     run_for_lat_lon(lat,lon)
+    #     parameters.append(load_parameters(wrf_geo_grid_file,wrf_file_search,lat,lon))
+    # 
 
 ## TESTING:
 # import wrf2noahmp
