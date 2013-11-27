@@ -14,6 +14,7 @@ def main():
     directories=glob("output_*")
     for d in directories:
         files=glob(d+"/*")
+        files.sort()
         print(d)
         if len(files)>30:
             rain1=io.read_nc(files[-3],"rain").data
