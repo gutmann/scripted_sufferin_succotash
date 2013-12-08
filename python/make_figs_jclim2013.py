@@ -185,6 +185,43 @@ def bias_fig():
     plt.savefig("FIG3_precip_bias.png",dpi=150)
     plt.close()
 
+def agu_6panel_fig():
+    """docstring for agu_6panel_fig"""
+    files=["CA-ncep-pr-BC12km_full_res_annual_MAP.nc",
+            "SD-ncep-pr-BC12km_full_res_annual_MAP.nc",
+            "SAR-ncep-pr-BC12km_full_res_annual_MAP.nc",
+            "SDmon_c-ncep-pr-BC12km_full_res_annual_MAP.nc",
+            "../WRF-12km_annual_MAP.nc"]
+    titles=["a) BCCA - obs", "b) BCSDd - obs", "c) AR - obs", "d) BCSDm - obs"," e) WRF - obs"]
+    cbar_label="Precipitation Bias [mm/yr]"
+    cbars=[False,True]*3
+    # cbars.append(True)
+    mask=get_mask()
+    
+    obsfile="obs-maurer.125-pr_full_res_annual_MAP.nc"
+    obs=np.ma.array(myio.read_nc(stats_location+zeromm_loc+obsfile).data,mask=mask)
+    
+    plt.figure(figsize=(15,10),dpi=300)
+    # plt.figure(figsize=(7,5),dpi=300)
+    for i,f in enumerate(files):
+        
+        lonlabels=[0,0,0,1]
+        latlabels=[1,0,0,0]
+        if i<3:lonlabels=[0,0,0,0]
+        if (i%2)==1:latlabels=[0,0,0,0]
+        
+        data=np.ma.array(myio.read_nc(stats_location+zeromm_loc+f).data,mask=mask)-obs
+        plt.subplot(3,2,i+1)
+        map_vis(data,title=titles[i],cmap=cm.seismic,vmin=-500,vmax=500,
+                showcolorbar=cbars[i],cbar_label=cbar_label,
+                latlabels=latlabels,lonlabels=lonlabels)
+        if i==4:
+            plt.plot([-111,-111,-102.5,-102.5,-111],[35.5,42.5,42.5,35.5,35.5],color="green",linewidth=2)
+    plt.subplots_adjust(wspace = -0.0001,hspace=0.15)
+        
+    plt.savefig("AGU_FIG_precip_bias.png",dpi=150)
+    plt.close()
+
 def changemap_fig():
     
     cbar_label="Precipitation Change [mm/yr]"
@@ -634,6 +671,7 @@ def main():
     #### hucmap_fig()
     # mean_annual_fig()
     # bias_fig()
+    agu_6panel_fig()
     # changemap_fig()
     # monthly_precip_fig()
     # interannual_fig()
@@ -645,7 +683,7 @@ def main():
     #### geostats_fig()
     #### obs_wetfrac_fig()
     
-    print_stats()
+    # print_stats()
 
 if __name__ == '__main__':
     main()
