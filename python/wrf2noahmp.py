@@ -1,12 +1,18 @@
 #!/usr/bin/env python
-import glob,os,shutil
+from __future__ import print_function
+import glob,os,shutil,sys
 import datetime
+import argparse
 
 import numpy as np
 
 import swim_io
 import units
 from bunch import Bunch
+
+# assumes:
+# main data = /glade/p/ral/RHAP/asd000/HW2010.2/ctrl/wrfout/wrfout*
+#  nfiles = 3014
 
 wrf_directory="/glade/p/ral/RHAP/asd000/HW2010.2/"
 
@@ -103,7 +109,9 @@ def date_from_filename(filename):
     year=fileparts[0][-4:]
     month=fileparts[1]
     day=fileparts[2][:2]
-    return year+month+day
+    hour=filename.split("_")[-1].split(":")[0]
+    minute=filename.split("_")[-1].split(":")[1]
+    return year+month+day+hour+minute
     
 def get_latlon_pos(filename,lat,lon,latvar="XLAT",lonvar="XLONG"):
     """subset out the time dimention from lat and lon variables"""
@@ -222,6 +230,7 @@ def get_timeseries(files,varname,y,x):
     return outputdata[:curpos]
 
 def calc_times(filesearch):
+    """Calculate times assuming assending by 1hr from a start date derived from the filename"""
     files=glob.glob(filesearch)
     files.sort()
     t1=date_from_filename(files[0])
@@ -229,9 +238,11 @@ def calc_times(filesearch):
     dates=[str(d1+datetime.timedelta(i/24.0)).replace("-"," ").replace(":"," ")[:-2] for i in range(len(files)*24)]
     return dates
 
-def read_times(filesearch,varname): #THIS IS INCREDIBLY INEFFICIENT... not sure why Nio can't read string arrays fast!
+def read_times(filesearch,varname): 
     return calc_times(filesearch)
     
+    # Actually reading the dates from the files...
+    # THIS IS INCREDIBLY INEFFICIENT... not sure why Nio can't read string arrays fast!
     # dates=np.concatenate(swim_io.read_files(filesearch,varname))
     # alldates=[]
     # for i in range(dates.shape[0]):
@@ -274,7 +285,7 @@ def load_forcing_data(filesearch,lat,lon,data=None):
 
     return Bunch(wind=windspeed,winddir=windspeed*0, t=t,rh=rh,p=p,precip=precip,sw=sw,lw=lw,times=times)
 
-def read_forcing_step(filename,lastforcing=None):
+def read_forcing_step(filename,lastforcing=None,lastfile=None):
     """Load a time series of WRF forcing data for the lat/lon position given"""
     
     u=swim_io.read_nc(filename,"U10").data
@@ -288,6 +299,10 @@ def read_forcing_step(filename,lastforcing=None):
     rawprecip=precip.copy()
     if lastforcing:
         precip-=lastforcing.rawprecip[-1,:,:]
+    elif lastfile:
+        lastprecip=swim_io.read_nc(lastfile,"RAINNC").data/3600.0
+        precip-=lastprecip[-1,:,:]
+    
     precip[1:,:,:]=precip[1:,:,:]-precip[:-1,:,:]
     sw=swim_io.read_nc(filename,"SWDOWN").data
     lw=swim_io.read_nc(filename,"GLW").data
@@ -347,53 +362,92 @@ def run_for_lat_lon(lat,lon):
     forcing=load_forcing_data(wrf_file_search,lat,lon)
     write_outputfile(template_file, output_file, parameters,forcing)
 
-def run_for_grid():
+def run_for_grid(startpt=0,stoppt=None,save_base_data=True,lastfile=None):
     files=glob.glob(wrf_file_search)
     files.sort()
-    files=files[318:418]
+    if (startpt!=0):
+        lastfile=files[startpt-1]
+        
+    files=files[startpt:stoppt]
     basefile=files[0]
     xlat=swim_io.read_nc(basefile,"XLAT").data[0,...]
     xlon=swim_io.read_nc(basefile,"XLONG").data[0,...]
-    xlat=xlat[30:210,100:220]
+    xlat=xlat[30:210,100:220] #30:210,100:220
     xlon=xlon[30:210,100:220]
+#    xlat=xlat[200:210,210:220] #30:210,100:220
+#    xlon=xlon[200:210,210:220]
     outputfiles=[]
     positions=[]
     parameters=[]
+    lasty=0
+    print("Setting up base file data")
     for lat,lon in zip(xlat.flat,xlon.flat):
         y,x=get_latlon_pos(basefile,lat,lon)
-        print(y,x)
+        if (y!=lasty):
+            print(y," / ", 210,"\r",end="")
+            sys.stdout.flush()
+            lasty=y
         positions.append((y,x))
         outputfiles.append("met_grid_data_"+str(lat)+"_"+str(lon)+".dat")
-        # parameters.append(load_parameters(wrf_geo_grid_file,wrf_file_search,lat,lon,y,x))
-        # setup_base_file(template_file,outputfiles[-1],parameters[-1])
+        if save_base_data:
+            parameters.append(load_parameters(wrf_geo_grid_file,wrf_file_search,lat,lon,y,x))
+            setup_base_file(template_file,outputfiles[-1],parameters[-1])
         
     lastforcing=None
+    print("Reading Forcing (and writing data simultaneously)")
+    print(" last file=  "+files[-1].split("/")[-1])
     for f in files:
-        print(f)
-        forcing=read_forcing_step(f,lastforcing)
+        print("   "+f.split("/")[-1])
+        forcing=read_forcing_step(f,lastforcing,lastfile=lastfile)
         for pos,outf in zip(positions,outputfiles):
             append_forcing(outf,forcing,pos[0],pos[1])
         lastforcing=forcing
 
 def main():
-    run_for_grid()
+    parser= argparse.ArgumentParser(description='Pull out time series points for Noah-MP offline modeling. ')
+    parser.add_argument('startpt',action='store',nargs="?",help="First file to work on",default="0")
+    parser.add_argument('stoppt',action='store',nargs="?",help="Last file to work on",default=None)
+    parser.add_argument('withbase',action='store',nargs="?",help="0/1 = don't/do save base file data",default=1)
+    parser.add_argument('-v', '--version',action='version',
+            version='wrf2noahmp.py 1.0')
+    parser.add_argument ('--verbose', action='store_true',
+            default=False, help='verbose output', dest='verbose')
+    args = parser.parse_args()
+
+    startpt=int(args.startpt)
+    if (args.stoppt==None) or (args.stoppt=="None"):
+        stoppt=None
+    else:
+        stoppt=int(args.stoppt)
+    try:
+        outputdir="weather_"+str(startpt)+"_"+str(stoppt)
+        os.mkdir(outputdir)
+        os.chdir(outputdir)
+        shutil.copyfile("../template.dat","./template.dat")
+        
+    except Exception as e:
+        print(e)
+        return
+    exit_code = run_for_grid(startpt,stoppt,int(args.withbase)==1)
+    
+    # run_for_grid()
     # run_for_lat_lon(40.0+2.0/60.0, -105.0-33.0/60.0)
-    # 
-    # basefile=glob.glob(wrf_file_search)[0]
-    # xlat=swim_io.read_nc(basefile,"XLAT").data[0,...]
-    # xlon=swim_io.read_nc(basefile,"XLONG").data[0,...]
-    # for lat,lon in zip(xlat.flat,xlon.flat):
-    #     run_for_lat_lon(lat,lon)
-    #     parameters.append(load_parameters(wrf_geo_grid_file,wrf_file_search,lat,lon))
-    # 
+
+def mpi_batch_create():
+    nfiles=3014
+    f=open("mpi_command_file","wu")
+    n=nfiles/32
+    for i in range(0,nfiles,n):
+        f.write("-n 1 wrf2noahmp.py "+str(i)+ " "+str(i+n)+" 0\n")
+    f.close()
 
 ## TESTING:
 # import wrf2noahmp
 # reload(wrf2noahmp)
 # from wrf2noahmp import *
 # dates=calc_times(wrf_file_search)
-# write_outputfile(template_file, output_file, parameters,forcing)
 # forcing=load_forcing_data(wrf_file_search,lat,lon)
 # parameters=load_parameters(wrf_geo_grid_file,wrf_file_search,lat,lon)
+# write_outputfile(template_file, output_file, parameters,forcing)
 if __name__ == '__main__':
     main()
