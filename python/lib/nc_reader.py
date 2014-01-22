@@ -276,7 +276,7 @@ class NC_Reader(object):
         if geomatch_file:
             if geoin_file==None:
                 geoin_file=self._filenames[0]
-            print('Calculating XY match lookup table, this may take a while.')
+            # print('Calculating XY match lookup table, this may take a while.')
             self.init_xy(geoin_file,geomatch_file,subset=subset,geo_subset=geo_subset,
                         glatvar=glatvar,glonvar=glonvar)
         else:

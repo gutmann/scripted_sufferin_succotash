@@ -11,8 +11,7 @@ import regrid, snodas, recon, wrf, modscag
 
 comparison_domain=Bunch(lat=[35.5,42],lon=[-109,-104.5])
 
-def load_wrf(years):
-    all_data=wrf.load("wrf/SWE_daily.nc")
+def split2years(all_data,years):
     wrfdata=[]
     for y in years:
         curstart=np.where(all_data.dates>=datetime.datetime(y,1,1,0,0))[0][0]
@@ -20,6 +19,10 @@ def load_wrf(years):
         wrfdata.append(Bunch(data=all_data.data[curstart:curend+1,:,:],
                             lat=all_data.lat,lon=all_data.lon,dates=all_data.dates[curstart:curend+1]))
     return wrfdata
+
+def load_wrf(years):
+    all_data=wrf.load("wrf/SWE_daily.nc")
+    return split2years(all_data,years)
 
 def sca():
     """Compare SCA between MODSCAG and WRF
@@ -83,10 +86,12 @@ def sca():
         wrf_mid_z=np.zeros(len(modsca.gooddates.indices))
         sca_mid_z=np.zeros(len(modsca.gooddates.indices))
         for i in range(len(modsca.gooddates.indices)):
-            wrf_pts=np.where((wsca[modsca.gooddates.indices[i],:,:]>=t1-0.05)&(wsca[modsca.gooddates.indices[i],:,:]<=t1+0.05))
+            wrf_pts=np.where((wsca[modsca.gooddates.indices[i],:,:]>=t1-0.05)
+                    &(wsca[modsca.gooddates.indices[i],:,:]<=t1+0.05))
             if len(wrf_pts[0])>0:
                 wrf_mid_z[i]=zsub[wrf_pts].mean()
-            sca_pts=np.where((sca_grid[modsca.gooddates.indices[i],:,:]>=t1-0.05)&(sca_grid[modsca.gooddates.indices[i],:,:]<=t1+0.05))
+            sca_pts=np.where((sca_grid[modsca.gooddates.indices[i],:,:]>=t1-0.05)
+                    &(sca_grid[modsca.gooddates.indices[i],:,:]<=t1+0.05))
             if len(sca_pts[0])>0:
                 sca_mid_z[i]=zsub[sca_pts].mean()
     
@@ -153,3 +158,25 @@ def all():
 
 if __name__ == '__main__':
     sca()
+
+# for i in range(len(years)):
+#     plt.clf();
+#     subplot(1,2,1);plt.imshow(sstat[i].melt_date[:,17:]-rstat[i].melt_date[:,:-17],cmap=plt.cm.seismic,vmin=-50,vmax=50)
+#     plt.title("SNODAS - Noahmp")
+#     plt.colorbar();
+#     plt.title("Melt Date - SNODAS - Noahmp")
+#     subplot(1,2,2);plt.imshow(sstat[0].melt_date[:,17:]-wstat[0].melt_date[:-11,17:-1],cmap=plt.cm.seismic,vmin=-50,vmax=50)
+#     plt.title("Melt Date - SNODAS - Noah")
+#     plt.colorbar();
+#     plt.savefig("melt-"+str(years[i])+".png")
+#     
+# for i in range(len(years)):
+#     plt.clf();
+#     subplot(1,2,1);plt.imshow(sstat[0].peak[:,17:]*1000-rstat[0].peak[:,:-17],cmap=plt.cm.seismic,vmin=-600,vmax=600)
+#     plt.title("Peak SWE - SNODAS - Noahmp")
+#     plt.colorbar();
+#     subplot(1,2,2);plt.imshow(sstat[0].peak[:,17:]*1000-wstat[0].peak[:-11,17:-1],cmap=plt.cm.seismic,vmin=-600,vmax=600)
+#     plt.title("Peak SWE - SNODAS - Noah")
+#     plt.colorbar();
+#     plt.savefig("peak-"+str(years[i])+".png")
+#     

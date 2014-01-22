@@ -42,6 +42,23 @@ def sca(data,maxSWE=0.08):
         sca[tmp]=1-(np.exp(-2.6*data[tmp]/maxSWE)-(data[tmp]/maxSWE)*np.exp(-2.6))
     return sca    
 
+def load_noahmp(filename, startyear=2000,startdate=None):
+    """Load WRF-Noahmp SWE data from a file
+    """
+    wrf_dir="/".join(filename.split("/")[:-1])
+    geo_file=filename
+    data=myio.read_nc(filename,"SNEQV").data[8*2::48,:,:]
+    lat=myio.read_nc(geo_file,"lat").data
+    lon=myio.read_nc(geo_file,"lon").data
+    
+    if startdate==None:startdate=datetime.datetime(startyear,10,1,0)
+    ntimes=data.shape[0]
+    
+    dates=np.array([startdate+datetime.timedelta(i) for i in range(ntimes)])
+    
+    return Bunch(data=data,lat=lat,lon=lon,dates=dates)
+
+
 def load(filename, startyear=2000,startdate=None):
     """Load WRF SWE data from a file
     """
