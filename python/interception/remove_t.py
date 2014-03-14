@@ -131,6 +131,7 @@ def main():
     data=swim_io.read_nc("full_interception.nc").data
     print("Fitting T")
     stats,compression,rawt,tsmooth,fitt=optimal_t_fit(data)
+    
     print("Applying to data")
     v=decimate(data[:,8].astype("d"),decimation_factor)
     vo=decimate(data[:,-1].astype("d"),decimation_factor)
@@ -142,6 +143,7 @@ def main():
     for i in range(len(poly)):
         full_fitt+=poly[len(poly)-i-1]*full_smootht**i
     
+    print("Calculating dates")
     startdate=datetime.datetime(2013,10,3,10,0)
     enddate=datetime.datetime(2014,3,5,13,0,0)
     dt=(enddate-startdate)/len(rawt)
@@ -158,6 +160,7 @@ def main():
     plt.xlim(dates[0],dates[-1])
     plt.legend()
     
+    # plotting temperature on a second axis
     temp_axis=plt.twinx()
     temp_axis.plot(dates,rawt,color="grey")
     temp_axis.set_ylim(10,-50)
@@ -165,8 +168,6 @@ def main():
     date_index=start_point/decimation_factor
     temp_axis.plot([dates[date_index],dates[date_index]],[10,-50],color="black")
     temp_axis.plot([dates[0],dates[-1]],[0,0],color="red")
-    
-    plt.draw()
     
     plt.savefig("temp-v-compression.png")
 
