@@ -59,7 +59,10 @@ def read_nc(filename,var="data",proj=None,returnNCvar=False):
         if returnNCvar:
             outputdata=data
         else:
-            outputdata=data[:]
+            if len(data.shape)==0:
+                outputdata=data.get_value()
+            else:
+                outputdata=data[:]
     outputproj=None
     if proj!=None:
         projection=d.variables[proj]
@@ -138,7 +141,7 @@ def addvar(NCfile,data,varname,dims,dtype='f',attributes=None):
             NCfile.variables[varname].__setattr__(k,attributes[k])
 
 def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes=None,
-          lat=None,lon=None,extravars=None):
+          lat=None,lon=None,extravars=None,history=""):
     """write a netcdf file 
     
     filename = name of output netcdf file (.nc will be appended automatically)
@@ -164,7 +167,7 @@ def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes
                 'S1': character
             attribues: bunch/dictionary with key/values pairs to be added as attributes
     """
-    history = 'Created : ' + time.ctime() +'\nusing simple io.write by:'+os.environ['USER']
+    history = 'Created : ' + time.ctime() +'\nusing simple io.write by:'+os.environ['USER']+"  "+history
     NCfile=Nio.open_file(filename,mode="w",format="nc",history=history)
     if len(data.shape)==1:
         if dims==None:

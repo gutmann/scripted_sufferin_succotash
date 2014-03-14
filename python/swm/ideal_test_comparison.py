@@ -28,6 +28,7 @@ def main():
             plt.title(d)
             plt.xlabel("Distance [km]")
             plt.ylabel("Precipitation rate [mm/s]")
+            plt.ylim(0,2)
             plt.savefig(d+".png")
             
         
