@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import swim_io
+from stats import extremes
 
 def load_obs():
     return np.concatenate(swim_io.read_files("obs/*","pr"))
@@ -79,6 +80,10 @@ def process_data(data,name,hucs):
     print("Calculating p99")
     sys.stdout.flush()
     # swim_io.write(name+"_p99_"+"grid",calc_p99(data))
+    
+    # ext_data=extremes(data,year_intervals=[50])
+    # swim_io.write(name+"_ext_"+"grid",ext_data[0,:])
+    
     gc.collect()
     
     for h in hucs:
@@ -88,10 +93,16 @@ def process_data(data,name,hucs):
         hucdata=scaletohuc(data,h)
         print("Calculating wetfrac")
         sys.stdout.flush()
-        swim_io.write(name+"_wetfrac_"+h[2],calc_wetfrac(hucdata))
+        # swim_io.write(name+"_wetfrac_"+h[2],calc_wetfrac(hucdata))
         print("Calculating p99")
         sys.stdout.flush()
-        swim_io.write(name+"_p99_"+h[2],calc_p99(hucdata))
+        # swim_io.write(name+"_p99_"+h[2],calc_p99(hucdata))
+
+        # if len(hucdata.shape)==2:
+        #     hucdata=hucdata[:,np.newaxis,:]
+        ext_data=extremes(hucdata,year_intervals=[50])
+        swim_io.write(name+"_ext_"+h[2],ext_data[0,:])
+        
     
     
 def main():

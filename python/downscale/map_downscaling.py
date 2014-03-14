@@ -9,7 +9,7 @@ cur_file="prcp_norm.nc"
 global_basefile="/d2/gutmann/usbr/stat_data/DAILY/obs/maurer.125/pr/nldas_met_update.obs.daily.pr.2000.nc"
 global_file_search="processing_*/"+cur_file
 global_bounds=Bunch(lat=Bunch(min=34,max=44),lon=Bunch(min=-114,max=-100))
-global_output_file="grid_"+cur_file[:-3]
+global_output_file="grid_04_"+cur_file[:-3]
 
 
 def find_files(startdate):
@@ -74,7 +74,7 @@ def get_xy(filename,geo):
     return xy
     
 
-def main(start_date="20010101"):
+def main(start_date="20040101"):
     """convert a file (or files) from downscaling code to maps"""
     files=find_files(start_date)
     files.sort()

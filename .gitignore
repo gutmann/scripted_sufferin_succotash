@@ -1,3 +1,7 @@
+python/site-packages/site.py
+*.pth
+*.egg
+*.pyc
 downscale
 swim_real
 swim_2_real

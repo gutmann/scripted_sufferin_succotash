@@ -139,7 +139,7 @@ def calc_extreme_value(params,distribution,nyear,datafraction=1.0):
     return distribution.ppf(1-probability,*params)
 
 
-def extremes(data, dist_name="gamma",verbose=True):
+def extremes(data, dist_name="gamma",verbose=True,year_intervals=None):
     if dist_name=="weibull":
         distribution=stats.weibull_min
     elif dist_name=="exponential":
@@ -149,17 +149,26 @@ def extremes(data, dist_name="gamma",verbose=True):
     else:
         return None
     old_settings=np.seterr(invalid='ignore')
-        
-    year_intervals=[2,10,50,100]
+
+    if year_intervals==None:
+        year_intervals=[2,10,50,100]
     shape=data.shape
-    extremes=np.zeros((len(year_intervals),shape[1],shape[2]))
+    if len(shape)==3:
+        extremes=np.zeros((len(year_intervals),shape[1],shape[2]))
+        jlen=shape[0]
+    else:
+        extremes=np.zeros((len(year_intervals),shape[1]))
+        jlen=1
     if verbose:print("Calculating Extremes")
     for i in range(shape[1]):
         if verbose:
             print("progress= {0}/{1}      \r".format(i,shape[1]),end="")
             sys.stdout.flush()
-        for j in range(shape[2]):
-            curdata=data[:,i,j]
+        for j in range(jlen):
+            if len(shape)==3:
+                curdata=data[:,i,j]
+            else:
+                curdata=data[:,i]
             medianval=np.median(curdata[curdata>0])
             # medianval=np.median(curdata[curdata>medianval])
             usevals=np.where(curdata>=medianval)[0]
@@ -168,8 +177,12 @@ def extremes(data, dist_name="gamma",verbose=True):
                 curextremes=[calc_extreme_value(params,distribution,
                                                 year,len(usevals)/float(shape[0])) 
                                                 for year in year_intervals]
-                extremes[:,i,j]=np.array(curextremes)
-                if extremes[:,i,j].min()==0:print(i,j)
+                if len(shape)==3:
+                    extremes[:,i,j]=np.array(curextremes)
+                    if extremes[:,i,j].min()==0:print(i,j)
+                else:
+                    extremes[:,i]=np.array(curextremes)
+                    if extremes[:,i].min()==0:print(i)
                 
     print("\nFinished")
     new_settings=np.seterr(invalid=old_settings["invalid"])
