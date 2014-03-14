@@ -133,14 +133,14 @@ def main():
     
     ntimes=find_times(files[0])
     
-    ncfile=setup_nc_file(output_file,output_lat,output_lon,ntimes,ylen,xlen)
-    
     output_data=np.zeros((ntimes,ylen,xlen))
     for v in variables:
         load_data(files,v,output_data,x,y)
+        
+        ncfile=setup_nc_file(output_file+"_"+v,output_lat,output_lon,ntimes,ylen,xlen)
         write_data(output_data,v,var_atts[v],ncfile)
+        finalize_ncfile(ncfile)
     
-    finalize_ncfile(ncfile)
     
 
 if __name__ == '__main__':
