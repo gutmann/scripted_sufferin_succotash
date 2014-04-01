@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import glob,os,sys
+import os.path
 import numpy as np
 # import swim_io as io
 from bunch import Bunch
@@ -106,6 +107,12 @@ def niwot():
     xyzfiles=sys.argv[1:]
 
     demfile=xyzfiles[0].replace(".txt",".nc")
+    print(demfile)
+    if os.path.isfile(demfile):
+        print("Already found:"+demfile)
+        return
+    else:
+        mygis.write(demfile,np.zeros((10,10)))
     
     x,y=niwot_grid()
     data=np.zeros((2,y.size,x.size),dtype="f")
@@ -123,8 +130,15 @@ def niwot():
             except:
                 print("All processing failed for file: "+curfile)
     
-
-    if success:mygis.write(demfile,data)
+    # if os.path.isfile(demfile):
+    #     os.remove(demfile)
+    if success:
+        try:
+            os.remove(demfile)
+        except:
+            pass
+        # should automatically clobber the temporary file anyway
+        mygis.write(demfile,data)
     
 
 if __name__ == '__main__':
