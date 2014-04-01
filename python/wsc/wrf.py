@@ -1,6 +1,6 @@
 import datetime
 import numpy as np
-from stat_down import myio
+import mygis as myio
 from bunch import Bunch
 
 def stats(data):
@@ -121,7 +121,7 @@ def bin_by_elevation(data,dem,mask):
                 exposed=exposed,exposedmed=exposedmed,exposedmin=exposedmin,exposedmax=exposedmax)
 
 
-def load_elev_comparison(swefile="SWE_dailly.nc",info="4km_wrf_output.nc"):
+def load_elev_comparison(swefile="SWE_daily.nc",info="4km_wrf_output.nc"):
     
     forest=[1,5]
     bare=[7,10]
