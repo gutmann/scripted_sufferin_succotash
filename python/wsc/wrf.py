@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import datetime
 import numpy as np
 import mygis as myio
@@ -80,7 +81,7 @@ def bin_by_elevation(data,dem,mask):
     """docstring for bin_by_elevation"""
     minz=dem[dem>100].min()
     maxz=dem[dem<5000].max()
-    dz=50
+    dz=100
     
     n=np.round((maxz-minz)/dz)
     veg=np.zeros(n)
@@ -122,10 +123,12 @@ def bin_by_elevation(data,dem,mask):
 
 
 def load_elev_comparison(swefile="SWE_daily.nc",info="4km_wrf_output.nc"):
+    import matplotlib.pyplot as plt
     
     forest=[1,5]
     bare=[7,10]
     mayday=212
+    print("Loading data")
     vegclass=myio.read_nc(info,"IVGTYP").data[0,...]
     forested=np.where((vegclass==forest[0])|(vegclass==forest[1]))
     exposed=np.where((vegclass==bare[0])|(vegclass==bare[1]))
@@ -134,9 +137,10 @@ def load_elev_comparison(swefile="SWE_daily.nc",info="4km_wrf_output.nc"):
     mask[exposed]=2
     
     dem=myio.read_nc(info,"HGT").data[0,...]
-    snow=myio.read_nc(swefile,"SNOW").data[mayday,:,:]
+    snow=myio.read_nc(swefile,"SNOW").data[mayday,:,:]/1000.0
     
-    banded=bin_by_elevation(snow,dem,mask)
+    print("Binning")
+    banded=bin_by_elevation(snow[20:220,100:220],dem[20:220,100:220],mask[20:220,100:220])
     # [150:184,172:198]
 
     print("Plotting")
@@ -159,13 +163,14 @@ def load_elev_comparison(swefile="SWE_daily.nc",info="4km_wrf_output.nc"):
                         
 
     plt.legend(loc=2)
-    plt.xlim(2500,4000)
-    plt.ylim(0,2)
+    plt.xlim(2400,3800)
+    plt.ylim(0,0.7)
     plt.ylabel("Snow Water Equivalent [m]")
     plt.xlabel("Elevation [m]")
     plt.title("WRF SWE over headwaters")
-    plt.savefig("lidar_by_elev.png")
+    plt.savefig("wrf_by_elev.png")
     
-    
+if __name__ == '__main__':
+    load_elev_comparison()
     
     
