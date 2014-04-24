@@ -256,6 +256,9 @@ def convert2daily(output,days):
     return outputdata
 
 def wrap_around(times,length):
+    # checks for areas where times is outside of the bounds 0,length
+    # wraps times such that times >length start counting from 0 again
+    #  times less than 0 start counting down from length
     tmp=np.where(times<0)
     if len(tmp[0])>0:
         times[tmp]=length+times[tmp]
@@ -534,7 +537,7 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
     if exp=="dry":training_search=dry_search
     if exp=="hot":training_search=hot_search
     if exp=="cold":training_search=cold_search
-    if exp=="conus":
+    if (exp=="conus") or (exp=="pgw"):
         training_search=e0_search
         subset=[0,None,0,None] #no subset, =CONUS
         
@@ -558,7 +561,11 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
             print(narr_dir+narr_var_dir+narr_var+extra+cur_search)
             narrfiles.extend(glob.glob(narr_dir+narr_var_dir+narr_var+extra+cur_search))
         narrfiles.sort()
-        outputfiles=glob.glob(narr_dir+narr_var_dir+narr_var+extra+output_search)
+        if exp=="pgw":
+            outputfiles=glob.glob("pgw/ncep/"+narr_var_dir+narr_var+extra+output_search)
+        else:
+            outputfiles=glob.glob(narr_dir+narr_var_dir+narr_var+extra+output_search)
+
         outputfiles.sort()
         obs_files=[]
         for cur_search in training_search:
@@ -657,7 +664,7 @@ if __name__ == '__main__':
     try:
         parser= argparse.ArgumentParser(description='Compute a Statistical Asynchronous Regression (with hard coded files). ')
         parser.add_argument('var',action='store',nargs="?",help="Chose a variable [tasmax,tasmin,pr]",default="pr")
-        parser.add_argument('exp',action='store',nargs="?",help="Chose an experiment [e0,e1,conus,wet,dry,hot,cold]",default="e0")
+        parser.add_argument('exp',action='store',nargs="?",help="Chose an experiment [e0,e1,conus,pgw,wet,dry,hot,cold]",default="e0")
         parser.add_argument('res',action='store',nargs="?",help="Chose a resolution [4km, 6km, 12km]",default="12km")
         parser.add_argument('forcing',action='store',nargs="?",help="Chose a forcing model [NCEP, NARR,CCSM]",default="NCEP")
         parser.add_argument('month',action='store',nargs="?",help="Only run this month",default=None)

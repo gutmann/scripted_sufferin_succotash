@@ -53,7 +53,7 @@ def time_gen(year,model):
     return np.arange(t_start,t_stop)
 
 def update_files_for_year(year,res,variable,model,mask):
-    files=glob.glob("SAR3conus/"+model+"/"+variable+"/BCSAR*"+res+"*"+str(year)+"*")
+    files=glob.glob("SAR3pgw/"+model+"/"+variable+"/BCSAR*"+res+"*"+str(year)+"*")
     files.sort()
     time_info.data=time_gen(year,model)
     data=np.concatenate(myio.read_files(files,variable))
@@ -70,10 +70,10 @@ def update_files_for_year(year,res,variable,model,mask):
 def main():
     # res=["12km","6km"]
     # variables=["pr","tasmax","tasmin"]
-    # models=["ncep","narr"]
+    # models=["ncep","narr","ccsm"]
     
     res=["12km"]
-    models=["ccsm"]
+    models=["ncep"]
     # variables=["tasmax","tasmin"]
     variables=["pr"]
     
