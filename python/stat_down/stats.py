@@ -6,7 +6,7 @@ import sys
 import numpy as np
 from scipy import stats
 
-import swim_io
+import mygis as swim_io
 import stats_driver
     
 def wetdry(data,threshold=0):

@@ -3,65 +3,6 @@ import sys
 import numpy as np
 from scipy import stats
 from bunch import Bunch
-# from nc_reader import NC_Reader
-# import mygis
-narrfilename='/Volumes/Data2/usbr/NARR/flxnc/HGT_2006010100.nc'
-'''Default filename to use for low res geographic information'''
-wrffilename="/Volumes/G-SAFE/usbr/wrf4km-sfc-output/wrfout_d01_2008-01-01_00:00:00.nc"
-'''Default filename to use for high res geographic information'''
-narrdatafiles="/Volumes/Data2/usbr/NARR/precip/merged_AWIP32.2008*"
-'''Default search path to use for low res data sets'''
-wrfdatafiles=["/Volumes/G-SAFE/usbr/wrf4km_daily_precip/NARR_04km_OCT2007-SEP2008.nc",
-              "/Volumes/G-SAFE/usbr/wrf4km_daily_precip/NARR_04km_OCT2008-DEC2008.nc"]
-'''Default files to use for high res data'''
-
-def read_wrf():
-    '''Read in WRF precip data'''
-    pass
-    # # read data from two files, the first is a full Water Year, 
-    # # the second completes the calendar year of the first
-    # d1=mygis.read_nc(wrfdatafiles[0],var="RAINNC").data
-    # d2=mygis.read_nc(wrfdatafiles[1],var="RAINNC").data
-    # # nday shift = the number of days to strip from the beginning of the first file
-    # nday_shift=d2.shape[0] # (31+30+31)
-    # # compute the first day from accumulated values
-    # day1=d1[nday_shift,:,:]-d1[nday_shift-1,:,:]
-    # # strip off / shift data by n_days
-    # d1[:-nday_shift,:,:]=d1[nday_shift:,:,:]
-    # # tack on the second files data to the end
-    # d1[-nday_shift:,:,:]=d2
-    # # compute the difference from accumulated precip for the rest of the data
-    # d1[1:,:,:]=np.diff(d1,axis=0)
-    # # finally restore the first day computed previously
-    # d1[0,:,:]=day1
-    # return d1
-
-def read_narr():
-    '''Read in NARR precip dataset from N files into an array(N,y,x) matching a hires file'''
-    # make an NC_Reader object that can loop over all files and geographically match them
-    # to the wrf input data file
-    pass
-    # narr=NC_Reader(narrdatafiles,geoin_file=narrfilename,geomatch_file=wrffilename,
-    #                 readvars=list(['PRATE_221_SFC']),nn=False, bilin=True)
-    # # read the first (and only) variable ([0]) from the first data file
-    # narrd1=narr.next()[0]
-    # # create an output array to handle the data
-    # narroutputdata=np.empty((len(narr._filenames),narrd1.shape[0],narrd1.shape[1]),dtype=np.float32)
-    # # insert the first day
-    # narroutputdata[0,:,:]=narrd1*3*60*60
-    # # could probably do this as an enumerate(narr) ?
-    # # i is the index into the output dataset
-    # i=1
-    # for d in narr:
-    #     # loop through the narr dataset storing each value in the outputdata. 
-    #     narroutputdata[i,:,:]=d[0]*3*60*60 #convert mm/s to mm over a three hour period
-    #     i+=1
-    # # now strip the data down from 3hrly to daily data (3hr = 8x per day)
-    # daily=np.empty((len(narr._filenames)/8,narrd1.shape[0],narrd1.shape[1]),dtype=np.float32)
-    # for i in range(daily.shape[0]):
-    #     daily[i]=narroutputdata[i*8:(i+1)*8,:,:].sum(axis=0)
-    #     
-    # return daily
 
 def make_xy(inx,iny,precip=True,n=300.0):
     '''Make x,y into <= n [300] roughly evenly spaced values'''
@@ -116,6 +57,8 @@ def test_plot(x,y,linfits,i,j):
 
 def piecewise_linear_regression(x,y,n=6):
     '''Compute piecewise linear regression on x,y in n equal subsections'''
+    if len(x)<24:
+        n=int(np.floor(len(x)/4))
     output=np.empty((6,n))
     nx=x.size
     step=nx/float(n)
@@ -210,13 +153,13 @@ def develop_async(hires=None,lowres=None,isPrecip=True,verbose=True,even_xy=Fals
                         x=x[-nvals:]
                         y=y[-nvals:]
                         # force a minimum value so the log can't explode
-                        x[x<1E-5]=1E-5
-                        y[y<1E-5]=1E-5
+                        x[x<1E-10]=1E-10
+                        y[y<1E-10]=1E-10
                         # convert to log space
                         x=np.log(x)
                         y=np.log(y)
                 # compute the piecewise linear regression
-                if len(x)>20:
+                if len(x)>=5: #require a minimum number of data points per line segment...
                     plr=piecewise_linear_regression(x,y)
                     # append results to the list of plrs
                     allplrs.append((plr,i,j))
@@ -238,9 +181,10 @@ def correct_the_top(data,maxval,scale=None):
     if len(tmp[0])==0:
         return
     if data.max()>500:
-        print(data.max())
+        print(data.max(),maxval)
     if scale==None:scale=0.2*maxval
     errs=data[tmp]-maxval
+    # rescale high data to asymptotically approach maxval+scale, scale is often 10[K] or 20% max[mm]
     data[tmp]=scale*(1-1/(1+errs/scale))+maxval
 
 def correct_the_bottom(data,minval,scale=None):
@@ -291,7 +235,7 @@ def fill_missing(data,missing=-9999):
                 curval = (curinterp*goodvals[nextval]) + ((1-curinterp)*goodvals[prevval])
             data[i]=curval
 
-def apply_plr(x,plr,vmax=1E3,vmin=-40,precip=True):
+def apply_plr(x,plr,vmax=1E4,vmin=-30,precip=True):
     """apply piecewise linear regression to x"""
     n=plr.shape[1]
     output=np.zeros(x.shape,dtype=x.dtype)-9999
@@ -304,7 +248,11 @@ def apply_plr(x,plr,vmax=1E3,vmin=-40,precip=True):
         else:
             cur=np.where((x>=plr[0,i])&(x<plr[1,i]))
         # apply the regression slope and offset values
-        output[cur]=x[cur]*plr[2,i]+plr[3,i]
+        try:
+            output[cur]=x[cur]*plr[2,i]+plr[3,i]
+        except:
+            # we get here when plr[2:3,i]==NaN bevause x ~= -11 ~= 1e-5 mm
+            output[cur]=0
     # if these are precip data, need to reverse the log transform
     if precip:
         output=np.exp(output)
@@ -317,7 +265,7 @@ def apply_plr(x,plr,vmax=1E3,vmin=-40,precip=True):
         correct_the_bottom(output,vmin,scale=10.0)
     return output
 
-def apply_async(data,async,vmax=1E10,vmin=-40,isPrecip=True,verbose=True):
+def apply_async(data,async,vmax=1E4,vmin=-30,isPrecip=True,verbose=True):
     '''Apply asynchronous regression to entire dataset
     
     data = array(n,ny,nx)

@@ -1,6 +1,6 @@
 import numpy as np
 from bunch import Bunch
-import swim_io
+import mygis as swim_io
 import sys
 
 
