@@ -7,6 +7,7 @@ Series of routines for reading / writing various GIS formats
     (added as I need them)
 
 Requires GDAL and netCDF4 (both the libraries and the Python bindings)
+    if GDAL is not available it will still import, but libraries that require gdal will raise an import error
 
 Created by Ethan Gutmann on 2011-06-17.
 Copyright (c) 2011 National Center for Atmospheric Research. All rights reserved.
@@ -183,11 +184,11 @@ def write_tiff(filename,data,res=None,origin=None,zone=None):
     dst_ds=None
 
 
-def read_geo(filename):
+def read_geo(filename,outputdim=2):
     latnames=["lat","latitude","XLAT","XLAT_M"]
     lonnames=["lon","longitude","XLONG","XLONG_M"]
-    latdata=None
-    londata=None
+    latdat=None
+    londat=None
     
     for lat,lon in zip(latnames,lonnames):
         try:
@@ -196,14 +197,17 @@ def read_geo(filename):
         except Exception as e:
             pass
     
-    if latdata==None:
+    if latdat==None:
         # we probably weren't looking at a netcdf file...
         return None
     
     if londat.max()>180:
         londat[londat>180]=londat[londat>180]-360
-    if len(londat.shape)==1:
+    if (len(londat.shape)==1) and (outputdim>1):
         londat,latdat=np.meshgrid(londat,latdat)
+    if outputdim==3:
+        londat=londat[np.newaxis,...]
+        latdat=latdat[np.newaxis,...]
     
     return Bunch(lat=latdat,lon=londat)
 

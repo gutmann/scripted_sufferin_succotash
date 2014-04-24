@@ -22,13 +22,14 @@ def load_geoLUT(lat1,lon1,lat2,lon2,subset=None):
     '''
     # (lon2,lat2)=read_geo_latlon(georef,subset=subset)
     N=lat2.shape
+    Nhi=lat1.shape
     # output data
     geoLUT=np.empty((N[0],N[1],4,3))
 
     # intermediate variables
     x=np.zeros(4).astype('i')
     y=np.zeros(4).astype('i')
-    winhalfsize=3 # search window for next data point
+    winhalfsize=5 # search window for next data point
     
     # figure out which direction is positive in latitude and longitude (just in case)
     dxinc=np.sign(lon1[1,1]-lon1[0,0]).astype('i')
@@ -45,18 +46,18 @@ def load_geoLUT(lat1,lon1,lat2,lon2,subset=None):
         (prevx,prevy)=(lastx,lasty)
         # create a window around that position to start searching as we loop through the rest of it
         y0=max(lasty-winhalfsize,0)
-        y1=min(lasty+winhalfsize,N[1])
+        y1=min(lasty+winhalfsize,Nhi[0])
         x0=max(lastx-winhalfsize,0)
-        x1=min(lastx+winhalfsize,N[0])
+        x1=min(lastx+winhalfsize,Nhi[1])
         latwin=lat1[y0:y1,x0:x1]
         lonwin=lon1[y0:y1,x0:x1]
         for j in range(N[0]):
             # if we have moved update the window position
             if (prevx!=lastx) or (prevy!=lasty):
                 y0=max(lasty-winhalfsize,0)
-                y1=min(lasty+winhalfsize,N[1])
+                y1=min(lasty+winhalfsize,Nhi[0])
                 x0=max(lastx-winhalfsize,0)
-                x1=min(lastx+winhalfsize,N[0])
+                x1=min(lastx+winhalfsize,Nhi[1])
                 latwin=lat1[y0:y1,x0:x1]
                 lonwin=lon1[y0:y1,x0:x1]
                 (prevx,prevy)=(lastx,lasty)
