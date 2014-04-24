@@ -1,5 +1,4 @@
-#!/opt/python/bin/python
-###!/usr/bin/env python
+#!/usr/bin/env python
 import glob
 import time
 import cPickle
@@ -9,10 +8,10 @@ import argparse,traceback
 
 import numpy as np
 
-import nc_addvars
+# import nc_addvars
 import async
-import swim_io
-# import mygis
+# import swim_io
+import mygis as swim_io
 # from nc import NC_writer
 import date_fun
 from bunch import Bunch
@@ -31,6 +30,16 @@ subxmax=None
 subymin=0
 subymax=None
 geoLUT=None
+
+# CCSM specific offsets into a single huge file
+startyears =Bunch(train=1979,apply=1979)
+endyears   =Bunch(train=1999,apply=2060)
+
+startpoints=Bunch(train=(startyears["train"]-1960)*365,
+                  apply=(startyears["apply"]-1960)*365)
+endpoints=Bunch(train=(endyears["train"]-1960+1)*365,
+                  apply=(endyears["apply"]-1960+1)*365)
+
 
 def read_geo_latlon(geo_file=None,subset=None,mask=False):
     if not geo_file:
@@ -301,6 +310,42 @@ def read_narr_file(filename,month,geo,loadvar="prate",pad_length=15,subset=None,
     # d.ncfile.close()
     return output
 
+def read_ccsm_file(filename,month,geo,loadvar="pr",pad_length=15,subset=None,startdate=[0,1,1,0,0.,0.],period="train"):
+    t=swim_io.read_nc(filename,var="time").data
+    # t[0] = [1960,1,1,0,0,0]
+    lat=swim_io.read_nc(filename,var="lat").data
+    lon=swim_io.read_nc(filename,var="lon").data
+    d=swim_io.read_nc(filename,var=loadvar,returnNCvar=True)
+
+    startpoint=startpoints[period]
+    endpoint=endpoints[period]
+    subymin=int(geo[:,:,:,0].min())
+    subymax=int(geo[:,:,:,0].max()+1)
+    subxmin=int(geo[:,:,:,1].min())
+    subxmax=int(geo[:,:,:,1].max()+1)
+    
+    # because times are from a 365 day year (noleap) we have to trick find_times by using the day of year
+    # this "pretends" they are all in the same year, but all find_times uses is the month so as long as
+    # startdate is a non-leap year this should work
+    doy=t%365
+    thismonth=find_times(doy[startpoint:endpoint],month,np.array([1999,1,1,0,0,0]),pad_length=pad_length)
+    dt=(t[1]-t[0])*60*60*24 # t is in days, need dt in seconds (= 86400)
+    
+    # Nio doesn't let you subset with a list, only with slices?
+    output=d.data[startpoint:endpoint,subymin:subymax,subxmin:subxmax][thismonth,:,:]
+    # if using the netcdf4-python library this might be a little faster
+    # output=d.data[thismonth,subymin:subymax,subxmin:subxmax]
+    output*=dt
+    output=regrid(output,lat,lon,geo,subymin,subxmin)
+    d.ncfile.close()
+    years=np.arange(startyears[period],endyears[period])
+    dayspermonth=output.shape[0]/len(years)
+    print(month,dayspermonth)
+    print(len(years),years[0],years[-1])
+    return Bunch(data=output,dates=years,lengths=[dayspermonth*i+dayspermonth for i in range(len(years))])
+
+
+
 def read_obs_file(filename,month,geo,loadvar="pr",pad_length=15,subset=None,startdate=[1940,1,1,0,0.,0.]):
     d=swim_io.read_nc(filename,var=loadvar,returnNCvar=True)
     t=swim_io.read_nc(filename,var="time").data
@@ -313,12 +358,6 @@ def read_obs_file(filename,month,geo,loadvar="pr",pad_length=15,subset=None,star
         xmin=0;xmax=None;ymin=0;ymax=None;
     
     year=int(filename.split('/')[-1].split('.')[-2])
-    # if re.match(".*obs/uw.0.*",filename):
-    #     print("WARNING: correcting dates in uw-6km files, is this still necessary?")
-    #     # correct screwed up dates in the UW nc files.  
-    #     if (year%4==0):
-    #         if (year%100!=0) or (year%400==0):
-    #             t[60:]-=1
     thismonth=find_times(t,month,np.array(startdate),pad_length=pad_length)
     # Nio doesn't let you subset with a list, only with slices?
     output=d.data[:,ymin:ymax,xmin:xmax][thismonth,:,:]
@@ -330,6 +369,7 @@ def read_obs_file(filename,month,geo,loadvar="pr",pad_length=15,subset=None,star
     
 
 def read_data(files,month,filereader,geo,loadvar=None,pad_length=15,subset=None,startdate=None):
+    
     d1=filereader(files[0],month,geo,loadvar=loadvar,pad_length=pad_length,subset=subset,startdate=startdate)
     output=np.empty((len(files)*(d1.shape[0]+1),d1.shape[1],d1.shape[2]))
     output[0:d1.shape[0],:,:]=d1
@@ -413,10 +453,13 @@ def read_mask(filename,load_var):
     d=swim_io.read_nc(filename,load_var,returnNCvar=True)
     data=d.data[0,...]
     d.ncfile.close()
-    if type(data.mask)==bool:
+    try:
+        if type(data.mask)==bool:
+            return False
+        else:
+            return data.mask
+    except:
         return False
-    else:
-        return data.mask
 
 def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
     """Perform an Asynchronous regression on NARR or NCEP data"""
@@ -424,6 +467,8 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
     # note you also have to add "nldas" between the / and the * after obsextra
     narr_dir=base_dir+"forcing/narr/"
     narr_extra=""
+    ccsm_dir="ccsm/"
+    ccsm_extra=""
     ncep_dir=base_dir+"forcing/ncep/"
     ncep_extra="*gauss*"
 
@@ -444,6 +489,10 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
         extra=ncep_extra
         narr_dir=ncep_dir
         startdate=np.array([1,1,1,0,0.,0.])
+    elif forcing=="CCSM":
+        extra=ccsm_extra
+        narr_dir=ccsm_dir
+        startdate=np.array([0,1,1,0,0.,0.])
     else:
         extra=narr_extra
         startdate=np.array([1800,1,1,0,0.,0.])
@@ -505,8 +554,8 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
             load_narr_var="tasmax"
         if narr_var=="prate":
             load_narr_var="pr"
-        
         for cur_search in training_search:
+            print(narr_dir+narr_var_dir+narr_var+extra+cur_search)
             narrfiles.extend(glob.glob(narr_dir+narr_var_dir+narr_var+extra+cur_search))
         narrfiles.sort()
         outputfiles=glob.glob(narr_dir+narr_var_dir+narr_var+extra+output_search)
@@ -531,7 +580,10 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
         
             print("  Loading "+forcing+" data")
             t1=time.time()
-            narr=read_data(narrfiles,month,read_narr_file,geo,load_narr_var,pad_length=15,startdate=startdate)
+            if forcing=="CCSM":
+                narr=read_ccsm_file(narrfiles[0],month,geo,load_narr_var,pad_length=15,startdate=startdate,period="train")
+            else:
+                narr=read_data(narrfiles,month,read_narr_file,geo,load_narr_var,pad_length=15,startdate=startdate)
             print("   "+str((time.time()-t1)/60)+" minutes")
             sys.stdout.flush()
         
@@ -551,9 +603,13 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
          
             print("  Applying async regression")
             t1=time.time()
-            narr=read_data(outputfiles,month,read_narr_file,geo,load_narr_var,pad_length=0,subset=subset,startdate=startdate)
+            if forcing=="CCSM":
+                narr=read_ccsm_file(narrfiles[0],month,geo,load_narr_var,pad_length=15,startdate=startdate,period="apply")
+            else:
+                narr=read_data(outputfiles,month,read_narr_file,geo,load_narr_var,pad_length=0,subset=subset,startdate=startdate)
             output=async.apply_async(narr.data,regression,vmax=obsmax*1.2,isPrecip=(narr_var=="prate"),verbose=True)
-            if type(omask)==np.ndarray:
+            
+            if (type(omask)==np.ndarray) and (omask.shape[0]==output.shape[1]) and (omask.shape[1]==output.shape[2]):
                 for thistime in range(output.shape[0]):
                     output[thistime,:,:][omask]=-9999
         
@@ -576,23 +632,23 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
             del obs
             gc.collect()
         
-        if runmonth==None:
-            # add the lat and lon variables to the orignal files (should also add time?)
-            nc_addvars.main(output_dir+"BCSAR*"+res+"*.nc",copy_from_file=obs_files[0],
-                            ranges=[[subset[0],subset[1]],[subset[2],subset[3]]],
-                            vars2copy=["lon","lat"])
-            # next delete the old files
-            old_files=glob.glob(output_dir+"BCSAR*"+res+"*.nc")
-            old_files.sort()
-            for f in old_files:
-                print(f)
-                os.remove(f)
-            # then rename "added" files back to the original filenames
-            new_files=glob.glob(output_dir+"added*"+res+"*.nc")
-            new_files.sort()
-            for o,n in zip(old_files,new_files):
-                print(n,o)
-                os.rename(n,o)
+        # if runmonth==None:
+        #     # add the lat and lon variables to the orignal files (should also add time?)
+        #     nc_addvars.main(output_dir+"BCSAR*"+res+"*.nc",copy_from_file=obs_files[0],
+        #                     ranges=[[subset[0],subset[1]],[subset[2],subset[3]]],
+        #                     vars2copy=["lon","lat"])
+        #     # next delete the old files
+        #     old_files=glob.glob(output_dir+"BCSAR*"+res+"*.nc")
+        #     old_files.sort()
+        #     for f in old_files:
+        #         print(f)
+        #         os.remove(f)
+        #     # then rename "added" files back to the original filenames
+        #     new_files=glob.glob(output_dir+"added*"+res+"*.nc")
+        #     new_files.sort()
+        #     for o,n in zip(old_files,new_files):
+        #         print(n,o)
+        #         os.rename(n,o)
             
         
     
@@ -603,10 +659,10 @@ if __name__ == '__main__':
         parser.add_argument('var',action='store',nargs="?",help="Chose a variable [tasmax,tasmin,pr]",default="pr")
         parser.add_argument('exp',action='store',nargs="?",help="Chose an experiment [e0,e1,conus,wet,dry,hot,cold]",default="e0")
         parser.add_argument('res',action='store',nargs="?",help="Chose a resolution [4km, 6km, 12km]",default="12km")
-        parser.add_argument('forcing',action='store',nargs="?",help="Chose a forcing model [NCEP, NARR]",default="NCEP")
+        parser.add_argument('forcing',action='store',nargs="?",help="Chose a forcing model [NCEP, NARR,CCSM]",default="NCEP")
         parser.add_argument('month',action='store',nargs="?",help="Only run this month",default=None)
         parser.add_argument('-v', '--version',action='version',
-                version='async_narr.py 1.0')
+                version='async_narr.py 1.2')
         parser.add_argument ('--verbose', action='store_true',
                 default=False, help='verbose output', dest='verbose')
         args = parser.parse_args()

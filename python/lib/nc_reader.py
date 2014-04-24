@@ -32,7 +32,7 @@ VERSION
 
 import numpy as np
 
-import swim_io
+import mygis as swim_io
 from bunch import Bunch
 import glob
 

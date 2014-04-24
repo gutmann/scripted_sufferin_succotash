@@ -201,7 +201,7 @@ def read_geo(filename):
         return None
     
     if londat.max()>180:
-        londat=londat-360
+        londat[londat>180]=londat[londat>180]-360
     if len(londat.shape)==1:
         londat,latdat=np.meshgrid(londat,latdat)
     
@@ -260,26 +260,36 @@ def read_nc(filename,var="data",proj=None,returnNCvar=False):
 def _write1d(NCfile,data,varname="data",units=None,dtype='f',dims=('x',),attributes=None):
     nx=data.size
     NCfile.createDimension(dims[0], nx)
-    NCfile.createVariable(varname,dtype,dims)
+    try:
+        fill_value=attributes["_FillValue"]
+    except:
+        fill_value=None
+    NCfile.createVariable(varname,dtype,dims,fill_value=fill_value)
     NCfile.variables[varname][:]=data.astype(dtype)
     if units!=None:
         NCfile.variables[varname].units=units
     if attributes:
         for k in attributes.keys():
-            NCfile.variables[varname].__setattr__(k,attributes[k])
+            if k!="_FillValue":
+                NCfile.variables[varname].__setattr__(k,attributes[k])
 
 def _write2d(NCfile,data,varname="data",units=None,dtype='f',dims=('y','x'),attributes=None):
     (ny,nx)=data.shape
     if dims[0]=="time":ny=0
     NCfile.createDimension(dims[1], nx)
     NCfile.createDimension(dims[0], ny)
-    NCfile.createVariable(varname,dtype,dims)
+    try:
+        fill_value=attributes["_FillValue"]
+    except:
+        fill_value=None
+    NCfile.createVariable(varname,dtype,dims,fill_value=fill_value)
     NCfile.variables[varname][:]=data.astype(dtype)
     if units!=None:
         NCfile.variables[varname].units=units
     if attributes:
         for k in attributes.keys():
-            NCfile.variables[varname].__setattr__(k,attributes[k])
+            if k!="_FillValue":
+                NCfile.variables[varname].__setattr__(k,attributes[k])
 
 def _write3d(NCfile,data,varname="data",units=None,dtype='f',dims=('z','y','x'),attributes=None):
     (nz,ny,nx)=data.shape
@@ -287,13 +297,18 @@ def _write3d(NCfile,data,varname="data",units=None,dtype='f',dims=('z','y','x'),
     NCfile.createDimension(dims[2], nx)
     NCfile.createDimension(dims[1], ny)
     NCfile.createDimension(dims[0], nz)
-    NCfile.createVariable(varname,dtype,dims)
+    try:
+        fill_value=attributes["_FillValue"]
+    except:
+        fill_value=None
+    NCfile.createVariable(varname,dtype,dims,fill_value=fill_value)
     NCfile.variables[varname][:]=data.astype(dtype)
     if units!=None:
         NCfile.variables[varname].units=units
     if attributes:
         for k in attributes.keys():
-            NCfile.variables[varname].__setattr__(k,attributes[k])
+            if k!="_FillValue":
+                NCfile.variables[varname].__setattr__(k,attributes[k])
 
 def _write4d(NCfile,data,varname="data",units=None,dtype='f',dims=('t','z','y','x'),attributes=None):
     (nt,nz,ny,nx)=data.shape
@@ -302,13 +317,18 @@ def _write4d(NCfile,data,varname="data",units=None,dtype='f',dims=('t','z','y','
     NCfile.createDimension(dims[2], ny)
     NCfile.createDimension(dims[1], nz)
     NCfile.createDimension(dims[0], nt)
-    NCfile.createVariable(varname,dtype,dims)
+    try:
+        fill_value=attributes["_FillValue"]
+    except:
+        fill_value=None
+    NCfile.createVariable(varname,dtype,dims,fill_value=fill_value)
     NCfile.variables[varname][:]=data.astype(dtype)
     if units!=None:
         NCfile.variables[varname].units=units
     if attributes:
         for k in attributes.keys():
-            NCfile.variables[varname].__setattr__(k,attributes[k])
+            if k!="_FillValue":
+                NCfile.variables[varname].__setattr__(k,attributes[k])
 
 
 def addvar(NCfile,data,varname,dims,dtype='f',attributes=None):
@@ -316,11 +336,16 @@ def addvar(NCfile,data,varname,dims,dtype='f',attributes=None):
         if not(d in NCfile.dimensions):
             NCfile.createDimension(d,data.shape[i])
     
-    NCfile.createVariable(varname,dtype,dims)
+    try:
+        fill_value=attributes["_FillValue"]
+    except:
+        fill_value=None
+    NCfile.createVariable(varname,dtype,dims,fill_value=fill_value)
     NCfile.variables[varname][:]=data.astype(dtype)
     if attributes:
         for k in attributes.keys():
-            NCfile.variables[varname].__setattr__(k,attributes[k])
+            if k!="_FillValue":
+                NCfile.variables[varname].__setattr__(k,attributes[k])
 
 def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes=None,
           lat=None,lon=None,extravars=None,history=""):

@@ -3,7 +3,8 @@ import glob
 
 import numpy as np
 
-from stat_down import myio
+# from stat_down import myio
+import mygis as myio
 import date_fun
 from bunch import Bunch
 
@@ -42,24 +43,26 @@ def load_geo(res="12km"):
     lon=myio.read_nc(geofile,"lon").data
     return lat,lon
 
-def time_gen(year):
+def time_gen(year,model):
     t_base=date_fun.date2mjd(1940,1,1,0,0,0)
     t_start=date_fun.date2mjd(year,1,1,0,0,0)-t_base
-    t_stop=date_fun.date2mjd(year+1,1,1,0,0,0)-t_base
+    if model=="ccsm":
+        t_stop=t_start+365
+    else:
+        t_stop=date_fun.date2mjd(year+1,1,1,0,0,0)-t_base
     return np.arange(t_start,t_stop)
 
 def update_files_for_year(year,res,variable,model,mask):
-    files=glob.glob("SAR3conus/"+model+"/"+variable+"/BCSAR*"+res+"*"+str(year)+"*.nc")
+    files=glob.glob("SAR3conus/"+model+"/"+variable+"/BCSAR*"+res+"*"+str(year)+"*")
     files.sort()
-    
-    time_info.data=time_gen(year)
-    
+    time_info.data=time_gen(year,model)
     data=np.concatenate(myio.read_files(files,variable))
     for i in range(data.shape[0]):
         data[i,...][mask]=FILL_VALUE
     
     info=data_info[variable]
-    newfilename=files[0][:-6]
+    newfilename=files[0].replace(".nc","")[:-3]
+    print(newfilename)
     extra_vars=[lat_info,lon_info,time_info]
     myio.write(newfilename,data,varname=info.name,dtype=info.dtype,dims=info.dims,
                attributes=info.attributes,extravars=extra_vars)
@@ -69,12 +72,11 @@ def main():
     # variables=["pr","tasmax","tasmin"]
     # models=["ncep","narr"]
     
-    res=["6km"]
-    models=["narr"]
-    variables=["tasmax","tasmin"]
+    res=["12km"]
+    models=["ccsm"]
+    # variables=["tasmax","tasmin"]
     variables=["pr"]
     
-    years=range(1979,2009)
     
     for r in res:
         mask=load_mask(r)
@@ -82,6 +84,10 @@ def main():
         lat_info.data=lat
         lon_info.data=lon
         for m in models:
+            if m=="ccsm":
+                years=range(1979,2080)
+            else:
+                years=range(1979,2009)
             for v in variables:
                 for y in years:
                     print(r,m,v,y)

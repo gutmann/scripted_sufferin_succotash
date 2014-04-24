@@ -9,7 +9,7 @@ import glob
 import numpy as np
 
 from stat_down import stats,driver,agg
-from stat_down import myio as io
+import mygis as io
 import date_fun
 from nc_reader import NC_Reader
 from bunch import Bunch
@@ -130,6 +130,12 @@ def calc_year_start_dates(filenames):
         year1=float(year1)-1
     except IndexError:
         year1=float(filenames[0].split(".")[-3])-1
+    except ValueError:
+        year1=filenames[0].split(".")[-2]
+        if len(year1)>4:
+            year1=year1.split("_")[-1]
+        year1=float(year1)-1
+        
     
     return np.floor(np.arange((year1%4.0)/4,365*len(filenames),365.25))
 
@@ -256,6 +262,11 @@ def calc_dates(files,ntimes):
     # for another set of SD data
     except IndexError:
         year1=files[0].split(".")[-3]
+    except ValueError:
+        year1=files[0].split(".")[-2]
+        if len(year1)>4:
+            year1=year1.split("_")[-1]
+        year1=float(year1)-1
     
     # once we have the starting year, calculate all other years as modified julian day
     # and convert back to Year, Month, Day dates
