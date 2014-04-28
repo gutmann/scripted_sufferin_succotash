@@ -64,6 +64,55 @@ def ll2utm(lon,lat,zone=None,north=None):
     return xy
 
 
+def proj2ll(x=None,y=None,points=None,proj=None):
+    '''Convert an arbitrary projection point to latitude and longitude. 
+    
+    (lon,lat)=proj2ll(x,y,proj)
+    
+    where proj is either: 
+        <osgeo.osr.SpatialReference> object
+        Well Known Text (WKT)
+        Proj4
+        EPSG
+    
+    Assumes a WGS84 datum/spheroid for both
+    '''
+    if not gdalloaded:
+        raise ImportError("OSR not available")
+    
+    if proj==None:
+        raise TypeError("Must specify a projection")
+    
+    if type(proj)==str:
+        projWKT=proj
+        proj=osr.SpatialReferece()
+        try:
+            proj.ImportFromWkt(projWKT)
+        except:
+            proj.ImportFromProj4(projWKT)
+            
+    if type(proj)==int:
+        projEPSG=proj
+        proj=osr.SpatialReferece()
+        proj.ImportFromEPSG(projEPSG)
+    
+    # create a geographic reference in WGS84
+    geog_ref=osr.SpatialReference()
+    geog_ref.ImportFromEPSG(4326)
+    
+    # create a transfomration object between the two reference systems
+    transform=osr.CoordinateTransformation(proj,geog_ref)
+    # transform the input coordinates to lat lon
+    if points!=None:
+        data=np.array(transform.TransformPoints(points))
+        lon=data[:,0]
+        lat=data[:,1]
+    else:
+        lon,lat,z=transform.TransformPoint(x,y)
+        
+    return lat,lon
+
+
 def utm2ll(utmx,utmy,zone=13,north=1):
     '''Convert a given UTM point to latitude and longitude. 
     

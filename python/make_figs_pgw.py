@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from mpl_toolkits.basemap import Basemap
 
-from stat_down import myio
+import mygis as myio
 
 stats_location="/d2/gutmann/usbr/stat_data/DAILY/down/stats/"
 onemm_loc="conusprecip_1mm/"
@@ -19,8 +19,11 @@ zeromm_loc="conusprecip_0mm/"
 e0_loc="precip_0mm/"
 e0_1mm_loc="precip_1mm/"
 
-def load_monthly(filesearch,mask=None):
-    files=glob(stats_location+onemm_loc+filesearch)
+base_colormap=cm.rainbow_r
+diff_colormap=cm.seismic_r
+
+def load_monthly(filesearch,location=stats_location+onemm_loc,mask=None):
+    files=glob(location+filesearch)
     files.sort()
     outputdata=np.zeros(12)
     for i,f in enumerate(files):
@@ -32,8 +35,8 @@ def load_monthly(filesearch,mask=None):
         outputdata[i]=np.mean(data)
     return outputdata
 
-def load_scales(filesearch,mask=None):
-    files=glob(stats_location+filesearch)
+def load_scales(filesearch,location=stats_location,mask=None):
+    files=glob(location+filesearch)
     files.sort()
     files=np.array(files)[[0,3,2,1]]
     
@@ -131,23 +134,30 @@ def mean_annual_fig():
             "SAR-ncep-pr-BC12km_full_res_annual_MAP.nc",
             "SDmon_c-ncep-pr-BC12km_full_res_annual_MAP.nc",
             "obs-maurer.125-pr_full_res_annual_MAP.nc",
-            "../forcing20c/forcing-ncep-pr_full_res_annual_MAP.nc"]
-    titles=["a) BCCA", "b) BCSDd", "c) AR", "d) BCSDm", "e) Observations", "f) NCEP"]
+            "../../forcing20c/forcing-ncep-pr_full_res_annual_MAP.nc",
+            "SAR-ncep-pr-BC12km_full_res_annual_MAP.nc",
+            "SAR-ccsm-pr-BC12km_full_res_annual_MAP.nc"
+            ]
+    pgw_start=6
+    titles=["a) BCCA", "b) BCSDd", "c) AR", "d) BCSDm", "e) Observations", "f) NCEP","g) AR-PGW", "h) AR-CCSM"]
     cbar_label="Mean Annual Precip [mm/yr]"
-    cbars=[False,True]*3
+    cbars=[False,True]*4
     mask=get_mask()
     
-    plt.figure(figsize=(15,10),dpi=300)
+    plt.figure(figsize=(15,13),dpi=300)
     for i,f in enumerate(files):
         
         lonlabels=[0,0,0,1]
         latlabels=[1,0,0,0]
-        if i<4:lonlabels=[0,0,0,0]
+        if i<(len(files)-2):lonlabels=[0,0,0,0]
         if (i%2)==1:latlabels=[0,0,0,0]
-        
-        data=np.ma.array(myio.read_nc(stats_location+zeromm_loc+f).data,mask=mask)
-        plt.subplot(3,2,i+1)
-        map_vis(data,title=titles[i],cmap=cm.jet,vmin=0,vmax=2000,
+
+        if i<pgw_start:
+            data=np.ma.array(myio.read_nc(stats_location+zeromm_loc+f).data,mask=mask)
+        else:
+            data=np.ma.array(myio.read_nc(f).data,mask=mask)
+        plt.subplot(4,2,i+1)
+        map_vis(data,title=titles[i],cmap=base_colormap,vmin=0,vmax=2000,
                 showcolorbar=cbars[i],cbar_label=cbar_label,
                 latlabels=latlabels,lonlabels=lonlabels)
     plt.subplots_adjust(wspace = -0.1,hspace=0.15)
@@ -160,8 +170,12 @@ def bias_fig():
     files=["CA-ncep-pr-BC12km_full_res_annual_MAP.nc",
             "SD-ncep-pr-BC12km_full_res_annual_MAP.nc",
             "SAR-ncep-pr-BC12km_full_res_annual_MAP.nc",
-            "SDmon_c-ncep-pr-BC12km_full_res_annual_MAP.nc"]
-    titles=["a) BCCA - obs", "b) BCSDd - obs", "c) AR - obs", "d) BCSDm - obs"]
+            "SDmon_c-ncep-pr-BC12km_full_res_annual_MAP.nc",
+            "SAR-ncep-pr-BC12km_full_res_annual_MAP.nc",
+            "SAR-ccsm-pr-BC12km_full_res_annual_MAP.nc"
+            ]
+    pgw_start=4
+    titles=["a) BCCA - obs", "b) BCSDd - obs", "c) AR - obs", "d) BCSDm - obs", "e) AR-PGW - obs", "f) AR-CCSM - obs"]
     cbar_label="Precipitation Bias [mm/yr]"
     cbars=[False,True]*3
     mask=get_mask()
@@ -169,17 +183,20 @@ def bias_fig():
     obsfile="obs-maurer.125-pr_full_res_annual_MAP.nc"
     obs=np.ma.array(myio.read_nc(stats_location+zeromm_loc+obsfile).data,mask=mask)
     
-    plt.figure(figsize=(15,7),dpi=300)
+    plt.figure(figsize=(15,10),dpi=300)
     for i,f in enumerate(files):
         
         lonlabels=[0,0,0,1]
         latlabels=[1,0,0,0]
-        if i<2:lonlabels=[0,0,0,0]
+        if i<(len(files)-2):lonlabels=[0,0,0,0]
         if (i%2)==1:latlabels=[0,0,0,0]
         
-        data=np.ma.array(myio.read_nc(stats_location+zeromm_loc+f).data,mask=mask)-obs
-        plt.subplot(2,2,i+1)
-        map_vis(data,title=titles[i],cmap=cm.seismic,vmin=-500,vmax=500,
+        if i>=pgw_start:
+            data=np.ma.array(myio.read_nc(f).data,mask=mask)-obs
+        else:
+            data=np.ma.array(myio.read_nc(stats_location+zeromm_loc+f).data,mask=mask)-obs
+        plt.subplot(3,2,i+1)
+        map_vis(data,title=titles[i],cmap=diff_colormap,vmin=-500,vmax=500,
                 showcolorbar=cbars[i],cbar_label=cbar_label,
                 latlabels=latlabels,lonlabels=lonlabels)
     plt.subplots_adjust(wspace = -0.0001,hspace=0.15)
@@ -214,7 +231,7 @@ def agu_6panel_fig():
         
         data=np.ma.array(myio.read_nc(stats_location+zeromm_loc+f).data,mask=mask)-obs
         plt.subplot(3,2,i+1)
-        map_vis(data,title=titles[i],cmap=cm.seismic,vmin=-500,vmax=500,
+        map_vis(data,title=titles[i],cmap=diff_colormap,vmin=-500,vmax=500,
                 showcolorbar=cbars[i],cbar_label=cbar_label,
                 latlabels=latlabels,lonlabels=lonlabels)
         if i==4:
@@ -246,7 +263,7 @@ def changemap_fig():
     obs1=np.ma.array(myio.read_nc(stats_location+o1).data,mask=mask)
     dobs=np.ma.array(myio.read_nc(stats_location+o2).data,mask=mask)-obs1
     plt.subplot(1,2,1)
-    map_vis(dobs,title=obstitle,cmap=cm.seismic,vmin=-500,vmax=500,
+    map_vis(dobs,title=obstitle,cmap=diff_colormap,vmin=-500,vmax=500,
             showcolorbar=True,cbar_label=cbar_label,
             latlabels=latlabels,lonlabels=lonlabels)
     
@@ -254,7 +271,7 @@ def changemap_fig():
     ncep1=np.ma.array(myio.read_nc(stats_location+n1).data,mask=mask)
     dncep=np.ma.array(myio.read_nc(stats_location+n2).data,mask=mask)-ncep1
     plt.subplot(1,2,2)
-    map_vis(dncep,title=nceptitle,cmap=cm.seismic,vmin=-500,vmax=500,
+    map_vis(dncep,title=nceptitle,cmap=diff_colormap,vmin=-500,vmax=500,
             showcolorbar=True,cbar_label=cbar_label,
             latlabels=latlabels,lonlabels=lonlabels)
 
@@ -272,14 +289,18 @@ def monthly_precip_fig():
     ca=load_monthly("CA-ncep-pr-BC12km_full_res_month*_MAP.nc",mask=mask)
     obs=load_monthly("obs-maurer.125-pr_full_res_month*_MAP.nc",mask=mask)
     ncep=load_monthly("../forcing20c/forcing-ncep-pr_full_res_month*_MAP.nc",mask=mask)
+
+    pgw=load_monthly("SAR-ncep-pr-BC12km_full_res_month*_MAP.nc",location="./",mask=mask)
+    ccsm=load_monthly("SAR-ccsm-pr-BC12km_full_res_month*_MAP.nc",location="./",mask=mask)
+
     
     plt.figure(figsize=(7,5))
     
-    plot_v_season([sar,sdd,sdm,ca,obs],
-                colors=["g","darkred","red","b","k","k"],
-                linestyles=["-","-","-","-","-","--"],
-                markers=["None","None","None","None",".","None"],
-                labels=["AR","BCSDd","BCSDm","BCCA","Obs.","NCEP"],
+    plot_v_season([sar,sdd,sdm,ca,obs,ncep,pgw,ccsm],
+                colors=["g","darkred","red","b","k","k","g","g"],
+                linestyles=["-","-","-","-","-","--",":","--"],
+                markers=["None","None","None","None",".","None","None","None"],
+                labels=["AR","BCSDd","BCSDm","BCCA","Obs.","NCEP","AR-PGW","AR-CCSM"],
                 yrange=[30,120])
                 
     plt.ylabel("mm")
@@ -296,23 +317,30 @@ def interannual_fig():
             "SAR-ncep-pr-BC12km_full_res_annual_interannual.nc",
             "SDmon_c-ncep-pr-BC12km_full_res_annual_interannual.nc",
             "obs-maurer.125-pr_full_res_annual_interannual.nc",
-            "../forcing20c/forcing-ncep-pr_full_res_annual_interannual.nc"]
-    titles=["a) BCCA", "b) BCSDd", "c) AR", "d) BCSDm", "e) Observations", "f) NCEP"]
+            "../../forcing20c/forcing-ncep-pr_full_res_annual_interannual.nc",
+            "SAR-ncep-pr-BC12km_full_res_annual_interannual.nc",
+            "SAR-ccsm-pr-BC12km_full_res_annual_interannual.nc"
+            ]
+    pgw_start=6
+    titles=["a) BCCA", "b) BCSDd", "c) AR", "d) BCSDm", "e) Observations", "f) NCEP","g) AR-PGW","h) AR-CCSM"]
     cbar_label="Interannual Variability [mm/yr]"
-    cbars=[False,True]*3
+    cbars=[False,True]*4
     mask=get_mask()
     
-    plt.figure(figsize=(15,10),dpi=300)
+    plt.figure(figsize=(15,13),dpi=300)
     for i,f in enumerate(files):
         
         lonlabels=[0,0,0,1]
         latlabels=[1,0,0,0]
-        if i<4:lonlabels=[0,0,0,0]
+        if i<(len(files)-2):lonlabels=[0,0,0,0]
         if (i%2)==1:latlabels=[0,0,0,0]
         
-        data=np.ma.array(myio.read_nc(stats_location+zeromm_loc+f).data,mask=mask)
-        plt.subplot(3,2,i+1)
-        map_vis(data,title=titles[i],cmap=cm.jet,vmin=0,vmax=500,
+        if i>=pgw_start:
+            data=np.ma.array(myio.read_nc(f).data,mask=mask)
+        else:
+            data=np.ma.array(myio.read_nc(stats_location+zeromm_loc+f).data,mask=mask)
+        plt.subplot(4,2,i+1)
+        map_vis(data,title=titles[i],cmap=base_colormap,vmin=0,vmax=500,
                 showcolorbar=cbars[i],cbar_label=cbar_label,
                 latlabels=latlabels,lonlabels=lonlabels)
     plt.subplots_adjust(wspace = -0.1,hspace=0.15)
@@ -331,14 +359,16 @@ def monthly_interannual_fig():
     ca=load_monthly("CA-ncep-pr-BC12km_full_res_month*_interannual.nc",mask=mask)
     obs=load_monthly("obs-maurer.125-pr_full_res_month*_interannual.nc",mask=mask)
     ncep=load_monthly("../forcing20c/forcing-ncep-pr_full_res_month*_interannual.nc",mask=mask)
+    pgw=load_monthly("SAR-ncep-pr-BC12km_full_res_month*_interannual.nc",location="./",mask=mask)
+    ccsm=load_monthly("SAR-ccsm-pr-BC12km_full_res_month*_interannual.nc",location="./",mask=mask)
     
     plt.figure(figsize=(7,5))
     
-    plot_v_season([sar,sdd,sdm,ca,obs],
-                colors=["g","darkred","red","b","k","k"],
-                linestyles=["-","-","-","-","-","--"],
-                markers=["None","None","None","None",".","None"],
-                labels=["AR","BCSDd","BCSDm","BCCA","Obs.","NCEP"],
+    plot_v_season([sar,sdd,sdm,ca,obs,ncep,pgw,ccsm],
+                colors=["g","darkred","red","b","k","k","g","g"],
+                linestyles=["-","-","-","-","-","--",":","--"],
+                markers=["None","None","None","None",".","None","None","None"],
+                labels=["AR","BCSDd","BCSDm","BCCA","Obs.","NCEP","AR-PGW","AR-CCSM"],
                 yrange=[10,60])
                 
     plt.ylabel("mm")
@@ -405,23 +435,30 @@ def wetfrac_map_fig():
             "SAR-ncep-pr-BC12km_full_res_annual_wetfrac.nc",
             "SDmon_c-ncep-pr-BC12km_full_res_annual_wetfrac.nc",
             "obs-maurer.125-pr_full_res_annual_wetfrac.nc",
-            "../forcing20c/forcing-ncep-pr_full_res_annual_wetfrac.nc"]
-    titles=["a) BCCA", "b) BCSDd", "c) AR", "d) BCSDm", "e) Observations", "f) NCEP"]
+            "../../forcing20c/forcing-ncep-pr_full_res_annual_wetfrac.nc",
+            "SAR-ncep-pr-BC12km_full_res_annual_wetfrac.nc",
+            "SAR-ccsm-pr-BC12km_full_res_annual_wetfrac.nc",
+            ]
+    pgw_start=6
+    titles=["a) BCCA", "b) BCSDd", "c) AR", "d) BCSDm", "e) Observations", "f) NCEP","g) AR-PGW","h) AR-CCSM"]
     cbar_label="Wet Day Fraction (0mm)"
-    cbars=[False,True]*3
+    cbars=[False,True]*4
     mask=get_mask()
     
-    plt.figure(figsize=(15,10),dpi=300)
+    plt.figure(figsize=(15,13),dpi=300)
     for i,f in enumerate(files):
         
         lonlabels=[0,0,0,1]
         latlabels=[1,0,0,0]
-        if i<4:lonlabels=[0,0,0,0]
+        if i<(len(files)-2):lonlabels=[0,0,0,0]
         if (i%2)==1:latlabels=[0,0,0,0]
         
-        data=np.ma.array(myio.read_nc(stats_location+zeromm_loc+f).data,mask=mask)
-        plt.subplot(3,2,i+1)
-        map_vis(data,title=titles[i],cmap=cm.jet,vmin=0,vmax=1,
+        if i<pgw_start:
+            data=np.ma.array(myio.read_nc(stats_location+zeromm_loc+f).data,mask=mask)
+        else:
+            data=np.ma.array(myio.read_nc(f).data,mask=mask)
+        plt.subplot(4,2,i+1)
+        map_vis(data,title=titles[i],cmap=base_colormap,vmin=0,vmax=1,
                 showcolorbar=cbars[i],cbar_label=cbar_label,
                 latlabels=latlabels,lonlabels=lonlabels)
     plt.subplots_adjust(wspace = -0.1,hspace=0.15)
@@ -436,12 +473,19 @@ def wet0_scale_conus():
     sdm =load_scales(zeromm_loc+"SDmon_c-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
     ca  =load_scales(zeromm_loc+"CA-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
     obs =load_scales(zeromm_loc+"obs-maurer.125-pr_*_annual_wetfrac.nc",mask=mask)
+    try:
+        ncep=load_scales("../forcing20c/forcing-ncep-pr_*_annual_interannual.nc",mask=mask)
+    except: 
+        print("Missing ncep interannual as f(scale)")
+        ncep=obs-10
+    pgw =load_scales("SAR-ncep-pr-BC12km_*_annual_wetfrac.nc",location="./",mask=mask)
+    ccsm=load_scales("SAR-ccsm-pr-BC12km_*_annual_wetfrac.nc",location="./",mask=mask)
     
-    plot_v_scale([sar,sdd,sdm,ca,obs],
-                colors=["g","darkred","red","b","k","k"],
-                linestyles=["-","-","-","-","-","--"],
-                markers=["None","None","None","None",".","None"],
-                labels=["AR","BCSDd","BCSDm","BCCA","Obs.","NCEP"],
+    plot_v_scale([sar,sdd,sdm,ca,obs,ncep,pgw,ccsm],
+                colors=["g","darkred","red","b","k","k","g","g"],
+                linestyles=["-","-","-","-","-","--",":","--"],
+                markers=["None","None","None","None",".","None","None","None"],
+                labels=["AR","BCSDd","BCSDm","BCCA","Obs.","NCEP","AR-PGW","AR-CCSM"],
                 yrange=[0,1],label_x=False)
                 
     plt.ylabel("Wet Day Fraction")
@@ -534,15 +578,18 @@ def wetspell_dryspell_fig():
     sdm=load_monthly("SDmon_c-ncep-pr-BC12km_full_res_month*_wetspell.nc",mask=mask)
     ca=load_monthly("CA-ncep-pr-BC12km_full_res_month*_wetspell.nc",mask=mask)
     obs=load_monthly("obs-maurer.125-pr_full_res_month*_wetspell.nc",mask=mask)
+    ncep=load_monthly("../forcing20c/forcing-ncep-pr_full_res_month*_wetspell.nc",mask=mask)
+    pgw =load_monthly("SAR-ncep-pr-BC12km_full_res_month*_wetspell.nc",location="./",mask=mask)
+    ccsm=load_monthly("SAR-ccsm-pr-BC12km_full_res_month*_wetspell.nc",location="./",mask=mask)
     
     plt.figure(figsize=(14,5))
     
     plt.subplot(1,2,1)
-    plot_v_season([sar,sdd,sdm,ca,obs],
-                colors=["g","darkred","red","b","k","k"],
-                linestyles=["-","-","-","-","-","--"],
-                markers=["None","None","None","None",".","None"],
-                labels=["AR","BCSDd","BCSDm","BCCA","Obs.","NCEP"],
+    plot_v_season([sar,sdd,sdm,ca,obs,ncep,pgw,ccsm],
+                colors=["g","darkred","red","b","k","k","g","g"],
+                linestyles=["-","-","-","-","-","--",":","--"],
+                markers=["None","None","None","None",".","None","None","None"],
+                labels=["AR","BCSDd","BCSDm","BCCA","Obs.","NCEP","AR-PGW","AR-CCSM"],
                 yrange=[1,5])
                 
     plt.ylabel("Days")
@@ -555,14 +602,17 @@ def wetspell_dryspell_fig():
     sdm=load_monthly("SDmon_c-ncep-pr-BC12km_full_res_month*_dryspell.nc",mask=mask)
     ca=load_monthly("CA-ncep-pr-BC12km_full_res_month*_dryspell.nc",mask=mask)
     obs=load_monthly("obs-maurer.125-pr_full_res_month*_dryspell.nc",mask=mask)
+    ncep=load_monthly("../forcing20c/forcing-ncep-pr_full_res_month*_dryspell.nc",mask=mask)
+    pgw =load_monthly("SAR-ncep-pr-BC12km_full_res_month*_dryspell.nc",location="./",mask=mask)
+    ccsm=load_monthly("SAR-ccsm-pr-BC12km_full_res_month*_dryspell.nc",location="./",mask=mask)
     
     plt.subplot(1,2,2)
     
-    plot_v_season([sar,sdd,sdm,ca,obs],
-                colors=["g","darkred","red","b","k","k"],
-                linestyles=["-","-","-","-","-","--"],
-                markers=["None","None","None","None",".","None"],
-                labels=["AR","BCSDd","BCSDm","BCCA","Obs.","NCEP"],
+    plot_v_season([sar,sdd,sdm,ca,obs,ncep,pgw,ccsm],
+                colors=["g","darkred","red","b","k","k","g","g"],
+                linestyles=["-","-","-","-","-","--",":","--"],
+                markers=["None","None","None","None",".","None","None","None"],
+                labels=["AR","BCSDd","BCSDm","BCCA","Obs.","NCEP","AR-PGW","AR-CCSM"],
                 yrange=[5,35])
                 
     plt.ylabel("Days")
@@ -666,23 +716,31 @@ def print_stats():
     
 
 def main():
-    """Create figures for Journal of Climate 2013 downscaling paper"""
+    """Create figures for BAMS(?) synthesis downscaling paper"""
     #### hucmap_fig()
-    # mean_annual_fig()
-    # bias_fig()
+    print("mean annual")
+    mean_annual_fig()
+    print("bias")
+    bias_fig()
     # agu_6panel_fig()
     # changemap_fig()
-    # monthly_precip_fig()
-    # interannual_fig()
-    # monthly_interannual_fig()
+    print("monthly")
+    monthly_precip_fig()
+    print("interannual")
+    interannual_fig()
+    print("monthly interannual")
+    monthly_interannual_fig()
     # extreme_scaling_fig()
-    # wetfrac_map_fig()
-    # wetfrac_scale_fig()
-    # wetspell_dryspell_fig()
+    print("wet frac map")
+    wetfrac_map_fig()
+    print("wet frac scale")
+    wetfrac_scale_fig()
+    print("spell lengths")
+    wetspell_dryspell_fig()
     #### geostats_fig()
     #### obs_wetfrac_fig()
     
-    print_stats()
+    # print_stats()
 
 if __name__ == '__main__':
     main()

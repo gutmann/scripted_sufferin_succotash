@@ -14,6 +14,10 @@ import date_fun
 from nc_reader import NC_Reader
 from bunch import Bunch
 
+from flushprint import Flushfile
+sys.stdout=Flushfile(sys.stdout)
+
+
 def load_huc_data(hucfilename,geosubset):
     """Load a grid of HUC data from hucfilename within geosubset bounds"""
     
@@ -387,7 +391,7 @@ if __name__ == '__main__':
         parser.add_argument('-method',dest="methods",nargs="?",action='store',help="SD methods to test [SDmon,CAe0,SARe0,SDe0,CA]",
                     default=["SDmon","CAe0","SARe0","SDe0","CA","CAe1","SDe1"])#,"SARe1","SDe","CAe","SD"])
         parser.add_argument('-model',dest="models",nargs="?",action='store',
-                    default=["ncep","narr"],help="model forcing to test [ncep,narr]")
+                    default=["ncep","narr"],help="model forcing to test [ccsm,ncep,narr]")
         parser.add_argument('-res',dest="resolution",nargs="?",action='store',help="resolution to run [12km,6km]",
                     default=["12km","6km"])
         parser.add_argument('-var',dest="variable",nargs="?",action='store',

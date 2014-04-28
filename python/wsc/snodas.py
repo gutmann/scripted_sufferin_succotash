@@ -73,7 +73,10 @@ def load(filename,startyear=2004,startdate=None,fill=True):
     Assumes a flat binary file as described above, but calculates the number of days present
     Returns the data along with lat, lon, and date (based on startdate or startyear)
     """
-    d=np.fromfile(filename,np.float32)
+    if filename!=None:
+        d=np.fromfile(filename,np.float32)
+    else:
+        d=None
     
     startlon=-122.371249999998
     nlon=2191
@@ -86,13 +89,16 @@ def load(filename,startyear=2004,startdate=None,fill=True):
     lat=np.array([startlat+dlat*i for i in range(nlat)])
     
     if startdate==None:startdate=datetime.datetime(startyear,1,1,0)
-    ntimes=ntimes=d.size/nlon/nlat
+    if d==None:
+        ntimes=365
+    else:
+        ntimes=ntimes=d.size/nlon/nlat
     dates=[startdate+datetime.timedelta(i) for i in range(ntimes)]
     
-    d=d.reshape((ntimes,nlat,nlon))
-    
-    if fill:
-        fill_missing(d)
+    if d!=None:
+        d=d.reshape((ntimes,nlat,nlon))
+        if fill:
+            fill_missing(d)
     
     return Bunch(data=d,lat=lat,lon=lon,dates=dates)
     
