@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 import gc,sys
 import numpy as np
 
@@ -14,6 +15,7 @@ sys.stdout=Flushfile(sys.stdout)
 nlcd_file="/d2/gutmann/nldc/NLCD2006_landcover.tif"
 snodas_file="/d2/gutmann/wsc/snodas/SWE_Daily0600UTC_WesternUS_2010.dat"
 nlcd_subset=[25000,75000,30000,63000]
+nlcd_subset=[40000,52000,52000,58500]
 snodas_subset=[0,None,1200,None]
 
 # nlcd_subset=[42000,47000,54000,58000]
@@ -78,12 +80,10 @@ def lower_resolution(forest_cover,fgeo,ogeo,proj):
     else:
         olon,olat=(ogeo.lon,ogeo.lat)
     
-    print(fgeo.x.shape,fgeo.y.shape)
-    print(olon.shape,olat.shape)
     outputdata=np.zeros((2,olat.shape[0],olon.shape[0]))
     for i in range(forest_cover.shape[0]):
         if (i%100)==0:
-            print(i,forest_cover.shape[0], "    "+str(float(i)/forest_cover.shape[0]*100)[:5]+"%")
+            print(i,forest_cover.shape[0], "    "+str(float(i)/forest_cover.shape[0]*100)[:5]+"%", end=" ")
         for j in range(forest_cover.shape[1]):
             xlat,xlon=mygis.proj2ll(x=float(fgeo.x[j]),y=float(fgeo.y[i]),proj=proj)
             xpos=np.argmin(np.abs(olon-xlon))

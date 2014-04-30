@@ -3,7 +3,7 @@
 """
 SYNOPSIS
 
-    nc_addvars.py [-h] [--verbose] [-v, --version] <filename>
+    combine_nc_vars.py [-h] [--verbose] [-v, --version] <filename>
 
 DESCRIPTION
 
@@ -42,8 +42,16 @@ import numpy as np
 import mygis as swim_io
 # import nio
 from netCDF4 import Dataset
+verbose=True
 
-def add_vars_to_file(filename,inputvars,varnames,output_prefix="added_"):
+def myaverage(data):
+    """average all elements of a list together"""
+    outputdata=data[0]
+    for d in data[1:]:
+        outputdata+=d
+    return outputdata/float(len(data))
+
+def add_vars_to_file(f1,f2,inputvars,inputatts,varnames,outputdir,output_sub,func,output_prefix):
     '''Add the list of data (inputvars) and names (varnames) to file (filename)
     
     Note: the dimensions of the inputvars must match some existing 
@@ -57,35 +65,43 @@ def add_vars_to_file(filename,inputvars,varnames,output_prefix="added_"):
 
     A new file will be created titled: output_prefix+filename
     '''
-    outputfilename=output_prefix+filename.split("/")[-1]
-    outputfilename=outputfilename.strip(".nc") #strip off the .nc term first
+    outputfilename=output_prefix+f1.split("/")[-1].replace(output_sub[0][0],output_sub[0][1])
+    # outputfilename=outputfilename.strip(".nc") #strip off the .nc term first... 
+    # only strip .nc for nio, netCDF4 expects you to insert the nc
+    
     # if there wasn't a directory specified, make sure we aren't specifying "/"
-    if len(filename.split("/"))>1:
-        outputdir="/".join(filename.split("/")[:-1])+"/"
-    else:
-        outputdir=""
+    # if not outputdir:
+    #     if len(f1.split("/"))>1:
+    #         outputdir="/".join(f1.split("/")[:-1])+"/"
+    #     else:
+    #         outputdir=""
     # if there wasn't a directory specified, make sure we aren't specifying "/"
     if len(outputdir)==1:
         outputdir=""
-    outputf=Dataset(outputdir+outputfilename, 'w',format="nc")
-    inputf=Dataset(filename, 'r')
+    outputf=Dataset(outputdir+outputfilename, 'w',format="NETCDF4")
+    inputf1=Dataset(f1, 'r')
+    inputf2=Dataset(f2, 'r')
+    
     maxlen=0
     # loop over the input variables finding the maximum number of 
     # dimensions we need to know about
     for d in inputvars:
         maxlen=max(maxlen,len(d.shape))
+    
     # create an array to hold the references to the dimensions corresponding
     #  to the dimensions of each input variable
-    outputdims=np.array((len(inputvars),maxlen),dtype="S16")
+    outputdims=np.empty((len(inputvars),maxlen),dtype="S16")
     if len(outputdims.shape)==1:
         outputdims=outputdims.reshape((outputdims.shape[0],1))
+    
     dimnum=0
     # loop over the dimensions in the input file
-    for i,dim in enumerate(inputf.dimensions.keys()):
-        dimlen=int(inputf.dimensions[dim]) #in netCDF4python parlence we need a len() around dimension (?)
+    for i,dim in enumerate(inputf1.dimensions.keys()):
+        dimlen=len(inputf1.dimensions[dim]) #in netCDF4python parlence we need a len() around dimension (?)
+                                            # for Nio change len above to int
         
         # create that dimension in the outputfile too
-        outputf.create_dimension(dim,dimlen)
+        outputf.createDimension(dim,dimlen) #Nio=create_dimension
         # find any input variables that match this dimension
         for j,thisvar in enumerate(inputvars):
             finddim=np.where(np.array(thisvar.shape)==dimlen)
@@ -94,43 +110,63 @@ def add_vars_to_file(filename,inputvars,varnames,output_prefix="added_"):
                 # save the dimension in the output dims array
                 for k in finddim[0]:
                     outputdims[j,k]=dim
-
-    # loop through the existing variables in the input file
-    # copying them to the output file (originally allowed subsetting in time)
-    for v in inputf.variables:
-        thisvar=inputf.variables[v]
-        # create the variable
-        outputf.create_variable(str(v),thisvar.typecode(),thisvar.dimensions)
-        # copy the data over
-        outputf.variables[str(v)][:]=inputf.variables[v][:]
-            
+    
     i=0
-    # finally copy the new variables into the file as well
-    for v,name in zip(inputvars,varnames):
+    # copy the requested variables into the file
+    for v,atts,name in zip(inputvars,inputatts,varnames):
         # create the variable
-        outputf.create_variable(name,"f",tuple(outputdims[i,:len(v.shape)]))
+        outputf.createVariable(name,"f",tuple(outputdims[i,:len(v.shape)])) #Nio=create_variable
         # store the data
         outputf.variables[name][:]=v.astype("f")
+        outputf.variables[name].setncatts(atts)
         i+=1
+        
+    # finally, combine the requested variables from the input files to the output file
+    v1=output_sub[0][0]
+    v2=output_sub[1][0]
+    vout=output_sub[0][1]
+    thisvar=inputf1.variables[v1]
+    var1=thisvar[:]
+    var2=inputf2.variables[v2][:]
     
-    inputf.close()
+    outputvar=func([var1,var2])
+    # create the variable, dimensions and typecode are identical to the input file
+    outputf.createVariable(str(vout),thisvar.dtype,thisvar.dimensions) #Nio=create_variable, dtype=typecode()
+    # copy the data over
+    outputf.variables[str(vout)][:]=outputvar
+            
+    
+    inputf1.close()
+    inputf2.close()
     outputf.close()
     
-
-def main (filesearch="*.nc",copy_from_file="master.nc",vars2copy=["lat","lon"],
-          ranges=None,inputvars=None,verbose=False,output_prefix="added_"):
-    if ranges==None:
-        ranges=[]
-        for f in vars2copy:
-            ranges.append([])
+def main (filesearch="*.nc",outputdir="./",output_sub=None,func=None,vars2copy=["lat","lon"],
+            ranges=[],output_prefix="",inputvars=None):
     
-    files=glob.glob(filesearch)
-    files=np.sort(files)
+    files1=glob.glob(filesearch[0])
+    files1.sort()
+    files2=glob.glob(filesearch[1])
+    files2.sort()
+    for v in vars2copy:
+        ranges.append([])
     
-    # this isn't the most general way to do this, but I'm not likely to need an arbitrary number of dimensions
-    if inputvars==None:
+    if func==None:
+        func=myaverage
+    for f1,f2 in zip(files1,files2):
+        if verbose:
+            print(f1,f2)
+        copy_from_file=f1
+        
         inputvars=[]
+        inputatts=[]
         for v,minmax in zip(vars2copy,ranges):
+            d1=Dataset(copy_from_file)
+            print(copy_from_file)
+            print(v)
+            curatts=dict()
+            for k in d1.variables[v].ncattrs():
+                curatts[str(k)]=d1.variables[v].getncattr(k)
+            inputatts.append(curatts)
             # if it is only a one dimensional array
             if len(minmax)==2:
                 xmin=minmax[0]
@@ -166,27 +202,19 @@ def main (filesearch="*.nc",copy_from_file="master.nc",vars2copy=["lat","lon"],
                 inputvars.append(swim_io.read_nc(copy_from_file,var=v).data[tmin:tmax,zmin:zmax,ymin:ymax,xmin:xmax])
             else: #for now this defaults to all data if minmax=[] (or otherwise)
                 inputvars.append(swim_io.read_nc(copy_from_file,var=v).data)
-    else:
-        inputvars=[]
             
+            add_vars_to_file(f1,f2,inputvars,inputatts,vars2copy,outputdir,output_sub,func,output_prefix)
     
-    for f in files:
-        if verbose:
-            print(f)
-        add_vars_to_file(f,inputvars,vars2copy,output_prefix)
 
 if __name__ == '__main__':
-    filesearch="daily*.nc"
-    copy_from_file="/Volumes/G-SAFE/usbr/wrf4km_daily_precip/NARR_04km_OCT2000-SEP2001.nc"
-    vars2copy=["XLAT","XLONG"]
-    ranges=[[75,150],[95,185]]
-    # copy_from_file="/Volumes/G-SAFE/usbr/new_stats/obs/uw.0625/pr/pr.2000.nc"
-    # copy_from_file="/Volumes/G-SAFE/usbr/new_stats/obs/maurer.125/pr/21c/nldas_met_update.obs.daily.pr.2000.nc"
-    # vars2copy=["lat","lon"]
-    # xmin=200;xmax=400
-    # xmin=95;xmax=185
+    filesearch=["tasmin/*.nc","tasmax/*.nc"]
+    outputdir="tas/"
+    output_sub=[["tasmin","tas"],["tasmax","tas"]]
+    func=myaverage
+    
+    vars2copy=["lat","lon","time"]
 
-    main(filesearch=filesearch,copy_from_file=copy_from_file,ranges=ranges,vars2copy=vars2copy)
+    main(filesearch=filesearch,outputdir=outputdir,output_sub=output_sub,func=func,vars2copy=vars2copy)
     # try:
     #     parser= argparse.ArgumentParser(description='This is a template file for Python scripts. ')
     #     parser.add_argument('filename',action='store')

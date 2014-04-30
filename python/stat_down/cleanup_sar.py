@@ -8,6 +8,11 @@ import mygis as myio
 import date_fun
 from bunch import Bunch
 
+# CHANGE HERE (and below in main)
+search_dir="SAR3conus/"
+# END CHANGE HERE
+
+
 stat_data_dir="/d2/gutmann/usbr/stat_data/DAILY/down/"
 maskfile_6km=stat_data_dir+"CA/ncep/tasmax/BCCA_6km_T62_tmax.gauss.2m.2000.nc"
 maskfile_12km=stat_data_dir+"CA/ncep/tasmax/BCCA_12km_T62_tmax.gauss.2m.2000.nc"
@@ -24,13 +29,14 @@ time_atts=dict(units="days since 1940-01-01 00:00:00",axis="T",long_name="Time",
 time_info=Bunch(data=None,name="time",dims=("time",),dtype="d",attributes=time_atts)
 
 ta_atts=dict(units="C",_FillValue=FILL_VALUE,missing_value=FILL_VALUE)
+tas_info=Bunch(data=None,name="tas",dims=dims,dtype="f",attributes=ta_atts)
 tasmax_info=Bunch(data=None,name="tasmax",dims=dims,dtype="f",attributes=ta_atts)
 tasmin_info=Bunch(data=None,name="tasmin",dims=dims,dtype="f",attributes=ta_atts)
 
 pr_atts=dict(units="mm/day",_FillValue=FILL_VALUE,missing_value=FILL_VALUE)
 pr_info=Bunch(data=None,name="pr",dims=dims,dtype="f",attributes=pr_atts)
 
-data_info=dict(pr=pr_info,tasmax=tasmax_info,tasmin=tasmin_info)
+data_info=dict(pr=pr_info,tasmax=tasmax_info,tasmin=tasmin_info,tas=tas_info)
 
 
 def load_mask(res="12km"):
@@ -53,7 +59,7 @@ def time_gen(year,model):
     return np.arange(t_start,t_stop)
 
 def update_files_for_year(year,res,variable,model,mask):
-    files=glob.glob("SAR3pgw/"+model+"/"+variable+"/BCSAR*"+res+"*"+str(year)+"*")
+    files=glob.glob(search_dir+model+"/"+variable+"/BCSAR*"+res+"*"+str(year)+"*")
     files.sort()
     time_info.data=time_gen(year,model)
     data=np.concatenate(myio.read_files(files,variable))
@@ -72,10 +78,12 @@ def main():
     # variables=["pr","tasmax","tasmin"]
     # models=["ncep","narr","ccsm"]
     
+    # CHANGE HERE
     res=["12km"]
-    models=["ncep"]
+    models=["ccsm"]
     # variables=["tasmax","tasmin"]
-    variables=["pr"]
+    variables=["tas"]
+    # END CHANGE HERE
     
     
     for r in res:
@@ -85,7 +93,7 @@ def main():
         lon_info.data=lon
         for m in models:
             if m=="ccsm":
-                years=range(1979,2080)
+                years=range(1979,2060)
             else:
                 years=range(1979,2009)
             for v in variables:

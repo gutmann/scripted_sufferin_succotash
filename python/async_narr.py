@@ -17,6 +17,10 @@ import date_fun
 from bunch import Bunch
 import fix_async_names
 
+from flushprint import Flushfile
+sys.stdout=Flushfile(sys.stdout)
+
+
 outputdir="output/"
 geo_ref_file=None
 geolat=None
@@ -338,7 +342,8 @@ def read_ccsm_file(filename,month,geo,loadvar="pr",pad_length=15,subset=None,sta
     output=d.data[startpoint:endpoint,subymin:subymax,subxmin:subxmax][thismonth,:,:]
     # if using the netcdf4-python library this might be a little faster
     # output=d.data[thismonth,subymin:subymax,subxmin:subxmax]
-    output*=dt
+    if loadvar=="pr":
+        output*=dt #convert mm/s to mm
     output=regrid(output,lat,lon,geo,subymin,subxmin)
     d.ncfile.close()
     years=np.arange(startyears[period],endyears[period])
@@ -430,7 +435,7 @@ def write_data(data,month,years,endpts,varname,res,output_dir="async_output/"):
             outputdata=data[startpt:stoppt,:,:]
         startpt=stoppt
         filename=output_dir+"BCSAR_"+varname+"_"+res+"_"+str(year)+"_"+month_prefix+str(month)# +".nc"
-        if (varname=="tasmax") or (varname=="tasmin"):
+        if (varname=="tasmax") or (varname=="tasmin") or (varname=="tas"):
             reasonable_max=outputdata[outputdata<70].max()
             outputdata[(outputdata<10000)&(outputdata>reasonable_max)]=reasonable_max
             print(reasonable_max)
@@ -524,6 +529,7 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
         obs_vars=[var]
         if var=="tasmin":narr_vars=["tmin"]
         if var=="tasmax":narr_vars=["tmax"]
+        if var=="tas":narr_vars=["tas"]
         if var=="pr":narr_vars=["prate"]
     hot_search=["*198[8,6,0,9,1]*.nc","*199[5,0,6,4,9]*.nc"]
     cold_search=["*1979*.nc","*198[4,2,3,5]*.nc","*199[3,7,1,2,8]*.nc"]
@@ -555,6 +561,8 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
             load_narr_var="tasmin"
         if narr_var=="tmax":
             load_narr_var="tasmax"
+        if narr_var=="tas":
+            load_narr_var="tas"
         if narr_var=="prate":
             load_narr_var="pr"
         for cur_search in training_search:
@@ -663,7 +671,7 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
 if __name__ == '__main__':
     try:
         parser= argparse.ArgumentParser(description='Compute a Statistical Asynchronous Regression (with hard coded files). ')
-        parser.add_argument('var',action='store',nargs="?",help="Chose a variable [tasmax,tasmin,pr]",default="pr")
+        parser.add_argument('var',action='store',nargs="?",help="Chose a variable [tasmax,tasmin,tas,pr]",default="pr")
         parser.add_argument('exp',action='store',nargs="?",help="Chose an experiment [e0,e1,conus,pgw,wet,dry,hot,cold]",default="e0")
         parser.add_argument('res',action='store',nargs="?",help="Chose a resolution [4km, 6km, 12km]",default="12km")
         parser.add_argument('forcing',action='store',nargs="?",help="Chose a forcing model [NCEP, NARR,CCSM]",default="NCEP")
