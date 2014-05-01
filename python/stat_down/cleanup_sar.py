@@ -79,10 +79,10 @@ def main():
     # models=["ncep","narr","ccsm"]
     
     # CHANGE HERE
-    res=["12km"]
+    res=["6km"]
     models=["ccsm"]
     # variables=["tasmax","tasmin"]
-    variables=["tas"]
+    variables=["tas","pr"]
     # END CHANGE HERE
     
     

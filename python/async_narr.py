@@ -581,6 +581,7 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
             obs_files.extend(glob.glob(obs_dir+obs_var+obsextra+obs_var+cur_search))
         obs_files.sort()
         geo_ref_file=obs_files[0]
+        print(narrfiles[0])
         (lon,lat)=read_geo_latlon(narrfiles[0])#,mask=load_narr_var)
 
         print("Creating Geographic Look Up Table")

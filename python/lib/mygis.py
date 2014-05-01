@@ -85,7 +85,7 @@ def proj2ll(x=None,y=None,points=None,proj=None):
     
     if type(proj)==str:
         projWKT=proj
-        proj=osr.SpatialReferece()
+        proj=osr.SpatialReference()
         try:
             proj.ImportFromWkt(projWKT)
         except:
@@ -93,7 +93,7 @@ def proj2ll(x=None,y=None,points=None,proj=None):
             
     if type(proj)==int:
         projEPSG=proj
-        proj=osr.SpatialReferece()
+        proj=osr.SpatialReference()
         proj.ImportFromEPSG(projEPSG)
     
     # create a geographic reference in WGS84

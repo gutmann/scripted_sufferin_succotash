@@ -8,10 +8,10 @@ from bunch import Bunch
 
 import snodas
 
-from flushprint import Flushfile
-sys.stdout=Flushfile(sys.stdout)
+# from flushprint import Flushfile
+# sys.stdout=Flushfile(sys.stdout)
 
-
+dem_file="/d5/gutmann/lidar/grass/snow-off-dem.tif"
 nlcd_file="/d2/gutmann/nldc/NLCD2006_landcover.tif"
 snodas_file="/d2/gutmann/wsc/snodas/SWE_Daily0600UTC_WesternUS_2010.dat"
 nlcd_subset=[25000,75000,30000,63000]
