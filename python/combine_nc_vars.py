@@ -65,7 +65,9 @@ def add_vars_to_file(f1,f2,inputvars,inputatts,varnames,outputdir,output_sub,fun
 
     A new file will be created titled: output_prefix+filename
     '''
-    outputfilename=output_prefix+f1.split("/")[-1].replace(output_sub[0][0],output_sub[0][1])
+    outputfilename=output_prefix+f1.split("/")[-1]
+    for i in range(len(output_sub)):
+        outputfilename=outputfilename.replace(output_sub[i][0],output_sub[i][1])
     # outputfilename=outputfilename.strip(".nc") #strip off the .nc term first... 
     # only strip .nc for nio, netCDF4 expects you to insert the nc
     
@@ -209,7 +211,7 @@ def main (filesearch="*.nc",outputdir="./",output_sub=None,func=None,vars2copy=[
 if __name__ == '__main__':
     filesearch=["tasmin/*.nc","tasmax/*.nc"]
     outputdir="tas/"
-    output_sub=[["tasmin","tas"],["tasmax","tas"]]
+    output_sub=[["tasmin","tas"],["tasmax","tas"],["tmin","tas"],["tmax","tas"]]
     func=myaverage
     
     vars2copy=["lat","lon","time"]

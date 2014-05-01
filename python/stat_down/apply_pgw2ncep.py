@@ -7,12 +7,27 @@ import mygis
 from bunch import Bunch
 from bilin_regrid import load_geoLUT
 
-
-ratio_file="ratio_file.nc"
-ratio_var="ratio"
-
-ncep_files="ncep/pr/*"
 ncep_var="pr"
+ncep_var="tas"
+
+if ncep_var=="pr":
+    ncep_files="ncep/pr/*"
+    maxval=2.5
+    minval=0.5
+    pgw_file="ratio_file.nc"
+    pgw_var="ratio"
+    data_atts=Bunch(long_name="Precipitation",_FillValue=1e20, units="mm/d",GRIB_name="PRATE",
+                    var_desc="Precipitation Rate",level_desc="Surface",missing_value=1e20,dataset="NMC Reanalysis")
+else:
+    ncep_files="ncep/tas/*.nc"
+    maxval=20
+    minval=-20
+    pgw_file="PGW_difference_file.nc"
+    pgw_var="data"
+    data_atts=Bunch(long_name="2m Air Temperature",_FillValue=1e20, units="C",
+                    var_desc="2m Air Temperature",level_desc="2 meters",missing_value=1e20,dataset="NMC Reanalysis")
+    
+
 month_lengths=[31,28,31,30,31,30,31,31,30,31,30,31]
 months_mid_doy=np.zeros(14)
 months_mid_doy[0]=-15.5
@@ -20,9 +35,9 @@ for i in range(1,len(months_mid_doy)):
     months_mid_doy[i]=months_mid_doy[i-1]+month_lengths[(i+10)%12]/2.0+month_lengths[(i+11)%12]/2.0
 
 
-def load_ratios():
-    data=mygis.read_nc(ratio_file,ratio_var).data
-    geo=mygis.read_geo(ratio_file)
+def load_pgw_signals():
+    data=mygis.read_nc(pgw_file,pgw_var).data
+    geo=mygis.read_geo(pgw_file)
     print(geo.lat.shape)
     return Bunch(data=data,geo=geo)
 
@@ -50,33 +65,39 @@ def geo_interpolate(data,geo):
 
     outputdata[-1,...]=outputdata[1,...] #wrap around by one month (append january after december) to aid temporal interpolation
     outputdata[0,...]=outputdata[-2,...] #wrap around by one month (prepend december before january) to aid temporal interpolation
-    mygis.write("ratio_test_file.nc",outputdata)
-    outputdata[outputdata>2.5]=2.5
-    outputdata[outputdata<0.5]=0.5
+    mygis.write(ncep_var+"_pgw_test_file.nc",outputdata)
+    outputdata[outputdata>maxval]=maxval
+    outputdata[outputdata<minval]=minval
     return outputdata
 
-def make_daily(ratios,nceptime):
+def make_daily(pgw_signal,nceptime):
     """
     convert monthly data to daily for a given ncep year
     
     Applies a bilinear interpolation that wraps around the year 
     (e.g. Jan 1st is interpolated between Jan. and Dec. means)
     """
-    f=interp1d(months_mid_doy,ratios,axis=0)
+    f=interp1d(months_mid_doy,pgw_signal,axis=0)
     return f(nceptime)
 
-def apply_pgw(ncep,ratio):
-    """apply pgw ratio to ncep data (by file/month)"""
-    ncep_ratio=geo_interpolate(ratio,ncep.geo) # interpolate from the ccsm ratio grid to the ncep grid
+def pgw(data,signal):
+    if ncep_var=="pr":
+        return data*signal
+    else:
+        return data+signal
+
+def apply_pgw(ncep,pgw_signal):
+    """apply pgw signal to ncep data (by file/month)"""
+    ncep_pgw_signal=geo_interpolate(pgw_signal,ncep.geo) # interpolate from the ccsm pgw_signal grid to the ncep grid
     outputdata=[]
     files=[]
-    ncep_daily_ratio=make_daily(ncep_ratio,np.arange(365)+0.5)    # interpolate from monthly means to daily values
-    ncep_daily_leap_ratio=make_daily(ncep_ratio,365/366.*(np.arange(366)+0.5))    # same for a leap year
+    ncep_daily_pgw_signal=make_daily(ncep_pgw_signal,np.arange(365)+0.5)    # interpolate from monthly means to daily values
+    ncep_daily_leap_pgw_signal=make_daily(ncep_pgw_signal,365/366.*(np.arange(366)+0.5))    # same for a leap year
     for i in range(len(ncep.data)):
         if len(ncep.time[i])==365:
-            outputdata.append(ncep.data[i]*ncep_daily_ratio)
+            outputdata.append(pgw(ncep.data[i],ncep_daily_pgw_signal))
         elif len(ncep.time[i])==366:
-            outputdata.append(ncep.data[i]*ncep_daily_leap_ratio)
+            outputdata.append(pgw(ncep.data[i],ncep_daily_leap_pgw_signal))
             
         files.append("pgw/"+ncep.files[i])
         
@@ -87,8 +108,6 @@ def write_pgw(pgw):
     
     lat=pgw.geo.lat[:,0]
     lon=pgw.geo.lon[0,:]+360
-    data_atts=Bunch(long_name="Precipitation",_FillValue=1e20, units="mm/d",GRIB_name="PRATE",
-                    var_desc="Precipitation Rate",level_desc="Surface",missing_value=1e20,dataset="NMC Reanalysis")
     lat_atts =Bunch(long_name="Latitude", standard_name="latitude", units="degrees_north",
                     axis="Y",actual_range=np.array([lat.min(),lat.max()]))
     lon_atts =Bunch(long_name="Longitude", standard_name="longitude", units="degrees_east",
@@ -106,19 +125,21 @@ def write_pgw(pgw):
         times=pgw.time[i]
         evars[2].data=times
         evars[2].attributes.actual_range=np.array([times.min(),times.max()])
-        mygis.write(pgw.files[i],pgw.data[i],dtype="f",varname="pr",dims=datadims,attributes=data_atts,extravars=evars)
+        
+        mygis.write(pgw.files[i],pgw.data[i],dtype="f",varname=ncep_var,
+                        dims=datadims,attributes=data_atts,extravars=evars)
     
 
 def main():
-    """apply monthly ratios to ncep forcing data to generate a PGW NCEP"""
-    print("loading ratios")
-    ratio_data=load_ratios()
+    """apply monthly pgw_signals to ncep forcing data to generate a PGW NCEP"""
+    print("loading pgw signals")
+    pgw_signal_data=load_pgw_signals()
     
     print("loading ncep")
     ncep_data=load_ncep()
     
     print("applying PGW")
-    pgw_ncep=apply_pgw(ncep_data,ratio_data)
+    pgw_ncep=apply_pgw(ncep_data,pgw_signal_data)
     
     print("writing data")
     write_pgw(pgw_ncep)
