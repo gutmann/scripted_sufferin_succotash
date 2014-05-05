@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import mygis as io
 from bunch import Bunch
 
+import sys
 import flushprint
 if flushprint.in_ipython():
     pass
@@ -87,11 +88,10 @@ def load_fast(dem="demf",snow="snowdepth",veg="vegmask"):
     vegd=io.read_nc(veg).data
     return Bunch(veg=vegd,snow=snowd,dem=demd)
 
-def bin_by_elevation(data,dem,mask):
+def bin_by_elevation(data,dem,mask,dz=50):
     """docstring for bin_by_elevation"""
     minz=dem[dem>100].min()
     maxz=dem[dem<5000].max()
-    dz=50
     
     n=np.round((maxz-minz)/dz)
     veg=np.zeros(n)
@@ -136,7 +136,7 @@ def main():
     print("Loading data...")
     data=load_fast()
     
-    decimation_factor=924
+    decimation_factor=924 # 924 # for SNODAS or other 30arcsec grid
     print("Decimating Snow")
     snow=decimate(data.snow,decimation_factor)
     print("Decimating Veg")
@@ -146,7 +146,7 @@ def main():
     dem=decimate(data.dem,decimation_factor)
     
     print("Binning")
-    banded=bin_by_elevation(snow,dem,veg)
+    banded=bin_by_elevation(snow,dem,veg,dz=100)
     
     print("Plotting")
     plt.plot(banded.z,banded.exposed,label="Exposed",color="b",linewidth=2)
