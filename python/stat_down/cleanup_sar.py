@@ -67,7 +67,7 @@ def update_files_for_year(year,res,variable,model,mask):
         data[i,...][mask]=FILL_VALUE
     
     info=data_info[variable]
-    newfilename=files[0].replace(".nc","")[:-3]
+    newfilename=files[0].replace(".nc","")[:-3]+".nc"
     print(newfilename)
     extra_vars=[lat_info,lon_info,time_info]
     myio.write(newfilename,data,varname=info.name,dtype=info.dtype,dims=info.dims,

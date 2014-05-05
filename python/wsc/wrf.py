@@ -144,12 +144,12 @@ def load_elev_comparison(swefile="SWE_daily.nc",info="4km_wrf_output.nc"):
     # [150:184,172:198]
 
     print("Plotting")
-    plt.plot(banded.z,banded.veg,label="Vegetation",color="g",linewidth=2)
-    plt.plot(banded.z,banded.vegmed,"--",label="Veg. Median",color="g",linewidth=2)
-    plt.bar([0],[1],color="lightgreen",edgecolor="black",label="Veg. 10-90%")
     plt.plot(banded.z,banded.exposed,label="Exposed",color="b",linewidth=2)
     plt.plot(banded.z,banded.exposedmed,"--",label="Exp. Median",color="b",linewidth=2)
     plt.bar([0],[1],color="skyblue",edgecolor="black",label="Exp. 10-90%")
+    plt.plot(banded.z,banded.veg,label="Vegetation",color="g",linewidth=2)
+    plt.plot(banded.z,banded.vegmed,"--",label="Veg. Median",color="g",linewidth=2)
+    plt.bar([0],[1],color="lightgreen",edgecolor="black",label="Veg. 10-90%")
     
     plt.plot(banded.z,banded.vegmin,color="black")
     plt.plot(banded.z,banded.vegmax,color="black")
@@ -159,7 +159,7 @@ def load_elev_comparison(swefile="SWE_daily.nc",info="4km_wrf_output.nc"):
     plt.fill_between(banded.z,banded.exposedmin,banded.exposedmax,
                         color="skyblue",edgecolor="black")
     plt.fill_between(banded.z,banded.vegmin,banded.vegmax,
-                        color="lightgreen",edgecolor="black")
+                        color="lightgreen",alpha=0.5,edgecolor="black")
                         
 
     plt.legend(loc=2)
