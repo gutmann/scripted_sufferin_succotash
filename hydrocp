@@ -1,0 +1,2 @@
+#!/bin/bash
+scp $1 hydro-c1.rap.ucar.edu:$2

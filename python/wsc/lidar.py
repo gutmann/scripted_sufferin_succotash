@@ -6,6 +6,13 @@ import matplotlib.pyplot as plt
 import mygis as io
 from bunch import Bunch
 
+import flushprint
+if flushprint.in_ipython():
+    pass
+else:
+    sys.stdout=flushprint.Flushfile(sys.stdout)
+
+
 def filter_dem(data):
     """Filter a LIDAR DEM to remove some spurious jumps"""
     return medfilt2d(data,5)
@@ -129,7 +136,7 @@ def main():
     print("Loading data...")
     data=load_fast()
     
-    decimation_factor=10
+    decimation_factor=924
     print("Decimating Snow")
     snow=decimate(data.snow,decimation_factor)
     print("Decimating Veg")
@@ -142,12 +149,12 @@ def main():
     banded=bin_by_elevation(snow,dem,veg)
     
     print("Plotting")
-    plt.plot(banded.z,banded.veg,label="Vegetation",color="g",linewidth=2)
-    plt.plot(banded.z,banded.vegmed,"--",label="Veg. Median",color="g",linewidth=2)
-    plt.bar([0],[1],color="lightgreen",edgecolor="black",label="Veg. 10-90%")
     plt.plot(banded.z,banded.exposed,label="Exposed",color="b",linewidth=2)
     plt.plot(banded.z,banded.exposedmed,"--",label="Exp. Median",color="b",linewidth=2)
     plt.bar([0],[1],color="skyblue",edgecolor="black",label="Exp. 10-90%")
+    plt.plot(banded.z,banded.veg,label="Vegetation",color="g",linewidth=2)
+    plt.plot(banded.z,banded.vegmed,"--",label="Veg. Median",color="g",linewidth=2)
+    plt.bar([0],[1],color="lightgreen",edgecolor="black",label="Veg. 10-90%")
     
     plt.plot(banded.z,banded.vegmin,color="black")
     plt.plot(banded.z,banded.vegmax,color="black")
@@ -157,15 +164,15 @@ def main():
     plt.fill_between(banded.z,banded.exposedmin,banded.exposedmax,
                         color="skyblue",edgecolor="black")
     plt.fill_between(banded.z,banded.vegmin,banded.vegmax,
-                        color="lightgreen",edgecolor="black")
+                        color="lightgreen",alpha=0.5,edgecolor="black")
                         
 
     plt.legend(loc=2)
-    plt.xlim(2500,4000)
+    plt.xlim(2500,3800)
     plt.ylim(0,6)
     plt.ylabel("Snow Depth [m]")
     plt.xlabel("Elevation [m]")
-    plt.title("Lidar snowdepth at Niwot")
+    plt.title("Lidar snow depth at Niwot")
     plt.savefig("lidar_by_elev.png")
     
     
