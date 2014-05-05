@@ -8,15 +8,30 @@ from bunch import Bunch
 
 import snodas
 
-# from flushprint import Flushfile
-# sys.stdout=Flushfile(sys.stdout)
+import flushprint
+if flushprint.in_ipython():
+    pass
+else:
+    sys.stdout=flushprint.Flushfile(sys.stdout)
 
-dem_file="/d5/gutmann/lidar/grass/snow-off-dem.tif"
 nlcd_file="/d2/gutmann/nldc/NLCD2006_landcover.tif"
 snodas_file="/d2/gutmann/wsc/snodas/SWE_Daily0600UTC_WesternUS_2010.dat"
-nlcd_subset=[25000,75000,30000,63000]
-nlcd_subset=[40000,52000,52000,58500]
+# nlcd_subset=[25000,75000,30000,63000] #large area, takes too long to run
+nlcd_subset=[35000,52000,46000,58500] # approximate area of CO Rockies
+# nlcd_subset=[50000,51000,56000,56500] # fast debugging test case
 snodas_subset=[0,None,1200,None]
+
+dims=("lat","lon")
+FILL_VALUE=np.float32(-9999)
+lat_atts=dict(units="degrees_north",axis="Y", long_name="Latitude",standard_name="latitude")
+lat_info=Bunch(data=None,name="lat",dims=("lat",),dtype="f",attributes=lat_atts)
+
+lon_atts=dict(units="degrees_east",axis="X", long_name="Longitude",standard_name="longitude")
+lon_info=Bunch(data=None,name="lon",dims=("lon",),dtype="f",attributes=lon_atts)
+
+data_atts=dict(units="[]",_FillValue=FILL_VALUE,missing_value=FILL_VALUE,forest="1",exposed="0")
+data_info=Bunch(data=None,name="data",dims=dims,dtype="f",attributes=data_atts)
+
 
 # nlcd_subset=[42000,47000,54000,58000]
 # nlcd_subset=[44000,46000,55000,56000]
@@ -96,6 +111,30 @@ def lower_resolution(forest_cover,fgeo,ogeo,proj):
     forest_fraction[forest_fraction<0.5]=0
     return forest_fraction
 
+def write(filename,data,geo):
+    """write DEM data to a file after subsetting to 'good' data"""
+    # goodpoints=np.where(data>0)
+    # ymin=np.min(goodpoints[0])
+    # ymax=np.max(goodpoints[0])+1
+    # xmin=np.min(goodpoints[1])
+    # xmax=np.max(goodpoints[1])+1
+    xmin=0;xmax=None
+    ymin=0;ymax=None
+    
+    output_data=data[ymin:ymax,xmin:xmax]
+    output_lat=geo.lat[ymin:ymax]
+    output_lon=geo.lon[xmin:xmax]
+    
+    lat_info.data=output_lat
+    lon_info.data=output_lon
+    
+    # data_info.subset="[{},{},{},{}]".format(ymin,ymax,xmin,xmax)
+    extra_vars=[lat_info,lon_info]
+    mygis.write(filename,output_data,varname=data_info.name,dtype=data_info.dtype,dims=data_info.dims,
+               attributes=data_info.attributes,extravars=extra_vars,history="wsc/nlcd.py")
+    
+
+
 def forest_cover(geo_data=None):
     print("Loading NLCD file")
     lc_data=mygis.read_tiff(nlcd_file)
@@ -124,7 +163,7 @@ def forest_cover(geo_data=None):
     output_data=lower_resolution(lc_forest,lc_geo,geo_data,lc_data.proj)
 
     print("Writing data file")
-    mygis.write("snodas_forest.nc",output_data)
+    write("snodas_forest.nc",output_data,geo_data)
     
 if __name__ == '__main__':
     forest_cover()

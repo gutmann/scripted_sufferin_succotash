@@ -127,9 +127,10 @@ def write(filename,data,geo):
     lat_info.data=output_lat
     lon_info.data=output_lon
     
+    data_info.subset="[{},{},{},{}]".format(ymin,ymax,xmin,xmax)
     extra_vars=[lat_info,lon_info]
     mygis.write(filename,output_data,varname=data_info.name,dtype=data_info.dtype,dims=data_info.dims,
-               attributes=data_info.attributes,extravars=extra_vars,history="dem2snodas::[{},{},{},{}]".format(ymin,ymax,xmin,xmax))
+               attributes=data_info.attributes,extravars=extra_vars,history="dem2snodas")
     
 
 def rescale():

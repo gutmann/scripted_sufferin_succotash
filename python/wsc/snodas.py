@@ -197,7 +197,7 @@ def load_elev_comparison(swefile="SWE_Daily0600UTC_WesternUS_2010.dat"):
                         
 
     plt.legend(loc=2)
-    plt.xlim(2400,3800)
+    plt.xlim(2500,3800)
     plt.ylim(0,0.7)
     plt.ylabel("Snow Water Equivalent [m]")
     plt.xlabel("Elevation [m]")
