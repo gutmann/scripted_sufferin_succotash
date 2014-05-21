@@ -224,7 +224,7 @@ def convert_to_netcdf(filename="INTERCEP.TXT",outputfile="interception_data",dat
     Along with my helper module (swim_io) to write the netcdf file and I'm guessing most won't use this
     Also uses my date_fun module to convert the datetime objects into modified julian days (easier for netcdf)
     """
-    import swim_io
+    import mygis as swim_io
     from bunch import Bunch
     import date_fun
     

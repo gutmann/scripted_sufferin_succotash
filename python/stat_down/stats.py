@@ -155,7 +155,7 @@ def extremes(data, dist_name="gamma",verbose=True,year_intervals=None):
     shape=data.shape
     if len(shape)==3:
         extremes=np.zeros((len(year_intervals),shape[1],shape[2]))
-        jlen=shape[0]
+        jlen=shape[2]
     else:
         extremes=np.zeros((len(year_intervals),shape[1]))
         jlen=1

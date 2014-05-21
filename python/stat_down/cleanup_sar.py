@@ -9,7 +9,7 @@ import date_fun
 from bunch import Bunch
 
 # CHANGE HERE (and below in main)
-search_dir="SAR3conus/"
+search_dir="SAR3pgw/"
 # END CHANGE HERE
 
 
@@ -79,10 +79,11 @@ def main():
     # models=["ncep","narr","ccsm"]
     
     # CHANGE HERE
-    res=["6km"]
-    models=["ccsm"]
+    res=["12km"]
+    models=["ncep"]
     # variables=["tasmax","tasmin"]
-    variables=["tas","pr"]
+    # variables=["tas","pr"]
+    variables=["pr"]
     # END CHANGE HERE
     
     

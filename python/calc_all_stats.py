@@ -33,7 +33,7 @@ def load_huc_data(hucfilename,geosubset):
     return hucdata
 
 
-def load_data(files,varname,extra,res,minval=-100,maxval=500):
+def load_data(files,varname,extra,res,minval=-100,maxval=600):
     """Load data for varname in from all files matching the geographic area defined in extra
     
     files = a list of filenames to load
@@ -54,6 +54,13 @@ def load_data(files,varname,extra,res,minval=-100,maxval=500):
     files.sort()
     # if we don't have a geomatchfile then use nearest neighbor resampling
     usenn=(geo_matchfile==None)
+    if geo_matchfile!=None:
+        glatvar="latitude"
+        glonvar="longitude"
+    else:
+        glatvar="lat"
+        glonvar="lon"
+    print("NN="+str(usenn))
     # use the NC_Reader class to facilitate grid matching and subsetting as necessary
     reader=NC_Reader(None,filelist=files,
                     nn=usenn, bilin=(not usenn),
@@ -61,7 +68,7 @@ def load_data(files,varname,extra,res,minval=-100,maxval=500):
                     geomatch_file=geo_matchfile,
                     readvars=[varname],ntimes=365,
                     latvar="lat",lonvar="lon",
-                    glatvar="lat",glonvar="lon")
+                    glatvar=glatvar,glonvar=glonvar)
                     
     # load huc data before actually reading the data in
     outputdata=[]
@@ -222,21 +229,21 @@ def precip_stats(names,data,info):
         hist=np.vstack(stats.histogram(d))
         io.write(out+"_histogram",hist)
         
-        print("WARNING: NOT CALCULATING EXTREME EVENTS")
-        print("WARNING: NOT CALCULATING EXTREME EVENTS")
+        # print("WARNING: NOT CALCULATING EXTREME EVENTS")
+        # print("WARNING: NOT CALCULATING EXTREME EVENTS")
         # commented out for now because extreme events take a long time to calculate
         # if re.match(".*annual",n):
-        #     for ndays in info.nday_lengths:
-        #         data2test=d[ndays:,...].copy()
-        #         for i in range(ndays):
-        #             data2test+=d[i:-(ndays-i),...]
-        #         print("extremes "+str(ndays+1))
-        #         extremes=stats.extremes(data2test,dist_name=info.distributionname)
-        #         if extremes!=None:
-        #             for i in range(extremes.shape[0]):
-        #                 cur=extremes[i,...]
-        #                 print(cur[cur>0].mean())
-        #             io.write(out+"_extremes_nday"+str(ndays+1),extremes)
+        for ndays in info.nday_lengths[:1]:
+            data2test=d[ndays:,...].copy()
+            for i in range(ndays):
+                data2test+=d[i:-(ndays-i),...]
+            print("extremes "+str(ndays+1))
+            extremes=stats.extremes(data2test,dist_name=info.distributionname)
+            if extremes!=None:
+                for i in range(extremes.shape[0]):
+                    cur=extremes[i,...]
+                    print(cur[cur>0].mean())
+                io.write(out+"_extremes_nday"+str(ndays+1),extremes)
 
 def cleanup(data,minval=-999,maxval=1e5):
     sz=data.shape
@@ -296,7 +303,7 @@ def calc_stats(files,v,output_base,info,extra):
     # load data from files *assumes you can store all data in memory*
     # specifies different valid ranges for different variables
     if v=="pr":
-        data=load_data(files,v,extra,metadata.resolution,minval=0,maxval=300)
+        data=load_data(files,v,extra,metadata.resolution,minval=0,maxval=600)
     else:
         data=load_data(files,v,extra,metadata.resolution,minval=-60,maxval=100)
     # convert data structures to lists so that HUC and full_res can be processed together
@@ -389,7 +396,8 @@ if __name__ == '__main__':
     try:
         parser= argparse.ArgumentParser(description='Calculate nday/nyear return period events. ')
         parser.add_argument('-method',dest="methods",nargs="?",action='store',help="SD methods to test [SDmon,CAe0,SARe0,SDe0,CA]",
-                    default=["SDmon","CAe0","SARe0","SDe0","CA","CAe1","SDe1"])#,"SARe1","SDe","CAe","SD"])
+                    default=["SDmon_c","CA","SAR","SD"])#,"SARe1","SDe","CAe","SD"])
+                    # default=["SDmon","CAe0","SARe0","SDe0","CA","CAe1","SDe1"])#,"SARe1","SDe","CAe","SD"])
         parser.add_argument('-model',dest="models",nargs="?",action='store',
                     default=["ncep","narr"],help="model forcing to test [ccsm,ncep,narr]")
         parser.add_argument('-res',dest="resolution",nargs="?",action='store',help="resolution to run [12km,6km]",
