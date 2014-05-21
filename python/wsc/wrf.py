@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import datetime
+import glob
 import numpy as np
 import mygis as myio
 from bunch import Bunch
@@ -77,11 +78,10 @@ def load(filename, startyear=2000,startdate=None):
     return Bunch(data=data,lat=lat,lon=lon,dates=dates)
 
 
-def bin_by_elevation(data,dem,mask):
+def bin_by_elevation(data,dem,mask,dz=100):
     """docstring for bin_by_elevation"""
     minz=dem[dem>100].min()
     maxz=dem[dem<5000].max()
-    dz=100
     
     n=np.round((maxz-minz)/dz)
     veg=np.zeros(n)
@@ -118,32 +118,69 @@ def bin_by_elevation(data,dem,mask):
     vegmed=np.ma.array(vegmed,mask=(vegmed==0))
     vegmax=np.ma.array(vegmax,mask=(vegmax==0))
 
-    return Bunch(z=z[:n],veg=veg,vegmed=vegmed,vegmin=vegmin,vegmax=vegmax,
+    return Bunch(z=z[:n]+(dz/2),veg=veg,vegmed=vegmed,vegmin=vegmin,vegmax=vegmax,
                 exposed=exposed,exposedmed=exposedmed,exposedmin=exposedmin,exposedmax=exposedmax)
 
 
-def load_elev_comparison(swefile="SWE_daily.nc",info="4km_wrf_output.nc"):
+def load_elev_comparison(swefile="SWE_daily.nc",info="4km_wrf_output.nc",res=4,outputfile="wrf_by_elev.png",year=7,domain="FullDomain"):
     import matplotlib.pyplot as plt
-    
-    forest=[1,5]
-    bare=[7,10]
-    mayday=212
+    # wrf.load_elev_comparison(swefile="wrfout_d01_2008-05-01_00:00:00",res=2,outputfile="wrf_by_elev_2km_FullDomain_May2008.png")
+    if res==2:
+        forest=[11,12,13,14,15,18,21]
+        exposed=[1,2,3,4,5,7,8,9,10,16,17,19,20,22,23,24,25,26,27]
+        mayday=0
+        if domain=="FullDomain":
+            xmin=200
+            xmax=400
+            ymin=50
+            ymax=400
+            dz=100
+        else:
+            xmin=300
+            xmax=380
+            ymin=250
+            ymax=350
+            dz=200
+        info=swefile
+        dz=100
+    else:
+        forest=[1,5]
+        exposed=[7,10]
+        mayday=212
+        for i in range(year):
+            mayday+=365
+        mayday+=np.floor(year/4)
+        if domain=="FullDomain":
+            xmin=125
+            xmax=205
+            ymin=80
+            ymax=190
+            dz=150
+        else:
+            xmin=175
+            xmax=195
+            ymin=149
+            ymax=175
+            dz=300
+        
     print("Loading data")
     vegclass=myio.read_nc(info,"IVGTYP").data[0,...]
-    forested=np.where((vegclass==forest[0])|(vegclass==forest[1]))
-    exposed=np.where((vegclass==bare[0])|(vegclass==bare[1]))
     mask=np.zeros(vegclass.shape)
-    mask[forested]=1
-    mask[exposed]=2
+    for f in forest:
+        forested=np.where(vegclass==f)
+        mask[forested]=1
+    for e in exposed:
+        exposed=np.where(vegclass==e)
+        mask[exposed]=2
     
     dem=myio.read_nc(info,"HGT").data[0,...]
     snow=myio.read_nc(swefile,"SNOW").data[mayday,:,:]/1000.0
     
     print("Binning")
-    banded=bin_by_elevation(snow[20:220,100:220],dem[20:220,100:220],mask[20:220,100:220])
-    # [150:184,172:198]
+    banded=bin_by_elevation(snow[ymin:ymax,xmin:xmax],dem[ymin:ymax,xmin:xmax],mask[ymin:ymax,xmin:xmax],dz=dz)
 
     print("Plotting")
+    plt.clf();
     plt.plot(banded.z,banded.exposed,label="Exposed",color="b",linewidth=2)
     plt.plot(banded.z,banded.exposedmed,"--",label="Exp. Median",color="b",linewidth=2)
     plt.bar([0],[1],color="skyblue",edgecolor="black",label="Exp. 10-90%")
@@ -163,14 +200,25 @@ def load_elev_comparison(swefile="SWE_daily.nc",info="4km_wrf_output.nc"):
                         
 
     plt.legend(loc=2)
-    plt.xlim(2400,3800)
-    plt.ylim(0,0.7)
+    plt.xlim(2500,3800)
+    plt.ylim(0,0.8)
     plt.ylabel("Snow Water Equivalent [m]")
     plt.xlabel("Elevation [m]")
-    plt.title("WRF SWE over headwaters")
-    plt.savefig("wrf_by_elev.png")
+    plt.title("WRF SWE over headwaters "+domain)
+    plt.savefig(outputfile)
     
 if __name__ == '__main__':
-    load_elev_comparison()
+    domains=["FullDomain","GreaterFrontRange"]
+    for dom in domains:
+        files=glob.glob("wrfout*-05-01*")
+        files.sort()
+        for f in files:
+            year=f.split("_")[2][:4]
+            print(f,year,"2km",dom)
+            load_elev_comparison(swefile=f, year=year,outputfile="wrf_by_elev_2km_MAY{}_{}.png".format(year,dom),res=2,domain=dom)
+            
+        for year in range(8):
+            print(year,"2km",dom)
+            load_elev_comparison(year=year,outputfile="wrf_by_elev_4km_MAY{}_{}.png".format(2001+year,dom),domain=dom)
     
     
