@@ -10,15 +10,12 @@ import numpy as np
 
 # import nc_addvars
 import async
-# import swim_io
 import mygis as swim_io
-# from nc import NC_writer
 import date_fun
 from bunch import Bunch
-import fix_async_names
 
-from flushprint import Flushfile
-sys.stdout=Flushfile(sys.stdout)
+# from flushprint import Flushfile
+# sys.stdout=Flushfile(sys.stdout)
 
 
 outputdir="output/"
@@ -596,6 +593,7 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
         
             print("  Loading "+forcing+" data")
             t1=time.time()
+            print(narrfiles[0])
             if forcing=="CCSM":
                 narr=read_ccsm_file(narrfiles[0],month,geo,load_narr_var,pad_length=15,startdate=startdate,period="train")
             else:
@@ -605,6 +603,7 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
         
             print("  Loading obs data")
             t1=time.time()
+            print(obs_files[0])
             obs=read_data(obs_files,month,read_obs_file,geo,obs_var,pad_length=15,subset=subset,startdate=obs_startdate)
             print("   "+str((time.time()-t1)/60)+" minutes")
         
@@ -612,7 +611,7 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
             t1=time.time()
             # just in case one data set is longer than the other
             tmin=min(obs.data.shape[0],narr.data.shape[0])
-            obsmax=obs.data.max()
+            obsmax=obs.data[obs.data<1e5].max()
             regression=async.develop_async(hires=obs.data[:tmin,...],lowres=narr.data[:tmin,...],
                     isPrecip=(narr_var=="prate"),verbose=True,even_xy=False)
             print("   "+str((time.time()-t1)/60)+" minutes")
@@ -642,11 +641,12 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
             write_data(output,month,narr.dates,narr.lengths,obs_var,res+resextra,output_dir=output_dir)
             
             # trying to get rid of a weird memory leak
-            # cleanup large variables at the end of each month of processing. 
-            del narr
-            del output
-            del obs
-            gc.collect()
+            # cleanup large variables at the end of each month of processing.
+            # doesn't seem to help, but running each month as an independant process solves this problem
+            # del narr
+            # del output
+            # del obs
+            # gc.collect()
         
         # if runmonth==None:
         #     # add the lat and lon variables to the orignal files (should also add time?)

@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.basemap import Basemap
 
 
-def vis(data,geo=[25,52.7,-124.7,-67],title="",vmin=None,vmax=None,proj='cyl',
-        cmap=None,colorbar=True,latstep=5.0,lonstep=10.0,m=None):
+def vis(data,geo=[25,52.7,-124.7,-67],title="",vmin=None,vmax=None,ylim=None,xlim=None,proj='cyl',
+        cmap=None,colorbar=True,latstep=5.0,lonstep=10.0,m=None,lat=None,lon=None):
     """Plot a map of data using the bounds in geo=[lower_lat,upper_lat,left_lon,right_lon]
     
     Optionally specify a map title, min and max color values, colormap, projection,
@@ -17,6 +17,30 @@ def vis(data,geo=[25,52.7,-124.7,-67],title="",vmin=None,vmax=None,proj='cyl',
             geo=[35,43,-113,-101]
     if geo=="conus":
         geo=[25,52.7,-124.7,-67]
+
+    if geo==None:
+        if (lat==None) or (lon==None):
+            raise TypeError("Missing either geo or lat/lon variables")
+        
+        georank=len(lat.shape)
+        if georank>1:
+            if georank>2:
+                lat=lat[0,...]
+                lon=lon[0,...]
+            dlat=lat[1,0]-lat[0,0]
+            dlon=lon[0,1]-lon[0,0]
+            lat0=lat[0,0]
+            lon0=lon[0,0]
+            lat1=lat[-1,0]
+            lon1=lon[0,-1]
+        else:
+            dlat=lat[1]-lat[0]
+            dlon=lon[1]-lon[0]
+            lat0=lat[0,0]-dlat/2
+            lon0=lon[0,0]-dlon/2
+            lat1=lat[-1,0]+dlat/2
+            lon1=lon[0,-1]+dlon/2
+        geo=[lat0,lat1,lon0,lon1]
 
     if not m:
         if proj=="cyl":
@@ -36,12 +60,18 @@ def vis(data,geo=[25,52.7,-124.7,-67],title="",vmin=None,vmax=None,proj='cyl',
     m.drawparallels(np.arange(20,60,latstep),labels=[1,0,0,0],dashes=[1,4])
     m.drawmeridians(np.arange(-120,-65,lonstep),labels=[0,0,0,1],dashes=[1,4])
     m.drawstates(linewidth=1.5)
-    m.drawcountries(linewidth=0.5)
-    m.drawcoastlines(linewidth=0.5)
+    m.drawcountries(linewidth=1.5)
+    m.drawcoastlines(linewidth=1.5)
     
     if colorbar:
         m.colorbar()
     if title:
         plt.title(title)
+    if xlim:
+        plt.xlim(xlim)
+    if ylim:
+        plt.ylim(ylim)
+    
+    return m
 
 

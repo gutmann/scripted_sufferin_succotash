@@ -17,7 +17,11 @@ else:
 nlcd_file="/d2/gutmann/nldc/NLCD2006_landcover.tif"
 snodas_file="/d2/gutmann/wsc/snodas/SWE_Daily0600UTC_WesternUS_2010.dat"
 # nlcd_subset=[25000,75000,30000,63000] #large area, takes too long to run
-nlcd_subset=[35000,52000,46000,58500] # approximate area of CO Rockies
+# nlcd_subset=[35000,52000,46000,58500] # _1 approximate area of CO Rockies
+# nlcd_subset=[52000,60000,46000,50000] # _2 approximate area of CO Rockies
+# nlcd_subset=[60000,69000,46000,50000] # _3 approximate area of CO Rockies
+# nlcd_subset=[52000,60000,50000,58000] # _4 approximate area of CO Rockies
+# nlcd_subset=[60000,69000,50000,58000] # _5 approximate area of CO Rockies
 # nlcd_subset=[50000,51000,56000,56500] # fast debugging test case
 snodas_subset=[0,None,1200,None]
 
@@ -163,7 +167,7 @@ def forest_cover(geo_data=None):
     output_data=lower_resolution(lc_forest,lc_geo,geo_data,lc_data.proj)
 
     print("Writing data file")
-    write("snodas_forest.nc",output_data,geo_data)
+    write("snodas_forest_5.nc",output_data,geo_data)
     
 if __name__ == '__main__':
     forest_cover()

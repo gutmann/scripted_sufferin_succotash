@@ -1,11 +1,18 @@
 #!/usr/bin/env python
 import datetime
+import glob
 
 import numpy as np
 from bunch import Bunch
 
 import mygis as myio
 
+import flushprint
+if flushprint.in_ipython():
+    pass
+else:
+    import sys
+    sys.stdout=flushprint.Flushfile(sys.stdout)
 FILLVALUE=-9999
 
 def stats(data):
@@ -106,11 +113,10 @@ def load(filename,startyear=2004,startdate=None,fill=True):
     return Bunch(data=d,lat=lat,lon=lon,dates=dates)
     
 
-def bin_by_elevation(data,dem,mask):
+def bin_by_elevation(data,dem,mask,dz=100):
     """docstring for bin_by_elevation"""
     minz=dem[dem>100].min()
     maxz=dem[dem<5000].max()
-    dz=100
     
     n=np.round((maxz-minz)/dz)
     veg=np.zeros(n)
@@ -151,7 +157,7 @@ def bin_by_elevation(data,dem,mask):
                 exposed=exposed,exposedmed=exposedmed,exposedmin=exposedmin,exposedmax=exposedmax)
 
 
-def load_elev_comparison(swefile="SWE_Daily0600UTC_WesternUS_2010.dat"):
+def load_elev_comparison(swefile="SWE_Daily0600UTC_WesternUS_2010.dat",outputfile="snodas_by_elev.png",domainname="Front Range +",domain=None,dz=100):
     import matplotlib.pyplot as plt
     
     demfile="snodas_dem.nc"
@@ -160,7 +166,10 @@ def load_elev_comparison(swefile="SWE_Daily0600UTC_WesternUS_2010.dat"):
     bare=[0]
     
     mayday=120
-    minx=1800; miny=600; maxx=None;maxy=1100
+    if domain==None:
+        minx=1800; miny=600; maxx=None;maxy=1100
+    else:
+        miny=domain[0]; maxy=domain[1]; minx=domain[2]; maxx=domain[3]
     
     print("Loading data")
     vegclass=myio.read_nc(forestfile).data[miny:maxy,minx:maxx]
@@ -175,9 +184,10 @@ def load_elev_comparison(swefile="SWE_Daily0600UTC_WesternUS_2010.dat"):
     snow=snodas.data[mayday,miny:maxy,minx:maxx]
     
     print("Binning")
-    banded=bin_by_elevation(snow,dem,mask)
+    banded=bin_by_elevation(snow,dem,mask,dz=dz)
 
     print("Plotting")
+    plt.clf()
     plt.plot(banded.z,banded.exposed,label="Exposed",color="b",linewidth=2)
     plt.plot(banded.z,banded.exposedmed,"--",label="Exp. Median",color="b",linewidth=2)
     plt.bar([0],[1],color="skyblue",edgecolor="black",label="Exp. 10-90%")
@@ -198,13 +208,26 @@ def load_elev_comparison(swefile="SWE_Daily0600UTC_WesternUS_2010.dat"):
 
     plt.legend(loc=2)
     plt.xlim(2500,3800)
-    plt.ylim(0,0.7)
+    plt.ylim(0,0.8)
     plt.ylabel("Snow Water Equivalent [m]")
     plt.xlabel("Elevation [m]")
-    plt.title("SNODAS SWE over front range+")
-    plt.savefig("snodas_by_elev.png")
+    plt.title("SNODAS SWE over "+domainname)
+    plt.savefig(outputfile)
     
 if __name__ == '__main__':
-    load_elev_comparison()
+    files=glob.glob("SWE_Daily0600*.dat")
+    files.sort()
+
+    domains=[[830,870,1995,2045],
+             [790,900,1955,2050],
+             [500,950,1700,2100]]
+    domainnames=["FrontRange","GreaterFrontRange","FullDomain"]
+    dz_list=[200,150,100]
+    
+    for f in files[1:]:
+        year=f.split("_")[-1][:4]
+        for dz,dname,domain in zip(dz_list,domainnames,domains):
+            print(year,dname)
+            load_elev_comparison(swefile=f,outputfile="snodas_by_elev_{}_{}.png".format(year,dname),domainname=dname,dz=dz)
     
     

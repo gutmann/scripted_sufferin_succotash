@@ -180,8 +180,9 @@ def correct_the_top(data,maxval,scale=None):
     tmp=np.where(data>maxval)
     if len(tmp[0])==0:
         return
-    if data.max()>500:
-        print(data.max(),maxval)
+    curmax=data.max()
+    if (curmax>500) and (curmax<1e5):
+        print(curmax,maxval)
     if scale==None:scale=0.2*maxval
     errs=data[tmp]-maxval
     # rescale high data to asymptotically approach maxval+scale, scale is often 10[K] or 20% max[mm]
@@ -191,8 +192,9 @@ def correct_the_bottom(data,minval,scale=None):
     tmp=np.where(data<minval)
     if len(tmp[0])==0:
         return
-    if data.min()<-100:
-        print(data.min())
+    curmin=data.min()
+    if (curmin<-100) and (curmin>-1e5):
+        print(curmin)
     
     if scale==None:scale=0.2*minval
     errs=minval-data[tmp]
