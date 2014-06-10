@@ -1,0 +1,3 @@
+#!/bin/bash
+~/src/profiling/gprof2dot.py -f axe gprof_output | dot -Tpng -o output.png
+# ~/src/profiling/gprof2dot.py -f axe $1 | dot -Tpng -o output.png
