@@ -11,7 +11,8 @@ def load_geoLUT(lat1,lon1,lat2,lon2):
     maxlat_dist=np.abs(lat2[1,0]-lat2[0,0])/1.95
     maxlon_dist=np.abs(lon2[0,1]-lon2[0,0])/1.95
     for i in range(N1[0]):
-        print(i,N1[0])
+        if (i%10)==0:
+            print(i,N1[0])
         for j in range(N1[1]):
             dists=(lat1[i,j]-lat2)**2+(lon1[i,j]-lon2)**2
             (newy,newx)=np.unravel_index(dists.argmin(), dists.shape)
@@ -26,7 +27,7 @@ def load_geoLUT(lat1,lon1,lat2,lon2):
         
     return geoLUT
 
-def regrid_hi2low(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,FillValue=1E20,fast=True):
+def regrid_hi2low(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,FillValue=1E20,maxval=1e19,fast=True):
     """docstring for regrid_hi2low"""
     if geoLUT==None:
         if len(lat2.shape)==1:
@@ -41,7 +42,7 @@ def regrid_hi2low(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,FillV
         twoD=True
         data=data[np.newaxis,:,:]
     N=data.shape
-    outputdata=np.empty((N[0],geoLUT.shape[0],geoLUT.shape[1]))
+    outputdata=np.zeros((N[0],geoLUT.shape[0],geoLUT.shape[1]))+FillValue
     N2=outputdata.shape
     print("Regridding...")
     # NOTE, this might be speed up substantially by inlining C code... 
@@ -55,10 +56,11 @@ def regrid_hi2low(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,FillV
             for k in range(N2[2]):
                 if geoLUT[j,k,0]:
                     curdata=data[:,geoLUT[j,k,0],geoLUT[j,k,1]]
-                    curdata=np.ma.array(curdata,mask=(curdata==FillValue))
-                    outputdata[:,j,k]=curdata.mean(axis=1)
-                else:
-                    outputdata[:,j,k]=FillValue
+                    curdata=np.ma.array(curdata,mask=((curdata==FillValue) | (curdata>maxval)))
+                    if len(np.where(curdata.mask[0,:]==False)[0])>0:
+                        outputdata[:,j,k]=curdata.mean(axis=1)
+                # else:
+                #     outputdata[:,j,k]=FillValue
     else:
         for i in range(N2[0]):
             if (i%25)==0:
@@ -70,12 +72,11 @@ def regrid_hi2low(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,FillV
                         curdata=data[i,geoLUT[j,k,0],geoLUT[j,k,1]]
                         tmp=np.where(curdata<1E15)
                         if len(tmp[0])>0:
-                            outputdata[i,j,k]=curdata[curdata<1E15].mean()
-                        else:
-                            outputdata[i,j,k]=FillValue
-                        
-                    else:
-                        outputdata[i,j,k]=FillValue
+                            outputdata[i,j,k]=curdata[curdata<maxval].mean()
+                        # else:
+                        #     outputdata[i,j,k]=FillValue
+                    # else:
+                    #     outputdata[i,j,k]=FillValue
     print("100.0")    
     if twoD:
         print("2D")

@@ -5,6 +5,7 @@ import numpy as np
 import mygis as myio
 from bunch import Bunch
 
+
 def stats(data):
     """Calculate the rate of melt from peak to 0
     
@@ -61,70 +62,59 @@ def load_noahmp(filename, startyear=2000,startdate=None):
     return Bunch(data=data,lat=lat,lon=lon,dates=dates)
 
 
-def load(filename, startyear=2000,startdate=None):
+def load(filename, startyear=2000,startdate=None,extractday=None):
     """Load WRF SWE data from a file
     """
+    # find the directory in which files will be
     wrf_dir="/".join(filename.split("/")[:-1])
+    if len(wrf_dir)<1:
+        wrf_dir="."
+        
+    # geo information filename is hard coded...
     geo_file=wrf_dir+"/4km_wrf_output.nc"
-    data=myio.read_nc(filename,"SNOW").data
+    # if we only want a single day from the file, just load that day
+    if extractday!=None:
+        ncdata=myio.read_nc(filename,"SNOW",returnNCvar=True)
+        ntimes=ncdata.data.shape[0] #store the number of times for later use
+        data=ncdata.data[extractday,:,:]
+        ncdata.ncfile.close()
+    else:
+        data=myio.read_nc(filename,"SNOW").data
+        ntimes=data.shape[0]
+
+    # load forested vs bare land cover into a mask
+    vegclass=myio.read_nc(geo_file,"IVGTYP").data[0,...]
+    mask=np.zeros(vegclass.shape)
+    # these are the values of vegclass for forest and exposed areas in the WRF4km runs
+    forest=[1,5]
+    exposed=[7,10]
+    # loop through LC indices setting the mask
+    for f in forest:
+        forested=np.where(vegclass==f)
+        mask[forested]=1
+    for e in exposed:
+        exposed=np.where(vegclass==e)
+        mask[exposed]=2
+    mask[mask==0]=2 #assume unclassified areas are more exposed
+    
+    # load the dem and geographic data from the original file
+    dem=myio.read_nc(geo_file,"HGT").data[0,...]
     lat=myio.read_nc(geo_file,"XLAT").data[0,...]
     lon=myio.read_nc(geo_file,"XLONG").data[0,...]
     
+    # set up a dates array (one element if we are extracting a single day)
     if startdate==None:startdate=datetime.datetime(startyear,10,1,0)
-    ntimes=data.shape[0]
-    
     dates=np.array([startdate+datetime.timedelta(i) for i in range(ntimes)])
+    if extractday!=None:
+        dates=np.array([dates[extractday]])
     
-    return Bunch(data=data,lat=lat,lon=lon,dates=dates)
-
-
-def bin_by_elevation(data,dem,mask,dz=100):
-    """docstring for bin_by_elevation"""
-    minz=dem[dem>100].min()
-    maxz=dem[dem<5000].max()
-    
-    n=np.round((maxz-minz)/dz)
-    veg=np.zeros(n)
-    vegmed=np.zeros(n)
-    vegmin=np.zeros(n)
-    vegmax=np.zeros(n)
-    exposed=np.zeros(n)
-    exposedmed=np.zeros(n)
-    exposedmin=np.zeros(n)
-    exposedmax=np.zeros(n)
-    z=np.arange(minz,maxz+dz,dz)
-    
-    for i in np.arange(n):
-        curexp=np.where((dem>z[i])&(dem<=z[i+1])&(mask==2)&np.isfinite(data)&(data>0)&(data<20))
-        curn=len(curexp[0])
-        if curn>0:
-            exposed[i]=np.mean(data[curexp])
-            sorted_data=np.sort(data[curexp])
-            exposedmin[i]=sorted_data[int(curn*0.1)]
-            exposedmed[i]=sorted_data[int(curn*0.5)]
-            exposedmax[i]=sorted_data[int(curn*0.9)]
-
-        curveg=np.where((dem>z[i])&(dem<=z[i+1])&(mask==1)&np.isfinite(data)&(data>0)&(data<20))
-        curn=len(curveg[0])
-        if curn>0:
-            veg[i]=np.mean(data[curveg])
-            sorted_data=np.sort(data[curveg])
-            vegmin[i]=sorted_data[int(curn*0.1)]
-            vegmed[i]=sorted_data[int(curn*0.5)]
-            vegmax[i]=sorted_data[int(curn*0.9)]
-
-    veg=np.ma.array(veg,mask=(veg==0))
-    vegmin=np.ma.array(vegmin,mask=(vegmin==0))
-    vegmed=np.ma.array(vegmed,mask=(vegmed==0))
-    vegmax=np.ma.array(vegmax,mask=(vegmax==0))
-
-    return Bunch(z=z[:n]+(dz/2),veg=veg,vegmed=vegmed,vegmin=vegmin,vegmax=vegmax,
-                exposed=exposed,exposedmed=exposedmed,exposedmin=exposedmin,exposedmax=exposedmax)
+    return Bunch(data=data/1000.0,lat=lat,lon=lon,dates=dates,dem=dem,lc=mask)
 
 
 def load_elev_comparison(swefile="SWE_daily.nc",info="4km_wrf_output.nc",res=4,outputfile="wrf_by_elev.png",year=7,domain="FullDomain"):
-    import matplotlib.pyplot as plt
     # wrf.load_elev_comparison(swefile="wrfout_d01_2008-05-01_00:00:00",res=2,outputfile="wrf_by_elev_2km_FullDomain_May2008.png")
+    import wsc.compare2lidar as c2l
+    
     if res==2:
         forest=[11,12,13,14,15,18,21]
         exposed=[1,2,3,4,5,7,8,9,10,16,17,19,20,22,23,24,25,26,27]
@@ -174,38 +164,13 @@ def load_elev_comparison(swefile="SWE_daily.nc",info="4km_wrf_output.nc",res=4,o
         mask[exposed]=2
     
     dem=myio.read_nc(info,"HGT").data[0,...]
-    snow=myio.read_nc(swefile,"SNOW").data[mayday,:,:]/1000.0
+    snow=myio.read_nc(swefile,"SNOW").data[mayday,:,:]/1000
     
     print("Binning")
-    banded=bin_by_elevation(snow[ymin:ymax,xmin:xmax],dem[ymin:ymax,xmin:xmax],mask[ymin:ymax,xmin:xmax],dz=dz)
+    banded=c2l.bin_by_elevation(snow[ymin:ymax,xmin:xmax],dem[ymin:ymax,xmin:xmax],mask[ymin:ymax,xmin:xmax],dz=dz)
 
-    print("Plotting")
-    plt.clf();
-    plt.plot(banded.z,banded.exposed,label="Exposed",color="b",linewidth=2)
-    plt.plot(banded.z,banded.exposedmed,"--",label="Exp. Median",color="b",linewidth=2)
-    plt.bar([0],[1],color="skyblue",edgecolor="black",label="Exp. 10-90%")
-    plt.plot(banded.z,banded.veg,label="Vegetation",color="g",linewidth=2)
-    plt.plot(banded.z,banded.vegmed,"--",label="Veg. Median",color="g",linewidth=2)
-    plt.bar([0],[1],color="lightgreen",edgecolor="black",label="Veg. 10-90%")
+    c2l.plot_elevation_bands(banded,"WRF_SWE_elev.png","WRF SWE, Elevation, and Land Cover: "+domain)
     
-    plt.plot(banded.z,banded.vegmin,color="black")
-    plt.plot(banded.z,banded.vegmax,color="black")
-    plt.plot(banded.z,banded.exposedmin,color="black")
-    plt.plot(banded.z,banded.exposedmax,color="black")
-
-    plt.fill_between(banded.z,banded.exposedmin,banded.exposedmax,
-                        color="skyblue",edgecolor="black")
-    plt.fill_between(banded.z,banded.vegmin,banded.vegmax,
-                        color="lightgreen",alpha=0.5,edgecolor="black")
-                        
-
-    plt.legend(loc=2)
-    plt.xlim(2500,3800)
-    plt.ylim(0,0.8)
-    plt.ylabel("Snow Water Equivalent [m]")
-    plt.xlabel("Elevation [m]")
-    plt.title("WRF SWE over headwaters "+domain)
-    plt.savefig(outputfile)
     
 if __name__ == '__main__':
     domains=["FullDomain","GreaterFrontRange"]

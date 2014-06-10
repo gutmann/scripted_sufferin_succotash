@@ -77,7 +77,7 @@ def fill_missing(data):
 # VARS 1
 # swe 0 99 Snow Water Equivalant (Unit: meter); Snapshot at 0600UTC; Arbitrarily assigned to 0000UTC of the same day.
 # ENDVARS
-def load(filename,startyear=2004,startdate=None,fill=True):
+def load(filename,startyear=2004,startdate=None,fill=True,extractday=None):
     """Load a SNODAS SWE file
     
     Assumes a flat binary file as described above, but calculates the number of days present
@@ -87,6 +87,10 @@ def load(filename,startyear=2004,startdate=None,fill=True):
         d=np.fromfile(filename,np.float32)
     else:
         d=None
+    # find the directory in which files will be
+    snodas_dir="/".join(filename.split("/")[:-1])
+    if len(snodas_dir)<1:
+        snodas_dir="."
     
     startlon=-122.371249999998
     nlon=2191
@@ -97,6 +101,18 @@ def load(filename,startyear=2004,startdate=None,fill=True):
     nlat=1291
     dlat=dlon
     lat=np.array([startlat+dlat*i for i in range(nlat)])
+    
+    demfile=snodas_dir+"/snodas_dem.nc"
+    forestfile=snodas_dir+"/snodas_forest.nc"
+    forest=[1]
+    bare=[0]
+    vegclass=myio.read_nc(forestfile).data
+    forested=np.where(vegclass==forest[0])
+    exposed=np.where(vegclass==bare[0])
+    mask=np.zeros(vegclass.shape)
+    mask[forested]=1
+    mask[exposed]=2
+    dem=myio.read_nc(demfile).data
     
     if startdate==None:startdate=datetime.datetime(startyear,1,1,0)
     if d==None:
@@ -110,55 +126,59 @@ def load(filename,startyear=2004,startdate=None,fill=True):
         if fill:
             fill_missing(d)
     
-    return Bunch(data=d,lat=lat,lon=lon,dates=dates)
+    if extractday!=None:
+        d=d[extractday,...]
+        dates=np.array([dates[extractday]])
+    
+    return Bunch(data=d,lat=lat,lon=lon,dates=dates,dem=dem,lc=mask)
     
 
-def bin_by_elevation(data,dem,mask,dz=100):
-    """docstring for bin_by_elevation"""
-    minz=dem[dem>100].min()
-    maxz=dem[dem<5000].max()
-    
-    n=np.round((maxz-minz)/dz)
-    veg=np.zeros(n)
-    vegmed=np.zeros(n)
-    vegmin=np.zeros(n)
-    vegmax=np.zeros(n)
-    exposed=np.zeros(n)
-    exposedmed=np.zeros(n)
-    exposedmin=np.zeros(n)
-    exposedmax=np.zeros(n)
-    z=np.arange(minz,maxz+dz,dz)
-    
-    for i in np.arange(n):
-        curexp=np.where((dem>z[i])&(dem<=z[i+1])&(mask==2)&np.isfinite(data)&(data>0)&(data<20))
-        curn=len(curexp[0])
-        if curn>0:
-            exposed[i]=np.mean(data[curexp])
-            sorted_data=np.sort(data[curexp])
-            exposedmin[i]=sorted_data[int(curn*0.1)]
-            exposedmed[i]=sorted_data[int(curn*0.5)]
-            exposedmax[i]=sorted_data[int(curn*0.9)]
-
-        curveg=np.where((dem>z[i])&(dem<=z[i+1])&(mask==1)&np.isfinite(data)&(data>0)&(data<20))
-        curn=len(curveg[0])
-        if curn>0:
-            veg[i]=np.mean(data[curveg])
-            sorted_data=np.sort(data[curveg])
-            vegmin[i]=sorted_data[int(curn*0.1)]
-            vegmed[i]=sorted_data[int(curn*0.5)]
-            vegmax[i]=sorted_data[int(curn*0.9)]
-
-    veg=np.ma.array(veg,mask=(veg==0))
-    vegmin=np.ma.array(vegmin,mask=(vegmin==0))
-    vegmed=np.ma.array(vegmed,mask=(vegmed==0))
-    vegmax=np.ma.array(vegmax,mask=(vegmax==0))
-
-    return Bunch(z=z[:n],veg=veg,vegmed=vegmed,vegmin=vegmin,vegmax=vegmax,
-                exposed=exposed,exposedmed=exposedmed,exposedmin=exposedmin,exposedmax=exposedmax)
-
+# def bin_by_elevation(data,dem,mask,dz=100):
+#     """docstring for bin_by_elevation"""
+#     minz=dem[dem>100].min()
+#     maxz=dem[dem<5000].max()
+#     
+#     n=np.round((maxz-minz)/dz)
+#     veg=np.zeros(n)
+#     vegmed=np.zeros(n)
+#     vegmin=np.zeros(n)
+#     vegmax=np.zeros(n)
+#     exposed=np.zeros(n)
+#     exposedmed=np.zeros(n)
+#     exposedmin=np.zeros(n)
+#     exposedmax=np.zeros(n)
+#     z=np.arange(minz,maxz+dz,dz)
+#     
+#     for i in np.arange(n):
+#         curexp=np.where((dem>z[i])&(dem<=z[i+1])&(mask==2)&np.isfinite(data)&(data>0)&(data<20))
+#         curn=len(curexp[0])
+#         if curn>0:
+#             exposed[i]=np.mean(data[curexp])
+#             sorted_data=np.sort(data[curexp])
+#             exposedmin[i]=sorted_data[int(curn*0.1)]
+#             exposedmed[i]=sorted_data[int(curn*0.5)]
+#             exposedmax[i]=sorted_data[int(curn*0.9)]
+# 
+#         curveg=np.where((dem>z[i])&(dem<=z[i+1])&(mask==1)&np.isfinite(data)&(data>0)&(data<20))
+#         curn=len(curveg[0])
+#         if curn>0:
+#             veg[i]=np.mean(data[curveg])
+#             sorted_data=np.sort(data[curveg])
+#             vegmin[i]=sorted_data[int(curn*0.1)]
+#             vegmed[i]=sorted_data[int(curn*0.5)]
+#             vegmax[i]=sorted_data[int(curn*0.9)]
+# 
+#     veg=np.ma.array(veg,mask=(veg==0))
+#     vegmin=np.ma.array(vegmin,mask=(vegmin==0))
+#     vegmed=np.ma.array(vegmed,mask=(vegmed==0))
+#     vegmax=np.ma.array(vegmax,mask=(vegmax==0))
+# 
+#     return Bunch(z=z[:n],veg=veg,vegmed=vegmed,vegmin=vegmin,vegmax=vegmax,
+#                 exposed=exposed,exposedmed=exposedmed,exposedmin=exposedmin,exposedmax=exposedmax)
+# 
 
 def load_elev_comparison(swefile="SWE_Daily0600UTC_WesternUS_2010.dat",outputfile="snodas_by_elev.png",domainname="Front Range +",domain=None,dz=100):
-    import matplotlib.pyplot as plt
+    import wsc.compare2lidar as c2l
     
     demfile="snodas_dem.nc"
     forestfile="snodas_forest.nc"
@@ -184,35 +204,36 @@ def load_elev_comparison(swefile="SWE_Daily0600UTC_WesternUS_2010.dat",outputfil
     snow=snodas.data[mayday,miny:maxy,minx:maxx]
     
     print("Binning")
-    banded=bin_by_elevation(snow,dem,mask,dz=dz)
+    banded=c2l.bin_by_elevation(snow,dem,mask,dz=dz)
 
     print("Plotting")
-    plt.clf()
-    plt.plot(banded.z,banded.exposed,label="Exposed",color="b",linewidth=2)
-    plt.plot(banded.z,banded.exposedmed,"--",label="Exp. Median",color="b",linewidth=2)
-    plt.bar([0],[1],color="skyblue",edgecolor="black",label="Exp. 10-90%")
-    plt.plot(banded.z,banded.veg,label="Vegetation",color="g",linewidth=2)
-    plt.plot(banded.z,banded.vegmed,"--",label="Veg. Median",color="g",linewidth=2)
-    plt.bar([0],[1],color="lightgreen",edgecolor="black",label="Veg. 10-90%")
-    
-    plt.plot(banded.z,banded.vegmin,color="black")
-    plt.plot(banded.z,banded.vegmax,color="black")
-    plt.plot(banded.z,banded.exposedmin,color="black")
-    plt.plot(banded.z,banded.exposedmax,color="black")
-
-    plt.fill_between(banded.z,banded.exposedmin,banded.exposedmax,
-                        color="skyblue",edgecolor="black")
-    plt.fill_between(banded.z,banded.vegmin,banded.vegmax,
-                        color="lightgreen",alpha=0.5,edgecolor="black")
-                        
-
-    plt.legend(loc=2)
-    plt.xlim(2500,3800)
-    plt.ylim(0,0.8)
-    plt.ylabel("Snow Water Equivalent [m]")
-    plt.xlabel("Elevation [m]")
-    plt.title("SNODAS SWE over "+domainname)
-    plt.savefig(outputfile)
+    c2l.plot_elevation_bands(banded,outputfile,title="SNODAS SWE over "+domainname)
+    # plt.clf()
+    # plt.plot(banded.z,banded.exposed,label="Exposed",color="b",linewidth=2)
+    # plt.plot(banded.z,banded.exposedmed,"--",label="Exp. Median",color="b",linewidth=2)
+    # plt.bar([0],[1],color="skyblue",edgecolor="black",label="Exp. 10-90%")
+    # plt.plot(banded.z,banded.veg,label="Vegetation",color="g",linewidth=2)
+    # plt.plot(banded.z,banded.vegmed,"--",label="Veg. Median",color="g",linewidth=2)
+    # plt.bar([0],[1],color="lightgreen",edgecolor="black",label="Veg. 10-90%")
+    # 
+    # plt.plot(banded.z,banded.vegmin,color="black")
+    # plt.plot(banded.z,banded.vegmax,color="black")
+    # plt.plot(banded.z,banded.exposedmin,color="black")
+    # plt.plot(banded.z,banded.exposedmax,color="black")
+    # 
+    # plt.fill_between(banded.z,banded.exposedmin,banded.exposedmax,
+    #                     color="skyblue",edgecolor="black")
+    # plt.fill_between(banded.z,banded.vegmin,banded.vegmax,
+    #                     color="lightgreen",alpha=0.5,edgecolor="black")
+    #                     
+    # 
+    # plt.legend(loc=2)
+    # plt.xlim(2500,3800)
+    # plt.ylim(0,0.8)
+    # plt.ylabel("Snow Water Equivalent [m]")
+    # plt.xlabel("Elevation [m]")
+    # plt.title("SNODAS SWE over "+domainname)
+    # plt.savefig(outputfile)
     
 if __name__ == '__main__':
     files=glob.glob("SWE_Daily0600*.dat")
