@@ -10,6 +10,13 @@ import mygis as swim_io
 import stats_driver
     
 def wetdry(data,threshold=0):
+    """Calculate wet/dry statistics for data given a precip threshold
+    
+    data = 3D grid of precip data [time x lat x lon]
+    threshold = precip threshold to use as definition of a wet day
+    returns wet day fraction, mean wet spell length, and mean dry spell length
+        on a 2D grid [lat x lon]
+    """
     wetdays=np.zeros(data.shape)
     for i in range(data.shape[0]):
         wetdays[i,data[i,...]>threshold]=1
@@ -37,9 +44,16 @@ def wetdry(data,threshold=0):
     return(wetfraction,wetspell_length,dryspell_length)
     
 def mean(data,nyears=9,minval=-999,maxval=1e5):
+    """Calculate a mean annual total from a daily time series spanning nyears"""
     return(data.sum(axis=0)/nyears)
 
 def interannual(data,yearstarts,fun=None):
+    """Calculate interannual variability in mean annual values
+    
+    data = 3D grid [time x lat x lon]
+    yearstarts = list of indices into the time dimension specifying 
+                the starting point for each year
+    """
     if fun==None:
         fun=np.mean
     annshape=list(data.shape)
@@ -58,6 +72,11 @@ def interannual(data,yearstarts,fun=None):
     return(np.std(annual_vals,axis=0))
 
 def histogram(data,precip=True):
+    """Calculate a histogram for data
+    
+    For precip calculate on a log scale. 
+    returns histgram bin value and center point as a tuple
+    """
     if precip:
         usedata=[]
         for i in range(data.shape[0]):
@@ -78,6 +97,7 @@ def histogram(data,precip=True):
     return(v,x)
     
 def calc_fritch(data):
+    """Calculate the fritch index from tmin data (C)"""
     growing_threshold=5
     
     startdate=np.zeros(data.shape[1:])+999
@@ -104,16 +124,26 @@ def calc_fritch(data):
         
     
 def temperature_indicies(data,yearstarts):
+    """Calculate various temperature indices from tmin data
+    
+    data = 3D grid of tmin (C or K) [time, lat, lon]
+    yearstarts = list of indices into the time dimension specifying year starting points
+    returns mean annual Frost days per year and Fritch index
+    on a 2D grid [lat, lon]
+    """
     if data.min()>100:
         data-=273.15
         datawerekelvin=True
+    # n frost days in time series
     frost_days=np.choose(data<=0,(0,1))
+    # frost days per year = nfrost days / nyears
     frost_dpy=frost_days.sum(axis=0)/float(len(yearstarts))
     
     fritchshape=list(data.shape)
     fritchshape[0]=len(yearstarts)
     fritch_indicies=np.zeros(fritchshape)
 
+    # loop over years calculating the fritch index for each year
     for i in range(fritchshape[0]):
         startpt=yearstarts[i]
         if i==fritchshape[0]-1:
@@ -125,6 +155,12 @@ def temperature_indicies(data,yearstarts):
     return(frost_dpy,fritch_indicies.mean(axis=0))
     
 def p99(data):
+    """Calculate the 99th and 1st percentile for data along the first index
+    
+    data can be a 2D or 3D array, 
+        sorts data on axis 0 and 
+        returns the 99th and 1st percentile on a 1D or 2D grid
+    """
     sorted_data=np.sort(data,axis=0)
     return (sorted_data[np.round(data.shape[0]*0.99),...],
             sorted_data[np.round(data.shape[0]*0.01),...])
@@ -140,6 +176,12 @@ def calc_extreme_value(params,distribution,nyear,datafraction=1.0):
 
 
 def extremes(data, dist_name="gamma",verbose=True,year_intervals=None):
+    """Calculate the 2, 5, 10 and 50yr return intervals for data using a specified distribution
+    
+    data = 3D grid of e.g. precip data [time, lat, lon]
+    dist_name = the distribution to use when fitting data (gamma, weibull, or exponential)
+    """
+    # select the distribution to use
     if dist_name=="weibull":
         distribution=stats.weibull_min
     elif dist_name=="exponential":
@@ -147,9 +189,13 @@ def extremes(data, dist_name="gamma",verbose=True,year_intervals=None):
     elif dist_name=="gamma":
         distribution=stats.gamma
     else:
-        return None
+        raise KeyError
+    
+    # set numpy error handling functions to ignore invalid data because we may get some, 
+    # but store the old settings so we can restore them after this function
     old_settings=np.seterr(invalid='ignore')
 
+    # return intervals to calculate storms for
     if year_intervals==None:
         year_intervals=[2,10,50,100]
     shape=data.shape
@@ -160,23 +206,30 @@ def extremes(data, dist_name="gamma",verbose=True,year_intervals=None):
         extremes=np.zeros((len(year_intervals),shape[1]))
         jlen=1
     if verbose:print("Calculating Extremes")
+    # loop over lat dimension
     for i in range(shape[1]):
+        # this may take a while so output progress to the screen if verbose output was specified
         if verbose:
             print("progress= {0}/{1}      \r".format(i,shape[1]),end="")
             sys.stdout.flush()
+        # loop over lon dimension
         for j in range(jlen):
             if len(shape)==3:
                 curdata=data[:,i,j]
             else:
                 curdata=data[:,i]
+            # just use the top half of the non-zero values in data
             medianval=np.median(curdata[curdata>0])
             # medianval=np.median(curdata[curdata>medianval])
             usevals=np.where(curdata>=medianval)[0]
             if len(usevals)>0:
+                # assuming there were some data to fit, fit the data
                 params=distribution.fit(curdata[usevals])
+                # now generate a list of calculate extremes for each return interval
                 curextremes=[calc_extreme_value(params,distribution,
                                                 year,len(usevals)/float(shape[0])) 
                                                 for year in year_intervals]
+                # and store the data in an output array
                 if len(shape)==3:
                     extremes[:,i,j]=np.array(curextremes)
                     if extremes[:,i,j].min()==0:print(i,j)
@@ -185,6 +238,7 @@ def extremes(data, dist_name="gamma",verbose=True,year_intervals=None):
                     if extremes[:,i].min()==0:print(i)
                 
     print("\nFinished")
+    # restore error checking stats
     new_settings=np.seterr(invalid=old_settings["invalid"])
     return extremes
     

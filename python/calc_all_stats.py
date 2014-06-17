@@ -73,7 +73,7 @@ def load_data(files,varname,extra,res,minval=-100,maxval=600):
     # load huc data before actually reading the data in
     outputdata=[]
     hucnames=[]
-    if hucfilename:
+    if hucfilename and (type(hucfilename)==list or (hucfilename.lower()!="none")):
         # if there are more than one hucfile to match iterate over them
         if type(hucfilename==list):
             hucdata=[]
@@ -104,7 +104,7 @@ def load_data(files,varname,extra,res,minval=-100,maxval=600):
     # finally aggreate to HUC shapes if necessary
     aggoutdata=[]
     huclist=[]
-    if hucfilename:
+    if hucfilename and (type(hucfilename)==list or (hucfilename.lower()!="none")):
         for h in hucdata:
             print("aggregating...")
             if varname=="pr":
@@ -122,7 +122,7 @@ def load_data(files,varname,extra,res,minval=-100,maxval=600):
     # and the huc shapes (aggdata) as well as the corresponding list of hucs
     return Bunch(data=outputdata,aggdata=aggoutdata,hucs=huclist,hucnames=hucnames)
 
-def calc_year_start_dates(filenames):
+def calc_year_start_dates(filenames,model="ncep"):
     """Calculate the starting points of each year for all files in filenames
     
     based on the filename, calculate the year of the first file and go from there. 
@@ -147,8 +147,11 @@ def calc_year_start_dates(filenames):
             year1=year1.split("_")[-1]
         year1=float(year1)-1
         
-    
-    return np.floor(np.arange((year1%4.0)/4,365*len(filenames),365.25))
+    if (model=="ncep") or (model=="narr"):
+        return np.floor(np.arange((year1%4.0)/4,365*len(filenames),365.25))
+    elif model=="ccsm":
+        return np.arange(0,365*len(filenames),365)
+        
 
 def temp_stats(names,data1,data2,info):
     """Calculate temperature statistics
@@ -229,21 +232,23 @@ def precip_stats(names,data,info):
         hist=np.vstack(stats.histogram(d))
         io.write(out+"_histogram",hist)
         
-        # print("WARNING: NOT CALCULATING EXTREME EVENTS")
-        # print("WARNING: NOT CALCULATING EXTREME EVENTS")
-        # commented out for now because extreme events take a long time to calculate
         # if re.match(".*annual",n):
         for ndays in info.nday_lengths[:1]:
+            # note use of "..." because this could be a 2D array (time x huc) or a 3D array (time x lat x lon)
             data2test=d[ndays:,...].copy()
             for i in range(ndays):
                 data2test+=d[i:-(ndays-i),...]
             print("extremes "+str(ndays+1))
-            extremes=stats.extremes(data2test,dist_name=info.distributionname)
-            if extremes!=None:
-                for i in range(extremes.shape[0]):
-                    cur=extremes[i,...]
-                    print(cur[cur>0].mean())
-                io.write(out+"_extremes_nday"+str(ndays+1),extremes)
+            try:
+                extremes=stats.extremes(data2test,dist_name=info.distributionname)
+                if extremes!=None:
+                    for i in range(extremes.shape[0]):
+                        cur=extremes[i,...]
+                        print(cur[cur>0].mean())
+                    io.write(out+"_extremes_nday"+str(ndays+1),extremes)
+            except KeyError:
+                print("Can't run distribution type : ",info.distributionname)
+                
 
 def cleanup(data,minval=-999,maxval=1e5):
     sz=data.shape
@@ -251,9 +256,30 @@ def cleanup(data,minval=-999,maxval=1e5):
         tmp=np.where((data[i,...]<minval)|(data[i,...]>maxval)|(~np.isfinite(data[i,...])))
         if len(tmp[0]):
             data[i,tmp[0],tmp[1]]=data[i-1,tmp[0],tmp[1]]
+
+def is_leap(year):
+    """Leap years are divisible by 4, 
+    unless they are divisible by 100, 
+    unless it is also divisible by 400...
     
-def calc_dates(files,ntimes):
-    """Calcualte the corresponding dates for a given dataset
+    (e.g. the year 1900 is not a leap year but 2000 is, 2100 will not be)
+    """
+    return (((int(year) % 4)==0) and 
+            ( ((int(year) % 100)!=0) or ((int(year) % 400)==0) ))
+
+def gen_dates(baseyear=1999):
+    """Generate a list of the month associated with each day of the year for a given year
+    defaults to a non-leap year"""
+    mjd1=date_fun.date2mjd(baseyear,1,1,12,0,0)
+    if is_leap(baseyear):
+        mjds=np.arange(mjd1,mjd1+366)
+    else:
+        mjds=np.arange(mjd1,mjd1+365)
+    dates=date_fun.mjd2date(mjds)
+    return dates
+    
+def calc_dates(files,ntimes,model):
+    """Calculate the corresponding dates for a given dataset
     
     Kind of a hack around multiple file / time / date structures
     """
@@ -273,6 +299,7 @@ def calc_dates(files,ntimes):
     # for another set of SD data
     except IndexError:
         year1=files[0].split(".")[-3]
+    # and YET another...
     except ValueError:
         year1=files[0].split(".")[-2]
         if len(year1)>4:
@@ -282,6 +309,18 @@ def calc_dates(files,ntimes):
     # once we have the starting year, calculate all other years as modified julian day
     # and convert back to Year, Month, Day dates
     year1=int(year1)
+    if model=="ccsm":
+        nyears=ntimes/365.0 
+        if int(nyears)!=len(files):
+            print("WARNING: number of files {}, does not equal the number of years in the time series {}".format(len(files),nyears))
+        years=np.floor(np.arange(float(year1),ntimes/365.0,1/365.0))
+        print(len(years))
+        dates=gen_dates()
+        print(dates.shape)
+        dates=dates.repeat(nyears,axis=0)
+        print(dates[0,:],dates[-1,:],dates.shape)
+        return Bunch(year=years,month=dates[:,1],day=dates[:,2])
+        
     mjd1=date_fun.date2mjd(year1,1,1,12,0,0)
     mjd=mjd1+np.arange(ntimes)
     dates=date_fun.mjd2date(mjd)
@@ -290,14 +329,18 @@ def calc_dates(files,ntimes):
 def calc_stats(files,v,output_base,info,extra):
     """Calculate primary statistics for a given meteorologic dataset"""
     
+    if info[2]=="ccsm":
+        model_period=365
+    else:
+        model_period=365.25
     # parse the extra list into a meaningful datastructure
     metadata=Bunch(output_base=extra[3]+output_base,
                    resolution=info[3],
                    distributionname=extra[0],
                    precip_threshold=extra[1],
                    nday_lengths=np.arange(5),
-                   year_starts=calc_year_start_dates(files),
-                   period=365.25)
+                   year_starts=calc_year_start_dates(files,model=info[2]),
+                   period=model_period)
 
     print("Loading Data")
     # load data from files *assumes you can store all data in memory*
@@ -311,6 +354,8 @@ def calc_stats(files,v,output_base,info,extra):
     alldata.append(data.data)
     allnames=data.hucnames
     allnames.append("full_res")
+    
+    alldata2=None #incase we have tas not tasmax
     if v=="tasmax":
         # if we just loaded tmax we also need to load tmin
         # first convert filenames
@@ -331,8 +376,9 @@ def calc_stats(files,v,output_base,info,extra):
                 a1[tmp]=a2[tmp]
                 a2[tmp]=bada1
         
-    dates=calc_dates(files,alldata[0].shape[0])
-    
+    dates=calc_dates(files,alldata[0].shape[0],info[2])
+    print(len(dates.month))
+    print(alldata[0].shape)
     # ---------- Calculate Annual values --------------
     fullyearnames=[oldname+"_annual" for oldname in allnames]
     if v=="pr":
@@ -411,7 +457,7 @@ if __name__ == '__main__':
         parser.add_argument('-huc',dest="huc",nargs="?",action='store',help="HUC file names [default= all]",
                     default=[bd+"HUC02/huc2_",bd+"HUC04/huc4_",bd+"HUC08/huc8_"])#,bd+"HUC12/huc12_"])
         parser.add_argument('-out',dest="outputdir",nargs="?",action='store',
-                    default="./",help="output directory [./]")
+                    default="stats/",help="output directory [./]")
         parser.add_argument('-yearsearch',dest="yearsearch",nargs="?",action='store',
                     default=["200[1-8]"],help='years to search for [200[1-8]]')
                     # default=["19*"],help='years to search for [200[1-8]]')
@@ -451,12 +497,32 @@ if __name__ == '__main__':
         if args.runsub:
             geosubset=[35,43,-112.8,-101.7] # subdomain
         
-        # driver.drive requires lists to iterate over, but CLI args will be individual
+        # driver.drive requires the following to be lists to iterate over, but CLI args will be individual
         #  elements.  However, default values are all lists, so we don't want to make them
         # lists of lists so we have to test to see if they are a list already first...
         for k in args.__dict__.keys():
             if type(args.__dict__[k])!=list:
-                args.__dict__[k]=[args.__dict__[k]]
+                if type(args.__dict__[k])==str:
+                    temp=args.__dict__[k].strip()
+                    args.__dict__[k]=temp.split(",")
+                    # possibly better test to see if the user was specifying a list of elements...?
+                    # but would require the user to think more about shell escapes for the [,] chars... so just assume...
+                    # if temp[0]=="[" and temp[-1]=="]":
+                    #     temp[0]=""
+                    #     temp[-1]=""
+                    #     args.__dict__[k]=temp.split(",")
+                    # else:
+                    #     args.__dict__[k]=[temp]
+                    
+                else: #not sure we'll ever get here, all input should be strings, and defaults should all be lists
+                    args.__dict__[k]=[args.__dict__[k]]
+        
+        print( args.methods)
+        print(args.variable)
+        print(args.resolution)
+        print(args.yearsearch)
+        
+        if not outputdir:outputdir="./"
         if outputdir[-1]!='/':outputdir+='/'
         if outputdir!="./":
             mk_all_dirs(outputdir[:-1])
@@ -480,10 +546,9 @@ if __name__ == '__main__':
             calc_stats(files,"pr","wrf",[0,0,0,"12km"],["gamma",pr_threshold,geosubset,outputdir,hucfile,None])
             os._exit(0)
         
-        
         # driver iterates over all combinations of methods/variables/forcing/resolutions and calls calc_stats for each
         driver.drive(calc_stats, #function to call
-                    yearsearch=args.yearsearch[0], #subset of years to run specified as a glob expression
+                    yearsearch=args.yearsearch, #subset of years to run specified as a glob expression
                     obs=runobs,stat=runstat,runforce=runforcing, # options to run either SD methods, observations or forcing
                     extra=[distribution,pr_threshold,geosubset,outputdir,hucfile,georeffile], #passed to calc_stats
                     methods=args.methods,   # list of SD methods to run
