@@ -135,6 +135,7 @@ def calc_year_start_dates(filenames,model="ncep"):
         wrfoffset=92
         return np.floor(np.arange((year1%4.0)/4,365*len(filenames),365.25))+wrfoffset
     try:
+        print(len(filenames))
         year1=filenames[0].split(".")[-2]
         if len(year1)>4:
             year1=year1.split("_")[-2]
@@ -150,7 +151,9 @@ def calc_year_start_dates(filenames,model="ncep"):
     if (model=="ncep") or (model=="narr"):
         return np.floor(np.arange((year1%4.0)/4,365*len(filenames),365.25))
     elif model=="ccsm":
-        return np.arange(0,365*len(filenames),365)
+        return np.arange(0,365.0*len(filenames),365)
+        
+    raise KeyError("Model unknown : {}".format(model))
         
 
 def temp_stats(names,data1,data2,info):
@@ -290,6 +293,10 @@ def calc_dates(files,ntimes,model):
         mjd=mjd1+np.arange(ntimes)
         dates=date_fun.mjd2date(mjd)
         return Bunch(year=dates[:,0],month=dates[:,1],day=dates[:,2])
+
+    # for CCSM data
+    # if re.match(".*run5\.complete.*\.nc",files[0].split("/")[-1]):
+        # year1=np.float(files[0].split(".")[-2])-1
     # for one set of SD data
     try:
         year1=files[0].split(".")[-2]
@@ -299,6 +306,7 @@ def calc_dates(files,ntimes,model):
     # for another set of SD data
     except IndexError:
         year1=files[0].split(".")[-3]
+        year1=float(year1)-1
     # and YET another...
     except ValueError:
         year1=files[0].split(".")[-2]
@@ -308,19 +316,17 @@ def calc_dates(files,ntimes,model):
     
     # once we have the starting year, calculate all other years as modified julian day
     # and convert back to Year, Month, Day dates
-    year1=int(year1)
     if model=="ccsm":
         nyears=ntimes/365.0 
         if int(nyears)!=len(files):
             print("WARNING: number of files {}, does not equal the number of years in the time series {}".format(len(files),nyears))
         years=np.floor(np.arange(float(year1),ntimes/365.0,1/365.0))
-        print(len(years))
         dates=gen_dates()
-        print(dates.shape)
         dates=dates.repeat(nyears,axis=0)
-        print(dates[0,:],dates[-1,:],dates.shape)
+        
         return Bunch(year=years,month=dates[:,1],day=dates[:,2])
         
+    year1=int(year1)
     mjd1=date_fun.date2mjd(year1,1,1,12,0,0)
     mjd=mjd1+np.arange(ntimes)
     dates=date_fun.mjd2date(mjd)
@@ -535,7 +541,7 @@ if __name__ == '__main__':
         if runforcing:
             hucfile=None
             print("Running Forcing Only")
-            georeffile="../obs/maurer.125/pr/nldas_met_update.obs.daily.pr.2000.nc"
+            georeffile="/d2/gutmann/usbr/stat_data/DAILY/obs/maurer.125/pr/nldas_met_update.obs.daily.pr.2000.nc"
             sys.stdout.flush()
         
         # 

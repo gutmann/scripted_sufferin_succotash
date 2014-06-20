@@ -99,8 +99,15 @@ def drive(foo,yearsearch="200*",obs=True,stat=True,runforce=False,extra=[None],
                 o="uw.4km"
                 
             for v in variables:
-                filesearch=obs_base+o+"/"+v+"/*"+v+"."+yearsearch+".nc"
-                files=glob.glob(filesearch)
+                if type(yearsearch)==list:
+                    files=[]
+                    for ysearch in yearsearch:
+                        filesearch=obs_base+o+"/"+v+"/*"+v+"."+ysearch+".nc"
+                        files.extend(glob.glob(filesearch))
+                else:
+                    filesearch=obs_base+o+"/"+v+"/*"+v+"."+yearsearch+".nc"
+                    files=glob.glob(filesearch)
+                
                 output_base="-".join(["obs",o,v])
                 print(len(files),output_base)
                 if len(files)>1:
@@ -116,13 +123,19 @@ def drive(foo,yearsearch="200*",obs=True,stat=True,runforce=False,extra=[None],
                 if forc=="ncep":
                     additional="gauss*"
                 else:
-                    additional="*"
-                filesearch=force_base+forc+"/"+v+"/*"+v+"*"+additional+yearsearch+".daily.nc"
-                files=glob.glob(filesearch)
+                    additional=""
+                if type(yearsearch)==list:
+                    files=[]
+                    for ysearch in yearsearch:
+                        filesearch=force_base+forc+"/"+v+"/*"+v+"*"+additional+ysearch+".nc"
+                        files.extend(glob.glob(filesearch))
+                else:
+                    filesearch=force_base+forc+"/"+v+"/*"+v+"*"+additional+yearsearch+".nc"
+                    files=glob.glob(filesearch)
                 output_base="-".join(["forcing",forc,v])
                 print(len(files),output_base)
                 if len(files)>1:
-                    foo(files,v,output_base,[forc,"BC","forcing","12km",v],extra)
+                    foo(files,v,output_base,[forc,"BC",forc,"12km",v],extra)
                 else:
                     print(filesearch)
                     print("--------Not enough files in "+ output_base.replace("-"," "))
