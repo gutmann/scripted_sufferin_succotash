@@ -2,6 +2,7 @@
 rm -r automatic_output
 amplxe-cl -collect hotspots -result-dir automatic_output swim_real
 amplxe-cl -R gprof-cc -r automatic_output -format text -report-output gprof_output
+mv gprof_output.txt gprof_output
 hydrocp gprof_output
 for ((i=0;i<10;i++)); do echo; done
 echo RUN: prof2png gprof_output

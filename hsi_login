@@ -1,7 +1,15 @@
 #!/bin/sh
-kinit
-#enter ucas password
-klist
+# klist
 #save ticket name
-export ticketname=`klist | head -1 | sed -e"s/:/ /g" | awk '{print $4 }'`
-hsi -c $ticketname
+export ticketname=`klist | head -1 | sed -e"s/:/ /g" | awk '{print $4 }'` 2>/dev/null
+if [[ $ticketname ]]; then
+	hsi -c $ticketname
+else
+	kinit
+	#enter ucas password
+	export ticketname=`klist | head -1 | sed -e"s/:/ /g" | awk '{print $4 }'` 2>/dev/null
+	if [[ $ticketname ]]; then
+		hsi -c $ticketname
+	fi
+fi
+echo hsi -c $ticketname
