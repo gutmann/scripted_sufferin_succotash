@@ -70,7 +70,7 @@ def aggdata(lut,data):
     
 # def load_geoLUT(lat1,lon1,lat2,lon2):
 # def regrid_hi2low(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,FillValue=1E20):
-def agg(data1,lat,lon,geo_lut=None):
+def agg(data1,lat,lon,geo_lut=None,agg_func=np.mean):
     lat,lon=norm(lat,lon)
     lat1,lon1=norm(data1.lat,data1.lon)
     
@@ -79,4 +79,4 @@ def agg(data1,lat,lon,geo_lut=None):
 
     # if geo_lut==None:geo_lut=regrid.load_geoLUT(lat1,lon1,lat,lon)
     
-    return (geo_lut, regrid.regrid_hi2low(data1.data,geoLUT=geo_lut))
+    return (geo_lut, regrid.regrid_hi2low(data1.data,geoLUT=geo_lut,agg_func=agg_func))
