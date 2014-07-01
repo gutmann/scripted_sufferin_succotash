@@ -276,8 +276,8 @@ def make_plots(data1,data2,date):
         make_subplot(data2[v],ny,nx,curplot,v," "+str(date)[:14])
     
 
-def main(swm_dir="output/"):
-    output_filename="vis_{}.png"
+def main(swm_dir="output/",output_dir="./"):
+    output_filename=output_dir+"vis_{}.png"
     wrf_files=glob.glob(wrf_dir+"wrfout*")
     wrf_files.sort()
     swm_files=glob.glob(swm_dir+"swim_out*")
@@ -298,11 +298,21 @@ def main(swm_dir="output/"):
 
 
 if __name__ == '__main__':
+
+    global wrf_dir
+    out_dir="./"
+    swm_dir="output/"
+
     if len(sys.argv)>1:
         if sys.argv[1][:2]=="-h":
-            print("Usage: real_comparison.py [swm_output_directory]")
+            print("Usage: real_comparison.py [swm_output_directory] [vis_output_directory] [wrf_dir]")
+            sys.exit()
+        
         swm_dir=sys.argv[1]
-    else:
-        swm_dir="output/"
+        if len(sys.argv)>2:
+            out_dir=sys.argv[2]
+        if len(sys.argv)>3:
+            wrf_dir=sys.argv[3]
+
     
-    main(swm_dir)
+    main(swm_dir,out_dir)

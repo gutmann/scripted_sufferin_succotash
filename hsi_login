@@ -1,10 +1,11 @@
 #!/bin/sh
 # klist
 #save ticket name
-export ticketname=`klist | head -1 | sed -e"s/:/ /g" | awk '{print $4 }'` 2>/dev/null
-if [[ $ticketname ]]; then
+if [[ $1 ]]; then
+	export ticketname=`klist | head -1 | sed -e"s/:/ /g" | awk '{print $4 }'` 2>/dev/null
 	hsi -c $ticketname
 else
+	echo "Initializing"
 	kinit
 	#enter ucas password
 	export ticketname=`klist | head -1 | sed -e"s/:/ /g" | awk '{print $4 }'` 2>/dev/null
