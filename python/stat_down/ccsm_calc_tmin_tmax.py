@@ -39,7 +39,7 @@ def write_data(filename,data):
     times=nc.createVariable("time","d",("time",))
     lats=nc.createVariable("lat","d",("lat",))
     lons=nc.createVariable("lon","d",("lon",))
-    odata=nc.createVariable(data.name,"d",("time","lat","lon"))
+    odata=nc.createVariable(data.name,"f",("time","lat","lon"))
     
     copy_var(data.ncdata.variables["time"],times,step=4)
     copy_var(data.ncdata.variables["lat"],lats)
