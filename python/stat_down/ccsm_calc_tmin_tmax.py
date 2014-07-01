@@ -59,7 +59,7 @@ def print_name():
     
 
 def main():
-    files=glob.glob("b30*")
+    files=glob.glob("b30*TREFHT*")
     files.sort()
     for f in files:
         print(f)
