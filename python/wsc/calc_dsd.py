@@ -11,8 +11,8 @@ import scipy.ndimage.morphology as morph
 
 import mygis
 
-# WARNING: these values are all over ridden by argparse, but are defined here to set up module level global variables
-#          do not delete, but changing the values will have no effect
+# WARNING: these values are all over ridden by argparse, but are defined here to identify module level global variables
+#          but CHANGING THE VALUES HERE WILL HAVE NO EFFECT
 # Cloud dilation filters
 cloud_dilation_doy=160 # day of year to begin expanding the cloud filter.
 cloud_threshold=150 # data value to use as threshold, anything greater than this must be "cloud" (actually 100?)
@@ -21,6 +21,9 @@ cloud_threshold=150 # data value to use as threshold, anything greater than this
 nfilter_passes=5    # number of times to loop over the final spatial filter
 filter_threshold=50 # number of days of difference permitted between neighbor gridcells
 min_reliable_DSD=20 # minimum number of days to snow disapearance to validate this as a "good" gridcell and use it in filtering
+
+# threshold value of SCA to search for
+snow_threshold=0
 
 def load_info(pattern="*.tif"):
     """load filenames and read dates from filenames"""
@@ -104,7 +107,7 @@ def main(pattern="*.tif",ndays=2,verbose=True):
         if verbose:
             print(date,end=", ")
             sys.stdout.flush()
-        snow_off_now=(img==0)
+        snow_off_now=(img==snow_threshold)
         #points to mark as snow off are those that had snow previously, but don't now
         snow_off_points=np.where(snow_on & snow_off_now)
         
@@ -116,7 +119,7 @@ def main(pattern="*.tif",ndays=2,verbose=True):
         snow_on_again[snow_off_points]=0
 
         # at points that have snow, add one to the snow on again counter
-        snow_on_again[(img<cloud_threshold)&(img>0)]+=1
+        snow_on_again[(img<cloud_threshold)&(img>snow_threshold)]+=1
         # after more than n days in a row set snow_on flag again
         snow_on[snow_on_again>ndays]=True
         last_date=date
@@ -132,6 +135,13 @@ def main(pattern="*.tif",ndays=2,verbose=True):
     
 
 if __name__ == '__main__':
+    global nfilter_passes
+    global filter_threshold
+    global min_reliable_DSD
+    global cloud_dilation_doy
+    global cloud_threshold
+    global snow_threshold
+
     try:
         parser= argparse.ArgumentParser(description='Find the date of snow disappearance in a series of SCA images. ')
 
@@ -149,6 +159,8 @@ if __name__ == '__main__':
                             help="Threshold to use to define cloud or other bad data")
         parser.add_argument('-cloud_day',type=int,nargs="?", dest='cloud_dilation_doy',action='store',default=160,
                             help="Day of the year to begin dilating bad (cloudy) data")
+        parser.add_argument('-snow_threshold',type=int,nargs="?", dest='snow_threshold',action='store',default=0,
+                            help="Threshold to use to define snow cover [default=0]")
         parser.add_argument('-v', '--version',action='version',
                             version='calc_dsd v1.0')
         parser.add_argument ('--verbose', action='store_true', default=False, 
@@ -160,6 +172,8 @@ if __name__ == '__main__':
         min_reliable_DSD=args.min_reliable_DSD
         cloud_dilation_doy=args.cloud_dilation_doy
         cloud_threshold=args.cloud_threshold
+        
+        snow_threshold=args.snow_threshold
 
         exit_code = main(args.search, args.ndays_snow_on, args.verbose)
         if exit_code is None:
