@@ -1,6 +1,6 @@
 #!/usr/bin/env python
-import datetime
-
+import datetime,glob
+import cPickle
 import numpy as np
 from scipy.signal import medfilt2d
 import matplotlib.pyplot as plt
@@ -92,7 +92,7 @@ def find_veg(vegz):
     """
     return vegz>2    
 
-def load_lidar_geo(filename,decimation_factor=10):
+def load_lidar_geo(filename,decimation_factor=1):
     ncdata=io.Dataset(filename)
     pvar=ncdata.variables["transverse_mercator"]
     proj=str(pvar.spatial_ref)
@@ -105,8 +105,8 @@ def load_lidar_geo(filename,decimation_factor=10):
     shape=ncdata.variables["Band1"].shape
     ncdata.close()
     dx=1.0
-    xpoints=np.arange(e,w,-dx)
-    ypoints=np.arange(s,n,dx)
+    xpoints=np.arange(w,e,dx)
+    ypoints=np.arange(n,s,-dx)
     
     xpts=decimate(xpoints,decimation_factor)
     ypts=decimate(ypoints,decimation_factor)
@@ -118,6 +118,39 @@ def load_lidar_geo(filename,decimation_factor=10):
     lat=lat.reshape((ny,nx))
     lon=lon.reshape((ny,nx))
     return Bunch(lat=lat,lon=lon)
+    
+def lidar2modscag(modscag_file="MODSCAG/fsca2008.dat",lidar_loc="lidar/",lidar_geo="snow-on-dem.nc",decimation_factor=5):
+    from wsc import modscag,regrid
+
+    print("loading modscag geo data")
+    modscagdata=modscag.load(modscag_file)
+    modscagdata.lat=modscagdata.lat[::-1]
+    print("loading lidar data")
+    data=load_fast(loc=lidar_loc,geofile=lidar_geo,decimation_factor=decimation_factor)
+    if glob.glob("lidar2modscag.geolut.pickle"):
+        print("reading geoLUT")
+        geoLUT_depickler=cPickle.Unpickler(open("lidar2modscag.geolut.pickle","r"))
+        geoLUT=geoLUT_depickler.load()
+    else:
+        geoLUT=None
+    
+    print("computing mean")
+    geoLUT,low_res_lidar_mean=regrid.agg(data,modscagdata.lat,modscagdata.lon,geo_lut=geoLUT,agg_func=np.mean)
+    print("computing std")
+    geoLUT,low_res_lidar_var =regrid.agg(data,modscagdata.lat,modscagdata.lon,geo_lut=geoLUT,agg_func=np.std)
+    print("computing max")
+    geoLUT,low_res_lidar_max =regrid.agg(data,modscagdata.lat,modscagdata.lon,geo_lut=geoLUT,agg_func=np.max)
+    
+    if not glob.glob("lidar2modscag.geolut.pickle"):
+        print("writing geolut")
+        geoLUT_pickler=cPickle.Pickler(open("lidar2modscag.geolut.pickle","w"))
+        geoLUT_pickler.dump(geoLUT)
+    
+    io.write("lidar2modscag_mean.nc", low_res_lidar_mean.data)
+    io.write("lidar2modscag_std.nc", low_res_lidar_var.data)
+    io.write("lidar2modscag_max.nc", low_res_lidar_max.data)
+        
+    
     
 
 def load(snowoff="compiled_lidar.nc",snowon="snow-on-dem.nc"):

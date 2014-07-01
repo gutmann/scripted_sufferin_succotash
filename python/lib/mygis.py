@@ -248,7 +248,7 @@ def read_geo(filename,outputdim=2):
     
     if latdat==None:
         # we probably weren't looking at a netcdf file...
-        return None
+        raise IOError("Unable to read latitude or longitude data from file:"+filename)
     
     if londat.max()>180:
         londat[londat>180]=londat[londat>180]-360
