@@ -8,9 +8,8 @@ import argparse,traceback
 
 import numpy as np
 
-# import nc_addvars
 import async
-import mygis as swim_io
+import mygis
 import date_fun
 from bunch import Bunch
 
@@ -18,29 +17,30 @@ from bunch import Bunch
 # sys.stdout=Flushfile(sys.stdout)
 
 
-outputdir="output/"
-geo_ref_file=None
-geolat=None
-geolon=None
-xmin=0
-xmax=None
-ymin=0
-ymax=None
-subxmin=0
-subxmax=None
-subymin=0
-subymax=None
-geoLUT=None
+# outputdir="output/"
+# geo_ref_file=None
+# xmin=0
+# xmax=None
+# ymin=0
+# ymax=None
+# subxmin=0
+# subxmax=None
+# subymin=0
+# subymax=None
+# geoLUT=None
 
 # CCSM specific offsets into a single huge file
 startyears =Bunch(train=1979,apply=1979)
 endyears   =Bunch(train=1999,apply=2060)
 
-startpoints=Bunch(train=(startyears["train"]-1960)*365,
-                  apply=(startyears["apply"]-1960)*365)
-endpoints=Bunch(train=(endyears["train"]-1960+1)*365,
-                  apply=(endyears["apply"]-1960+1)*365)
+ccsm_start_year=1900
+# ccsm_start_year=1960
+startpoints=Bunch(train=(startyears["train"]-ccsm_start_year)*365,
+                  apply=(startyears["apply"]-ccsm_start_year)*365)
+endpoints=Bunch(train=(endyears["train"]-ccsm_start_year+1)*365,
+                  apply=(endyears["apply"]-ccsm_start_year+1)*365)
 
+days_per_month=[31,28,31,30,31,30,31,31,30,31,30,31]
 
 def read_geo_latlon(geo_file=None,subset=None,mask=False):
     if not geo_file:
@@ -54,15 +54,15 @@ def read_geo_latlon(geo_file=None,subset=None,mask=False):
         # xmin=200;xmax=400;ymin=150;ymax=300;
         xmin=0;xmax=None;ymin=0;ymax=None;
     try:
-        lat=swim_io.read_nc(geo_file,var="lat").data
-        lon=swim_io.read_nc(geo_file,var="lon").data
+        lat=mygis.read_nc(geo_file,var="lat").data
+        lon=mygis.read_nc(geo_file,var="lon").data
     except:
         try:
-            lat=swim_io.read_nc(geo_file,var="latitude").data
-            lon=swim_io.read_nc(geo_file,var="longitude").data
+            lat=mygis.read_nc(geo_file,var="latitude").data
+            lon=mygis.read_nc(geo_file,var="longitude").data
         except:
-            lat=swim_io.read_nc(geo_file,var="XLAT").data
-            lon=swim_io.read_nc(geo_file,var="XLONG").data
+            lat=mygis.read_nc(geo_file,var="XLAT").data
+            lon=mygis.read_nc(geo_file,var="XLONG").data
         
     if lon.max()>180:
         lon=lon-360
@@ -72,7 +72,7 @@ def read_geo_latlon(geo_file=None,subset=None,mask=False):
         output=(lon[ymin:ymax,xmin:xmax],lat[ymin:ymax,xmin:xmax])
     
     if type(mask)==str:
-        d=swim_io.read_nc(geo_file,mask).data[0,...]
+        d=mygis.read_nc(geo_file,mask).data[0,...]
         d=d[ymin:ymax,xmin:xmax]
         try:
             badpoints=np.where(d.mask)
@@ -272,28 +272,72 @@ def find_times(alltimes,month,t0,pad_length=15):
     day0=date_fun.datearr2mjd(t0)
     days=alltimes+day0 #convert to Modified Julian Day
     dates=date_fun.mjd2date(days)
-    lastmonth=(month-1)%12
-    if lastmonth==0:lastmonth=12
-    nextmonth=(month+1)%12
-    if nextmonth==0:nextmonth=12
+    
     times_in_month=np.where((dates[:,1]==month))[0]
     
     # pad the data by ~two weeks on either side to make the regressions more stable
     if pad_length>0:
+        curtime=times_in_month[0]
+        output_times=times_in_month.copy()
+        additions=0
+        for i in range(1,len(times_in_month)-pad_length):
+            if (times_in_month[i]-curtime)>min(pad_length,359):
+                # we just jumped years
+                print(i,additions,output_times.shape,pad_length)
+                new_output_times=np.zeros(output_times.shape[0]+pad_length*2,dtype=np.int)
+                new_output_times[:i+additions]=output_times[:i+additions]
+                new_output_times[i+additions:i+additions+pad_length]=output_times[i+additions-1]+np.arange(1,pad_length+1)
+                new_output_times[i+additions+pad_length:i+additions+pad_length*2]=output_times[i+additions]+np.arange(-pad_length,0,1)
+                new_output_times[i+additions+pad_length*2:]=output_times[i+additions:]
+                output_times=new_output_times
+                additions+=pad_length*2
+            curtime=times_in_month[i]
+        times_in_month=output_times
+                
         start_padding=times_in_month[0]-(np.arange(pad_length)+1)
         start_padding=wrap_around(start_padding,len(alltimes))
         end_padding=times_in_month[-1]+(np.arange(pad_length)+1)
         end_padding=wrap_around(end_padding,len(alltimes))
         return np.hstack([start_padding,times_in_month,end_padding])
+        
     else:
         return times_in_month
+
+
+def add_trend_back(data,trend_start_point,trend,points_per_year=365):
+    n=data.shape[0]-trend_start_point
+    if n<(points_per_year*2):
+        # we have less than 2 years of data, don't bother
+        return
+    x=np.arange(n)
+    # plt.plot(data[trend_start_point:,150:189,100:230].mean(axis=1).mean(axis=1),label="AR-pre-addition")
+    data[trend_start_point:,:,:]+=x[:,np.newaxis,np.newaxis]*trend.gain[np.newaxis,:,:]
+    # plt.plot(data[trend_start_point:,150:189,100:230].mean(axis=1).mean(axis=1),label="AR-post-addition")
+    # plt.legend()
+    # plt.savefig("test.png")
+
+def remove_trend_in_data(data,trend_start_point,points_per_year=365):
+    n=data.shape[0]-trend_start_point
+    if n<(points_per_year*2):
+        # we have less than 2 years of data, don't bother
+        return
+    start_means=data[trend_start_point:trend_start_point+365,:,:].mean(axis=0)
+    # plt.clf()
+    # plt.plot(data[trend_start_point:,150:189,100:230].mean(axis=1).mean(axis=1),label="CCSM-pre")
+    data[trend_start_point:,:,:]-=start_means[np.newaxis,:,:]
+    mid_point_means=data[trend_start_point:,:,:].mean(axis=0)/(n/2.0)
+    x=np.arange(n)
+    data[trend_start_point:,:,:]-=x[:,np.newaxis,np.newaxis]*mid_point_means[np.newaxis,:,:]
+    data[trend_start_point:,:,:]+=start_means[np.newaxis,:,:]
+    # plt.plot(data[trend_start_point:,150:189,100:230].mean(axis=1).mean(axis=1),label="CCSM-post")
+    return Bunch(offset=start_means,gain=mid_point_means)
         
     
 def read_narr_file(filename,month,geo,loadvar="prate",pad_length=15,subset=None,startdate=[1800,1,1,0,0.,0.]):
-    d=swim_io.read_nc(filename,var=loadvar)#,returnNCvar=True)
-    t=swim_io.read_nc(filename,var="time").data
-    lat=swim_io.read_nc(filename,var="lat").data
-    lon=swim_io.read_nc(filename,var="lon").data
+    d=mygis.read_nc(filename,var=loadvar)#,returnNCvar=True)
+    t=mygis.read_nc(filename,var="time").data
+    lat=mygis.read_nc(filename,var="lat").data
+    lon=mygis.read_nc(filename,var="lon").data
     subymin=int(geo[:,:,:,0].min())
     subymax=int(geo[:,:,:,0].max()+1)
     subxmin=int(geo[:,:,:,1].min())
@@ -315,14 +359,18 @@ def read_narr_file(filename,month,geo,loadvar="prate",pad_length=15,subset=None,
     return output
 
 def read_ccsm_file(filename,month,geo,loadvar="pr",pad_length=15,subset=None,startdate=[0,1,1,0,0.,0.],period="train"):
-    t=swim_io.read_nc(filename,var="time").data
-    # t[0] = [1960,1,1,0,0,0]
-    lat=swim_io.read_nc(filename,var="lat").data
-    lon=swim_io.read_nc(filename,var="lon").data
-    d=swim_io.read_nc(filename,var=loadvar,returnNCvar=True)
+    t=mygis.read_nc(filename,var="time").data
+    lat=mygis.read_nc(filename,var="lat").data
+    lon=mygis.read_nc(filename,var="lon").data
+    d=mygis.read_nc(filename,var=loadvar,returnNCvar=True)
 
     startpoint=startpoints[period]
     endpoint=endpoints[period]
+    # CCSM precip and tas actually start in 1960, not 1900, so subtract 60yrs (in days)
+    if ((loadvar=="pr") or (loadvar=="tas")) and (ccsm_start_year==1900):
+        print("short circuiting...")
+        startpoint-=60*365
+        endpoint-=60*365
     subymin=int(geo[:,:,:,0].min())
     subymax=int(geo[:,:,:,0].max()+1)
     subxmin=int(geo[:,:,:,1].min())
@@ -332,7 +380,8 @@ def read_ccsm_file(filename,month,geo,loadvar="pr",pad_length=15,subset=None,sta
     # this "pretends" they are all in the same year, but all find_times uses is the month so as long as
     # startdate is a non-leap year this should work
     doy=t%365
-    thismonth=find_times(doy[startpoint:endpoint],month,np.array([1999,1,1,0,0,0]),pad_length=pad_length)
+    fake_start_date=np.array([1999,1,1,0,0,0])
+    thismonth=find_times(doy[startpoint:endpoint],month,fake_start_date,pad_length=pad_length)
     dt=(t[1]-t[0])*60*60*24 # t is in days, need dt in seconds (= 86400)
     
     # Nio doesn't let you subset with a list, only with slices?
@@ -343,17 +392,18 @@ def read_ccsm_file(filename,month,geo,loadvar="pr",pad_length=15,subset=None,sta
         output*=dt #convert mm/s to mm
     output=regrid(output,lat,lon,geo,subymin,subxmin)
     d.ncfile.close()
-    years=np.arange(startyears[period],endyears[period])
-    dayspermonth=output.shape[0]/len(years)
-    print(month,dayspermonth)
-    print(len(years),years[0],years[-1])
+    years=np.arange(startyears[period],endyears[period]+1)
+    dayspermonth=(output.shape[0]/len(years))-pad_length*2
+    print("Days in the month:",dayspermonth)
+    print("Days found:",output.shape[0])
+    print("Number of years:",len(years))
     return Bunch(data=output,dates=years,lengths=[dayspermonth*i+dayspermonth for i in range(len(years))])
 
 
 
 def read_obs_file(filename,month,geo,loadvar="pr",pad_length=15,subset=None,startdate=[1940,1,1,0,0.,0.]):
-    d=swim_io.read_nc(filename,var=loadvar,returnNCvar=True)
-    t=swim_io.read_nc(filename,var="time").data
+    d=mygis.read_nc(filename,var=loadvar,returnNCvar=True)
+    t=mygis.read_nc(filename,var="time").data
     if subset:
         xmin=subset[0]
         xmax=subset[1]
@@ -432,12 +482,12 @@ def write_data(data,month,years,endpts,varname,res,output_dir="async_output/"):
             outputdata=data[startpt:stoppt,:,:]
         startpt=stoppt
         filename=output_dir+"BCSAR_"+varname+"_"+res+"_"+str(year)+"_"+month_prefix+str(month)# +".nc"
-        if (varname=="tasmax") or (varname=="tasmin") or (varname=="tas"):
-            reasonable_max=outputdata[outputdata<70].max()
-            outputdata[(outputdata<10000)&(outputdata>reasonable_max)]=reasonable_max
-            print(reasonable_max)
+        # if (varname=="tasmax") or (varname=="tasmin") or (varname=="tas"):
+        #     reasonable_max=outputdata[outputdata<70].max()
+        #     outputdata[(outputdata<10000)&(outputdata>reasonable_max)]=reasonable_max
+        #     print(reasonable_max)
         
-        swim_io.write(filename,outputdata,varname=varname)
+        mygis.write(filename,outputdata,varname=varname)
     
 
 def mk_all_dirs(dirname):
@@ -455,7 +505,7 @@ def mk_all_dirs(dirname):
         os.chdir("../")
 
 def read_mask(filename,load_var):
-    d=swim_io.read_nc(filename,load_var,returnNCvar=True)
+    d=mygis.read_nc(filename,load_var,returnNCvar=True)
     data=d.data[0,...]
     d.ncfile.close()
     try:
@@ -466,7 +516,7 @@ def read_mask(filename,load_var):
     except:
         return False
 
-def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
+def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None,remove_trend=False):
     """Perform an Asynchronous regression on NARR or NCEP data"""
     base_dir="/d2/gutmann/usbr/stat_data/"
     # note you also have to add "nldas" between the / and the * after obsextra
@@ -554,10 +604,17 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
     for narr_var,obs_var in zip(narr_vars,obs_vars):
         narr_var_dir=obs_var+"/"
         narrfiles=[]
-        if narr_var=="tmin":
-            load_narr_var="tasmin"
-        if narr_var=="tmax":
-            load_narr_var="tasmax"
+        if forcing=="CCSM":
+            if narr_var=="tmin":
+                load_narr_var="TREFMN"
+            if narr_var=="tmax":
+                load_narr_var="TREFMX"
+        else:
+            if narr_var=="tmin":
+                load_narr_var="tasmin"
+            if narr_var=="tmax":
+                load_narr_var="tasmax"
+
         if narr_var=="tas":
             load_narr_var="tas"
         if narr_var=="prate":
@@ -617,12 +674,31 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
             print("   "+str((time.time()-t1)/60)+" minutes")
          
             print("  Applying async regression")
+            print("      Loading "+forcing+" data")
             t1=time.time()
             if forcing=="CCSM":
-                narr=read_ccsm_file(narrfiles[0],month,geo,load_narr_var,pad_length=15,startdate=startdate,period="apply")
+                narr=read_ccsm_file(narrfiles[0],month,geo,load_narr_var,pad_length=0,startdate=startdate,period="apply")
             else:
                 narr=read_data(outputfiles,month,read_narr_file,geo,load_narr_var,pad_length=0,subset=subset,startdate=startdate)
+                
+            print("      "+str((time.time()-t1)/60)+" minutes")
+            print("      Applying")
+            t1=time.time()
+            if remove_trend:
+                if load_narr_var=="pr":
+                    raise Exception("Removal of trend for precip not allowed")
+                print("      Removing trend")
+                points_per_year=days_per_month[month-1]
+                if forcing=="CCSM":
+                    trend_start_point=(points_per_year*(2000-ccsm_start_year)-((startpoints["apply"]/365)*points_per_year))
+                else:
+                    trend_start_point=0
+                trend=remove_trend_in_data(narr.data,trend_start_point,points_per_year=points_per_year)
             output=async.apply_async(narr.data,regression,vmax=obsmax*1.2,isPrecip=(narr_var=="prate"),verbose=True)
+            
+            if remove_trend:
+                add_trend_back(output,trend_start_point,trend,points_per_year=points_per_year)
+                
             
             if (type(omask)==np.ndarray) and (omask.shape[0]==output.shape[1]) and (omask.shape[1]==output.shape[2]):
                 for thistime in range(output.shape[0]):
@@ -639,33 +715,7 @@ def async_narr(var=None,exp="e0",res="12km",forcing="NCEP",runmonth=None):
             if forcing=="NCEP":
                 resextra="_gauss"
             write_data(output,month,narr.dates,narr.lengths,obs_var,res+resextra,output_dir=output_dir)
-            
-            # trying to get rid of a weird memory leak
-            # cleanup large variables at the end of each month of processing.
-            # doesn't seem to help, but running each month as an independant process solves this problem
-            # del narr
-            # del output
-            # del obs
-            # gc.collect()
-        
-        # if runmonth==None:
-        #     # add the lat and lon variables to the orignal files (should also add time?)
-        #     nc_addvars.main(output_dir+"BCSAR*"+res+"*.nc",copy_from_file=obs_files[0],
-        #                     ranges=[[subset[0],subset[1]],[subset[2],subset[3]]],
-        #                     vars2copy=["lon","lat"])
-        #     # next delete the old files
-        #     old_files=glob.glob(output_dir+"BCSAR*"+res+"*.nc")
-        #     old_files.sort()
-        #     for f in old_files:
-        #         print(f)
-        #         os.remove(f)
-        #     # then rename "added" files back to the original filenames
-        #     new_files=glob.glob(output_dir+"added*"+res+"*.nc")
-        #     new_files.sort()
-        #     for o,n in zip(old_files,new_files):
-        #         print(n,o)
-        #         os.rename(n,o)
-            
+                        
         
     
 
@@ -677,13 +727,15 @@ if __name__ == '__main__':
         parser.add_argument('res',action='store',nargs="?",help="Chose a resolution [4km, 6km, 12km]",default="12km")
         parser.add_argument('forcing',action='store',nargs="?",help="Chose a forcing model [NCEP, NARR,CCSM]",default="NCEP")
         parser.add_argument('month',action='store',nargs="?",help="Only run this month",default=None)
+        parser.add_argument('--remove_trend',dest='remove_trend',action='store_true',
+                help="Remove the trend over the time series",default=False)
         parser.add_argument('-v', '--version',action='version',
                 version='async_narr.py 1.2')
         parser.add_argument ('--verbose', action='store_true',
                 default=False, help='verbose output', dest='verbose')
         args = parser.parse_args()
     
-        exit_code = async_narr(args.var,args.exp,args.res,args.forcing,args.month)
+        exit_code = async_narr(args.var,args.exp,args.res,args.forcing,args.month,args.remove_trend)
         if exit_code is None:
             exit_code = 0
         sys.exit(exit_code)

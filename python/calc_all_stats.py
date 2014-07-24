@@ -148,7 +148,7 @@ def calc_year_start_dates(filenames,model="ncep"):
             year1=year1.split("_")[-1]
         year1=float(year1)-1
         
-    if (model=="ncep") or (model=="narr"):
+    if (model=="ncep") or (model=="narr") or (model=="obs"):
         return np.floor(np.arange((year1%4.0)/4,365*len(filenames),365.25))
     elif model=="ccsm":
         return np.arange(0,365.0*len(filenames),365)
@@ -235,22 +235,23 @@ def precip_stats(names,data,info):
         hist=np.vstack(stats.histogram(d))
         io.write(out+"_histogram",hist)
         
-        # if re.match(".*annual",n):
-        for ndays in info.nday_lengths[:1]:
-            # note use of "..." because this could be a 2D array (time x huc) or a 3D array (time x lat x lon)
-            data2test=d[ndays:,...].copy()
-            for i in range(ndays):
-                data2test+=d[i:-(ndays-i),...]
-            print("extremes "+str(ndays+1))
-            try:
-                extremes=stats.extremes(data2test,dist_name=info.distributionname)
-                if extremes!=None:
-                    for i in range(extremes.shape[0]):
-                        cur=extremes[i,...]
-                        print(cur[cur>0].mean())
-                    io.write(out+"_extremes_nday"+str(ndays+1),extremes)
-            except KeyError:
-                print("Can't run distribution type : ",info.distributionname)
+        if re.match(".*annual",n):
+            for ndays in info.nday_lengths[:1]:
+                # note use of "..." because this could be a 2D array (time x huc) or a 3D array (time x lat x lon)
+                data2test=d[ndays:,...].copy()
+                for i in range(ndays):
+                    data2test+=d[i:-(ndays-i),...]
+                #ndays = 0 for a 1 day period
+                print("extremes ndays="+str(ndays+1))
+                try:
+                    extremes=stats.extremes(data2test,dist_name=info.distributionname,minval=2.54*(ndays+1))
+                    if extremes!=None:
+                        for i in range(extremes.shape[0]):
+                            cur=extremes[i,...]
+                            print(cur[cur>0].mean())
+                        io.write(out+"_extremes_nday"+str(ndays+1),extremes)
+                except KeyError:
+                    print("Can't run distribution type : ",info.distributionname)
                 
 
 def cleanup(data,minval=-999,maxval=1e5):
@@ -471,6 +472,8 @@ if __name__ == '__main__':
                 default="gamma", help='name of extreme distribution ([gamma],weibull,exponential)', dest='distribution')
         parser.add_argument ('-pr_threshold', nargs="?", action='store', dest='prthresh',
                 default="0.0", help='Threshold to use when calculating wet day status')
+        parser.add_argument ('-subset', nargs="?", action='store', dest='subset',
+                default="cohw", help='Domain to process subset for [cohw, pnw, sw, se]')
         parser.add_argument ('--runsub', action='store_true',
                 default=False, help='Run subdomain only [False]', dest='runsub')
         parser.add_argument ('--runobs', action='store_true',
@@ -501,7 +504,16 @@ if __name__ == '__main__':
         if args.BC=="nobc":args.BC=""
         geosubset=[25,53,-124.7,-67] #CONUS
         if args.runsub:
-            geosubset=[35,43,-112.8,-101.7] # subdomain
+            subset=args.subset
+            if subset=="cohw":
+                geosubset=[35,43,-112.8,-101.7] # subdomain
+            if subset=="pnw":
+                geosubset=[40,49,-124.0,-111] # subdomain
+            if subset=="se":
+                geosubset=[29,39,-92.0,-79] # subdomain
+            if subset=="sw":
+                geosubset=[31,41,-124.0,-109.0] # subdomain
+        
         
         # driver.drive requires the following to be lists to iterate over, but CLI args will be individual
         #  elements.  However, default values are all lists, so we don't want to make them
@@ -537,12 +549,11 @@ if __name__ == '__main__':
         print(geosubset)
         if runobs:
             print("Running Observations Only")
-            sys.stdout.flush()
         if runforcing:
             hucfile=None
             print("Running Forcing Only")
             georeffile="/d2/gutmann/usbr/stat_data/DAILY/obs/maurer.125/pr/nldas_met_update.obs.daily.pr.2000.nc"
-            sys.stdout.flush()
+        sys.stdout.flush()
         
         # 
         if runwrf:

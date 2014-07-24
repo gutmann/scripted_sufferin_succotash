@@ -9,7 +9,7 @@ import date_fun
 from bunch import Bunch
 
 # CHANGE HERE (and below in main)
-search_dir="SAR3pgw/"
+search_dir="SAR3conus/"
 # END CHANGE HERE
 
 
@@ -59,7 +59,7 @@ def time_gen(year,model):
     return np.arange(t_start,t_stop)
 
 def update_files_for_year(year,res,variable,model,mask):
-    files=glob.glob(search_dir+model+"/"+variable+"/BCSAR*"+res+"*"+str(year)+"*")
+    files=glob.glob(search_dir+model+"/"+variable+"/BCSAR*"+res+"*"+str(year)+"_*")
     files.sort()
     time_info.data=time_gen(year,model)
     data=np.concatenate(myio.read_files(files,variable))
@@ -75,15 +75,15 @@ def update_files_for_year(year,res,variable,model,mask):
 
 def main():
     # res=["12km","6km"]
-    # variables=["pr","tasmax","tasmin"]
+    variables=["pr","tasmax","tasmin"]
     # models=["ncep","narr","ccsm"]
     
     # CHANGE HERE
     res=["12km"]
-    models=["ncep"]
-    # variables=["tasmax","tasmin"]
-    # variables=["tas","pr"]
-    variables=["pr"]
+    models=["ccsm"]
+    variables=["tasmax","tasmin"]
+    variables=["tas"]#,"pr"]
+    # variables=["pr"]
     # END CHANGE HERE
     
     

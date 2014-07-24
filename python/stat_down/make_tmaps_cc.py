@@ -11,9 +11,9 @@ from stat_down import map_vis
 wrfloc="/d5/gutmann/cc-downscaling-test/wrfoutput/T2m/"
 sdloc="/d5/gutmann/cc-downscaling-test/SDdata/DAILY/"
 geo_file=sdloc+"down/SAR/ccsm/pr/BCSAR_pr_12km_2000.nc"
-ccsmgeo_file=sdloc+"model/ccsm/tas.run5.ccsm.1999.nc"
+ccsmgeo_file=sdloc+"model/ccsm/tas/tas.run5.ccsm.1999.nc"
 
-sd_methods=["model/ccsm/tas",
+sd_methods=["model/ccsm/tas/tas.run5.ccsm",
             "down/CA/ccsm/tas/BCCA_12km_CCSM_tas",
             "down/SAR/ccsm/tas/BCSAR_tas_12km",
             "down/SD/ccsm/tas/BCSD_12km_CCSM_tas",
@@ -37,7 +37,7 @@ def get_time_bounds(timeperiod):
     for i in range(month-1):
         start+=ndays_dict["month{:02}".format(i+1)]
     
-    stop=start+ndays_dict[timeperiod]+1
+    stop=start+ndays_dict[timeperiod]
     if month==12:
         stop=None
 
@@ -58,18 +58,26 @@ def load_sd_data(stat,time,bounds=None):
     """load downscaling methods statistic for time"""
     output=[]
     means=[]
+    sdvar="tas"
     for sd in sd_methods:
-        print(sdloc,sd)
+        #load current climate data from 1995-2005
         curfiles=glob.glob(sdloc+sd+"*199[5-9]*")
         curfiles.extend(glob.glob(sdloc+sd+"*200[0-5]*"))
+        curfiles.sort()
         print(curfiles[0])
-        current=load_time_period(curfiles,"tas",time)
+        current=load_time_period(curfiles,sdvar,time)
         
+        #load future climate data from 2045-2055
         futfiles=glob.glob(sdloc+sd+"*204[5-9]*")
         futfiles.extend(glob.glob(sdloc+sd+"*205[0-5]*"))
-        future=load_time_period(futfiles,"tas",time)
+        futfiles.sort()
+        print(futfiles[0])
+        future=load_time_period(futfiles,sdvar,time)
         
+        #calculate the mean climate change over this time period
         data=future.mean(axis=0)-current.mean(axis=0)
+        
+        #subset the domain spatially if desired
         if bounds:
             if sd[:5]=="model":
                 print("CCSM")
@@ -77,7 +85,9 @@ def load_sd_data(stat,time,bounds=None):
             else:
                 print("Downscaled")
                 means.append(data[bounds[1][0]:bounds[1][1],bounds[1][2]:bounds[1][3]].mean())
+                print(means[-1])
         
+        #save the name of the current method
         name=sd.split("/")[1]
         
         output.append(Bunch(data=data,name=name))
@@ -115,7 +125,7 @@ def load_wrf_data(stat,time):
 
     
 
-def visualize(stat,time,sddata,wrfdata,geo,fig=None):
+def visualize(stat,time,sddata,wrfdata,geo,fig=None,m=None):
     """docstring for visualize"""
     
     # vmin,vmax=clims[stat]
@@ -135,17 +145,20 @@ def visualize(stat,time,sddata,wrfdata,geo,fig=None):
     else:
         fig.clf()
     plt.subplot(3,2,1)
-    m=map_vis.vis(wrfdata,title="WRF",cmap=cmap,proj="lcc",clim=clim,
-                    latstep=2.0,lonstep=5.0)
     
+    # first call to map_vis should be for WRF to set up the basemap
+    if m==None:
+        m=map_vis.vis(wrfdata,title="WRF",cmap=cmap,proj="lcc",clim=clim,
+                        latstep=2.0,lonstep=5.0)
+    else:
+        map_vis.vis(wrfdata,title="WRF",cmap=cmap,proj="lcc",clim=clim,
+                    m=m, latstep=2.0,lonstep=5.0)
+
+    
+    # now loop over remaining methods mapping each one reprojecting to the WRF grid
     for i,sd in enumerate(sddata):
         plt.subplot(3,2,i+2)
         if sd.name=="ccsm":
-            # plt.imshow(sd.data[7:14,8:18],cmap=plt.cm.seismic)
-            # plt.title("CCSM")
-            # plt.clim(clim)
-            # plt.colorbar()
-            #
             map_vis.vis(sd.data,title=sd.name,cmap=cmap,clim=clim,proj="lcc",
                         m=m,reproject=True,lat=ccsm_geo.lat,lon=ccsm_geo.lon,
                         latstep=2.0,lonstep=5.0)
@@ -155,7 +168,8 @@ def visualize(stat,time,sddata,wrfdata,geo,fig=None):
                         latstep=2.0,lonstep=5.0)
     
     fig.savefig(time+"_"+stat+".png",dpi=200)
-    return fig
+    #return the figure so it can be reused... would returning the basemap instance help too? 
+    return fig,m
 
 def get_bounds(geo):
     wrflatmin,wrflatmax,wrflonmin,wrflonmax=(34.19,43.65,-114.35,-99.64)
@@ -212,6 +226,7 @@ def main():
     print(cbounds)
     
     fig=None
+    basemap=None
     timeonly=False
     for t in times:
         for p in patterns:
@@ -228,7 +243,7 @@ def main():
             
             if not timeonly:
                 print("visualizing...")
-                fig=visualize(p,t,sd,wrf,(cgeo,geo),fig=fig)
+                fig,basemap=visualize(p,t,sd,wrf,(cgeo,geo),fig=fig) #m=basemap)
 
     plot_timeseries(timeseries,sd,"Mean Temperature")
 
