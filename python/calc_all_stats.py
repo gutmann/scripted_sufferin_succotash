@@ -506,13 +506,13 @@ if __name__ == '__main__':
         if args.runsub:
             subset=args.subset
             if subset=="cohw":
-                geosubset=[35,43,-112.8,-101.7] # subdomain
+                geosubset=[35,43,-112.8,-101.7] # subdomain # 32.0625, 44.9375, -114.9375, -99.0625
             if subset=="pnw":
-                geosubset=[40,49,-124.0,-111] # subdomain
+                geosubset=[39.0625, 52.8125, -124.6875, -108.8125] # subdomain
             if subset=="se":
-                geosubset=[29,39,-92.0,-79] # subdomain
+                geosubset=[25.1875, 39.0625, -93.6875, -67.0625] # subdomain
             if subset=="sw":
-                geosubset=[31,41,-124.0,-109.0] # subdomain
+                geosubset=[25.1875, 40.9375, -124.6875, -106.8125] # subdomain
         
         
         # driver.drive requires the following to be lists to iterate over, but CLI args will be individual

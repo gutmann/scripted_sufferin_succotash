@@ -17,8 +17,14 @@ import mygis as myio
 stats_location="/d2/gutmann/usbr/stat_data/DAILY/down/stats-r1/"
 onemm_loc="conusprecip_1mm/"
 zeromm_loc="conusprecip_0mm/"
-e0_loc="precip_0mm/"
-e0_1mm_loc="precip_1mm/"
+subdomain_names=["Southeast","Southwest","Northwest","Central Rockies"]
+sub_locs=["stats-se/","stats-sw/","stats-pnw/","stats-cohw/"]
+sub_locs_1mm=["stats-se_1mm/","stats-sw_1mm/","stats-pnw_1mm/","stats-cohw_1mm/"]
+subdomain_names=subdomain_names[1:]
+sub_locs=sub_locs[1:] #remove the SE domain
+sub_locs_1mm=sub_locs_1mm[1:] #remove the SE domain
+# e0_loc="precip_0mm/"
+# e0_1mm_loc="precip_1mm/"
 
 def load_monthly(filesearch,mask=None):
     files=glob(stats_location+onemm_loc+filesearch)
@@ -51,7 +57,11 @@ def load_scales(filesearch,mask=None):
             data=np.ma.array(data,mask=data>2000)
         data=np.ma.array(data,mask=~np.isfinite(data))
 
-        outputdata[i]=np.mean(data)
+        if re.match(".*stats-pnw.*/.*huc2.*",f):
+            # for the PNW subdomain, the other huc2s are too small a portion of the domain, so just use the PNW HUC2
+            outputdata[i]=data[0,-2]
+        else:
+            outputdata[i]=np.mean(data)
     return outputdata
 
 
@@ -116,11 +126,19 @@ def map_vis(data,geo=[],title="",vmin=None,vmax=None,cmap=None,showcolorbar=True
         
     plt.title(title,x=0.05,ha="left")
 
-def get_mask():
-    d=myio.read_nc(stats_location+zeromm_loc+"obs-maurer.125-pr_full_res_annual_MAP.nc").data
+def get_mask(i=None):
+    if i==None:
+        d=myio.read_nc(stats_location+zeromm_loc+"obs-maurer.125-pr_full_res_annual_MAP.nc").data
+        d+=myio.read_nc(stats_location+zeromm_loc+"SDmon*ncep-pr-BC12km_full_res_annual_MAP.nc").data
+        catest=myio.read_nc(stats_location+zeromm_loc+"CA-ncep-pr-BC12km_full_res_annual_extremes_nday1.nc").data[2,...]
+    else:
+        d=myio.read_nc(stats_location+sub_locs[i]+"obs-maurer.125-pr_full_res_annual_MAP.nc").data
+        d+=myio.read_nc(stats_location+sub_locs[i]+"SDmon*ncep-pr-BC12km_full_res_annual_MAP.nc").data
+        catest=myio.read_nc(stats_location+sub_locs[i]+"CA-ncep-pr-BC12km_full_res_annual_extremes_nday1.nc").data[2,...]
     mask=np.empty(d.shape,dtype=bool)
     mask[:]=False
     mask[d>1e10]=True
+    mask[~np.isfinite(catest)]=True
     return mask
 
 #--------------------------------------------------------
@@ -348,7 +366,7 @@ def monthly_interannual_fig():
     plt.savefig("FIG7_monthly_interannual.png",dpi=150)
 
 
-def ext_scale_conus():
+def ext_scale_conus(xlabel=False):
     mask=get_mask()
     sar =load_scales(zeromm_loc+"SAR-ncep-pr-BC12km_*_annual_extremes_nday1.nc",mask=mask)
     sdd =load_scales(zeromm_loc+"SD-ncep-pr-BC12km_*_annual_extremes_nday1.nc",mask=mask)
@@ -361,41 +379,43 @@ def ext_scale_conus():
                 linestyles=["-","-","-","-","-","--"],
                 markers=["None","None","None","None",".","None"],
                 labels=["AR","BCSDd","BCSDm","BCCA","Obs.","NCEP"],
-                yrange=[0,220])
+                yrange=[0,180],label_x=xlabel)
                 
     plt.ylabel("mm/day 50yr return")
     plt.title("CONUS")
-    plt.legend(loc=1,ncol=2)
+    # plt.legend(loc=1,ncol=2)
     
-def ext_scale_sub():
-    mask=None
-    sar =load_scales(e0_loc+"SARe0-ncep-pr-BC12km_*_annual_extremes_nday1.nc",mask=mask)
-    sdd =load_scales(e0_loc+"SDe0-ncep-pr-BC12km_*_annual_extremes_nday1.nc",mask=mask)
-    sdm =load_scales(e0_loc+"SDmon-ncep-pr-BC12km_*_annual_extremes_nday1.nc",mask=mask)
-    ca  =load_scales(e0_loc+"CA-ncep-pr-BC12km_*_annual_extremes_nday1.nc",mask=mask)
-    cae  =load_scales(e0_loc+"CAe0-ncep-pr-BC12km_*_annual_extremes_nday1.nc",mask=mask)
-    obs =load_scales(e0_loc+"obs-maurer.125-pr_*_annual_extremes_nday1.nc",mask=mask)
+def ext_scale_sub(i,ylabel=False,xlabel=False,legend=False):
+    mask=get_mask(i)
+    sar =load_scales(sub_locs[i]+"SAR-ncep-pr-BC12km_*_annual_extremes_nday1.nc",mask=mask)
+    sdd =load_scales(sub_locs[i]+"SD-ncep-pr-BC12km_*_annual_extremes_nday1.nc",mask=mask)
+    sdm =load_scales(sub_locs[i]+"SDmon-ncep-pr-BC12km_*_annual_extremes_nday1.nc",mask=mask)
+    ca  =load_scales(sub_locs[i]+"CA-ncep-pr-BC12km_*_annual_extremes_nday1.nc",mask=mask)
+    cae =load_scales(sub_locs[i]+"BCCA_*-ncep-pr-12km_*_annual_extremes_nday1.nc",mask=mask)
+    obs =load_scales(sub_locs[i]+"obs-maurer.125-pr_*_annual_extremes_nday1.nc",mask=mask)
     
     plot_v_scale([sar,sdd,sdm,ca,cae,obs],
                 colors=["g","darkred","red","b","skyblue","k"],
                 linestyles=["-","-","-","-","-","-"],
                 markers=["None","None","None","None","None","."],
                 labels=["AR","BCSDd","BCSDm","BCCA","BCCAr","Obs."],
-                yrange=[0,120])
+                yrange=[0,180],label_x=xlabel)
                 
-    # plt.ylabel("mm/day 50yr return")
-    plt.title("Subdomain")
-    plt.legend(loc=1,ncol=2)
+    if ylabel: plt.ylabel("mm/day 50yr return")
+    plt.title(subdomain_names[i])
+    if legend:plt.legend(loc=1,ncol=2)
     
 
 def extreme_scaling_fig():
-    plt.figure(figsize=(12,5))
+    plt.figure(figsize=(12,10))
     
-    plt.subplot(1,2,1)
+    plt.subplot(2,2,1)
     ext_scale_conus()
-    plt.subplot(1,2,2)
-    # ext_scale_sub()
+    for i in range(3):
+        plt.subplot(2,2,i+2)
+        ext_scale_sub(i,ylabel=((i%2)==1),xlabel=i>0,legend=(i==1))
     
+    plt.subplots_adjust(hspace=0.1)
     plt.savefig("FIG8_extreme_scaling.png",dpi=200)
     
 
@@ -447,26 +467,27 @@ def wet0_scale_conus():
                 
     plt.ylabel("Wet Day Fraction")
     plt.title("CONUS (0mm)")
-    plt.legend(loc=4,ncol=2)
+    # plt.legend(loc=4,ncol=2)
     
-def wet0_scale_sub():
-    mask=None
-    sar =load_scales(e0_loc+"SARe0-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
-    sdd =load_scales(e0_loc+"SDe0-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
-    sdm =load_scales(e0_loc+"SDmon-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
-    ca  =load_scales(e0_loc+"CA-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
-    cae  =load_scales(e0_loc+"CAe0-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
-    obs =load_scales(e0_loc+"obs-maurer.125-pr_*_annual_wetfrac.nc",mask=mask)
+def wet0_scale_sub(i,xlabel=False,legend=False):
+    mask=get_mask(i)
+    sar =load_scales(sub_locs[i]+"SAR-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
+    sdd =load_scales(sub_locs[i]+"SD-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
+    sdm =load_scales(sub_locs[i]+"SDmon-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
+    ca  =load_scales(sub_locs[i]+"CA-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
+    cae =load_scales(sub_locs[i]+"BCCA_*-ncep-pr-12km_*_annual_wetfrac.nc",mask=mask)
+    obs =load_scales(sub_locs[i]+"obs-maurer.125-pr_*_annual_wetfrac.nc",mask=mask)
     
     plot_v_scale([sar,sdd,sdm,ca,cae,obs],
                 colors=["g","darkred","red","b","skyblue","k"],
                 linestyles=["-","-","-","-","-","-"],
                 markers=["None","None","None","None","None","."],
                 labels=["AR","BCSDd","BCSDm","BCCA","BCCAr","Obs."],
-                yrange=[0,1],label_x=False)
+                yrange=[0,1],label_x=xlabel)
                 
-    plt.title("Subdomain (0mm)")
-    plt.legend(loc=4,ncol=2)
+    plt.ylabel("Wet Day Fraction")
+    plt.title("{} (0mm)".format(subdomain_names[i]))
+    if legend:plt.legend(loc=4,ncol=2)
     
 def wet1_scale_conus():
     mask=get_mask()
@@ -481,45 +502,55 @@ def wet1_scale_conus():
                 linestyles=["-","-","-","-","-","--"],
                 markers=["None","None","None","None",".","None"],
                 labels=["AR","BCSDd","BCSDm","BCCA","Obs.","NCEP"],
-                yrange=[0.1,0.5])
+                yrange=[0.1,0.5],label_x=False)
                 
-    plt.ylabel("Wet Day Fraction")
+    # plt.ylabel("Wet Day Fraction")
     plt.title("CONUS (1mm)")
     # plt.legend(loc=4,ncol=2)
     
-def wet1_scale_sub():
-    mask=None
-    sar =load_scales(e0_1mm_loc+"SARe0-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
-    sdd =load_scales(e0_1mm_loc+"SDe0-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
-    sdm =load_scales(e0_1mm_loc+"SDmon-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
-    ca  =load_scales(e0_1mm_loc+"CA-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
-    cae  =load_scales(e0_1mm_loc+"CAe0-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
-    obs =load_scales(e0_1mm_loc+"obs-maurer.125-pr_*_annual_wetfrac.nc",mask=mask)
+def wet1_scale_sub(i,xlabel=False):
+    mask=get_mask(i)
+    sar =load_scales(sub_locs_1mm[i]+"SAR-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
+    sdd =load_scales(sub_locs_1mm[i]+"SD-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
+    sdm =load_scales(sub_locs_1mm[i]+"SDmon_c-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
+    ca  =load_scales(sub_locs_1mm[i]+"CA-ncep-pr-BC12km_*_annual_wetfrac.nc",mask=mask)
+    cae =load_scales(sub_locs_1mm[i]+"BCCA_*-ncep-pr-12km_*_annual_wetfrac.nc",mask=mask)
+    obs =load_scales(sub_locs_1mm[i]+"obs-maurer.125-pr_*_annual_wetfrac.nc",mask=mask)
     
     plot_v_scale([sar,sdd,sdm,ca,cae,obs],
                 colors=["g","darkred","red","b","skyblue","k"],
                 linestyles=["-","-","-","-","-","-"],
                 markers=["None","None","None","None","None","."],
                 labels=["AR","BCSDd","BCSDm","BCCA","BCCAr","Obs."],
-                yrange=[0.1,0.5])
+                yrange=[0.1,0.5],label_x=xlabel)
                 
-    plt.title("Subdomain (1mm)")
+    plt.title("{} (1mm)".format(subdomain_names[i]))
     # plt.legend(loc=4,ncol=2)
 
 
 
 def wetfrac_scale_fig():
-    plt.figure(figsize=(12,10))
+    plt.figure(figsize=(12,20))
     
-    plt.subplot(2,2,1)
+    nx=4
+    ny=2
+    plt.subplot(nx,ny,1)
     wet0_scale_conus()
-    plt.subplot(2,2,2)
-    wet0_scale_sub()
+    plt.subplot(nx,ny,3)
+    wet0_scale_sub(0)
+    plt.subplot(nx,ny,5)
+    wet0_scale_sub(1)
+    plt.subplot(nx,ny,7)
+    wet0_scale_sub(2,xlabel=True,legend=True)
 
-    plt.subplot(2,2,3)
+    plt.subplot(nx,ny,2)
     wet1_scale_conus()
-    plt.subplot(2,2,4)
-    wet1_scale_sub()
+    plt.subplot(nx,ny,4)
+    wet1_scale_sub(0)
+    plt.subplot(nx,ny,6)
+    wet1_scale_sub(1)
+    plt.subplot(nx,ny,8)
+    wet1_scale_sub(2,xlabel=True)
     
     plt.subplots_adjust(hspace=0.1)
     
@@ -572,118 +603,128 @@ def wetspell_dryspell_fig():
     
     plt.savefig("FIG11_monthly_spells.png",dpi=150)
 
+def print_this_stat(statistic,i=None):
+    from scipy.stats import ttest_ind as ttest
+    if i==None:
+        location=stats_location+zeromm_loc
+        mask=get_mask()
+    else:
+        location=stats_location+sub_locs[i]
+        mask=get_mask(i)
+    subslice=slice(0,None,1)
+    if statistic=="extremes_nday1":
+        subslice=slice(2,3)
+        mask=mask.reshape((1,mask.shape[0],mask.shape[1]))
+    
+    sar=np.ma.array(myio.read_nc(location+"SAR-ncep-pr-BC12km_full_res_annual_{}.nc".format(statistic)).data[subslice,...],mask=mask)
+    sdd=np.ma.array(myio.read_nc(location+"SD-ncep-pr-BC12km_full_res_annual_{}.nc".format(statistic)).data[subslice,...],mask=mask)
+    sdm=np.ma.array(myio.read_nc(location+"SDmon*-ncep-pr-BC12km_full_res_annual_{}.nc".format(statistic)).data[subslice,...],mask=mask)
+    ca =np.ma.array(myio.read_nc(location+"CA-ncep-pr-BC12km_full_res_annual_{}.nc".format(statistic)).data[subslice,...],mask=mask)
+    obs=np.ma.array(myio.read_nc(location+"obs-maurer.125-pr_full_res_annual_{}.nc".format(statistic)).data[subslice,...],mask=mask)
+    
+    
+    obsmean=obs.mean()
+    print("AR    {}= {}      error = {}".format(statistic,str(sar.mean())[:5],str(sar.mean()-obsmean)[:5]))
+    print('  pvalue = {0}'.format(round(ttest(sar[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
+    print("BCSDd {}= {}      error = {}".format(statistic,str(sdd.mean())[:5],str(sdd.mean()-obsmean)[:5]))
+    print('  pvalue = {0}'.format(round(ttest(sdd[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
+    print("BCSDm {}= {}      error = {}".format(statistic,str(sdm.mean())[:5],str(sdm.mean()-obsmean)[:5]))
+    print('  pvalue = {0}'.format(round(ttest(sdm[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
+    print("BCCA  {}= {}      error = {}".format(statistic,str( ca.mean())[:5],str( ca.mean()-obsmean)[:5]))
+    print('  pvalue = {0}'.format(round(ttest(ca[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
+    if i!=None:
+        cae=np.ma.array(myio.read_nc(location+"BCCA_*-ncep-pr-12km_full_res_annual_{}.nc".format(statistic)).data[subslice,...],mask=mask)
+        print("BCCAr {}= {}      error = {}".format(statistic,str(cae.mean())[:5],str(cae.mean()-obsmean)[:5]))
+        print('  pvalue = {0}'.format(round(ttest(cae[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
+    print("Obs   {}= ".format(statistic)+str(obsmean)[:5])
+    
+
 def print_stats():
     from scipy.stats import ttest_ind as ttest
     
     mask=get_mask()
-    # sar=np.ma.array(myio.read_nc(stats_location+onemm_loc+"SAR-ncep-pr-BC12km_full_res_annual_dryspell.nc").data,mask=mask)
-    # sdd=np.ma.array(myio.read_nc(stats_location+onemm_loc+"SD-ncep-pr-BC12km_full_res_annual_dryspell.nc").data,mask=mask)
-    # sdm=np.ma.array(myio.read_nc(stats_location+onemm_loc+"SDmon_c-ncep-pr-BC12km_full_res_annual_dryspell.nc").data,mask=mask)
-    # ca=np.ma.array(myio.read_nc(stats_location+onemm_loc+"CA-ncep-pr-BC12km_full_res_annual_dryspell.nc").data,mask=mask)
-    # obs=np.ma.array(myio.read_nc(stats_location+onemm_loc+"obs-maurer.125-pr_full_res_annual_dryspell.nc").data,mask=mask)
-    # print("AR    dryspell= "+str(sar.mean())[:5])
-    # print('  pvalue = {0}'.format(round(ttest(sar[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("BCSDd dryspell= "+str(sdd.mean())[:5])
-    # print('  pvalue = {0}'.format(round(ttest(sdd[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("BCSDm dryspell= "+str(sdm.mean())[:5])
-    # print('  pvalue = {0}'.format(round(ttest(sdm[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("BCCA  dryspell= "+str( ca.mean())[:5])
-    # print('  pvalue = {0}'.format(round(ttest(ca[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("Obs   dryspell= "+str(obs.mean())[:5])
-    # print("")
-    #
-    # sar=np.ma.array(myio.read_nc(stats_location+onemm_loc+"SAR-ncep-pr-BC12km_full_res_annual_wetspell.nc").data,mask=mask)
-    # sdd=np.ma.array(myio.read_nc(stats_location+onemm_loc+"SD-ncep-pr-BC12km_full_res_annual_wetspell.nc").data,mask=mask)
-    # sdm=np.ma.array(myio.read_nc(stats_location+onemm_loc+"SDmon_c-ncep-pr-BC12km_full_res_annual_wetspell.nc").data,mask=mask)
-    # ca=np.ma.array(myio.read_nc(stats_location+onemm_loc+"CA-ncep-pr-BC12km_full_res_annual_wetspell.nc").data,mask=mask)
-    # obs=np.ma.array(myio.read_nc(stats_location+onemm_loc+"obs-maurer.125-pr_full_res_annual_wetspell.nc").data,mask=mask)
-    # print("AR    wetspell= "+str(sar.mean())[:5])
-    # print('  pvalue = {0}'.format(round(ttest(sar[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("BCSDd wetspell= "+str(sdd.mean())[:5])
-    # print('  pvalue = {0}'.format(round(ttest(sdd[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("BCSDm wetspell= "+str(sdm.mean())[:5])
-    # print('  pvalue = {0}'.format(round(ttest(sdm[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("BCCA  wetspell= "+str( ca.mean())[:5])
-    # print('  pvalue = {0}'.format(round(ttest(ca[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("Obs   wetspell= "+str(obs.mean())[:5])
-    # print("")
-    #
-    # sar=np.ma.array(myio.read_nc(stats_location+onemm_loc+"SAR-ncep-pr-BC12km_full_res_annual_wetfrac.nc").data,mask=mask)
-    # sdd=np.ma.array(myio.read_nc(stats_location+onemm_loc+"SD-ncep-pr-BC12km_full_res_annual_wetfrac.nc").data,mask=mask)
-    # sdm=np.ma.array(myio.read_nc(stats_location+onemm_loc+"SDmon_c-ncep-pr-BC12km_full_res_annual_wetfrac.nc").data,mask=mask)
-    # ca=np.ma.array(myio.read_nc(stats_location+onemm_loc+"CA-ncep-pr-BC12km_full_res_annual_wetfrac.nc").data,mask=mask)
-    # obs=np.ma.array(myio.read_nc(stats_location+onemm_loc+"obs-maurer.125-pr_full_res_annual_wetfrac.nc").data,mask=mask)
-    # print("AR    wetfrac= "+str(sar.mean())[:5])
-    # print('  pvalue = {0}'.format(round(ttest(sar[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("BCSDd wetfrac= "+str(sdd.mean())[:5])
-    # print('  pvalue = {0}'.format(round(ttest(sdd[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("BCSDm wetfrac= "+str(sdm.mean())[:5])
-    # print('  pvalue = {0}'.format(round(ttest(sdm[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("BCCA  wetfrac= "+str( ca.mean())[:5])
-    # print('  pvalue = {0}'.format(round(ttest(ca[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("Obs   wetfrac= "+str(obs.mean())[:5])
-    # print("")
-    #
-    # sar=np.ma.array(myio.read_nc(stats_location+onemm_loc+"SAR-ncep-pr-BC12km_full_res_annual_MAP.nc").data,mask=mask)
-    # sdd=np.ma.array(myio.read_nc(stats_location+onemm_loc+"SD-ncep-pr-BC12km_full_res_annual_MAP.nc").data,mask=mask)
+    # sar=np.ma.array(myio.read_nc(stats_location+zeromm_loc+"SAR-ncep-pr-BC12km_full_res_annual_extremes_nday1.nc").data[2,...],mask=mask)
+    # sdd=np.ma.array(myio.read_nc(stats_location+zeromm_loc+"SD-ncep-pr-BC12km_full_res_annual_extremes_nday1.nc").data[2,...],mask=mask)
     # sdd.mask[~np.isfinite(sdd)]=True
     # sdd.mask[sdd>1e5]=True
-    # sdm=np.ma.array(myio.read_nc(stats_location+onemm_loc+"SDmon_c-ncep-pr-BC12km_full_res_annual_MAP.nc").data,mask=mask)
+    # sdm=np.ma.array(myio.read_nc(stats_location+zeromm_loc+"SDmon_c-ncep-pr-BC12km_full_res_annual_extremes_nday1.nc").data[2,...],mask=mask)
     # sdm.mask[~np.isfinite(sdm)]=True
     # sdm.mask[sdm>1e5]=True
-    # ca=np.ma.array(myio.read_nc(stats_location+onemm_loc+"CA-ncep-pr-BC12km_full_res_annual_MAP.nc").data,mask=mask)
-    # obs=np.ma.array(myio.read_nc(stats_location+onemm_loc+"obs-maurer.125-pr_full_res_annual_MAP.nc").data,mask=mask)
-    # print("AR    MAP= "+str(sar.mean())[:5])
+    # ca=np.ma.array(myio.read_nc(stats_location+zeromm_loc+"CA-ncep-pr-BC12km_full_res_annual_extremes_nday1.nc").data[2,...],mask=mask)
+    # ca.mask[~np.isfinite(ca)]=True
+    # ca.mask[ca>1e5]=True
+    # obs=np.ma.array(myio.read_nc(stats_location+zeromm_loc+"obs-maurer.125-pr_full_res_annual_extremes_nday1.nc").data[2,...],mask=mask)
+    # print("AR    extremes_nday1= "+str(sar.mean())[:5])
     # print('  pvalue = {0}'.format(round(ttest(sar[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("BCSDd MAP= "+str(sdd.mean())[:5])
+    # print("BCSDd extremes_nday1= "+str(sdd.mean())[:5])
     # print('  pvalue = {0}'.format(round(ttest(sdd[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("BCSDm MAP= "+str(sdm.mean())[:5])
+    # print("BCSDm extremes_nday1= "+str(sdm.mean())[:5])
     # print('  pvalue = {0}'.format(round(ttest(sdm[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("BCCA  MAP= "+str( ca.mean())[:5])
+    # print("BCCA  extremes_nday1= "+str( ca.mean())[:5])
     # print('  pvalue = {0}'.format(round(ttest(ca[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    # print("Obs   MAP= "+str(obs.mean())[:5])
-    # print("")
+    # print("Obs   extremes_nday1= "+str(obs.mean())[:5])
+    #
+    # obs=np.ma.array(myio.read_nc(stats_location+zeromm_loc+"obs-uw.0625-pr_full_res_annual_extremes_nday1.nc").data[2,...])
+    # mask=np.empty(obs.shape,dtype=bool)
+    # mask[:]=False
+    # mask[obs>1e10]=True
+    # mask[~np.isfinite(obs)]=True
+    # obs.mask=mask
+    # print("Obs   extremes_nday1= "+str(obs.mean())[:5])
 
-    sar=np.ma.array(myio.read_nc(stats_location+zeromm_loc+"SAR-ncep-pr-BC12km_full_res_annual_extremes_nday1.nc").data[2,...],mask=mask)
-    sdd=np.ma.array(myio.read_nc(stats_location+zeromm_loc+"SD-ncep-pr-BC12km_full_res_annual_extremes_nday1.nc").data[2,...],mask=mask)
-    sdd.mask[~np.isfinite(sdd)]=True
-    sdd.mask[sdd>1e5]=True
-    sdm=np.ma.array(myio.read_nc(stats_location+zeromm_loc+"SDmon_c-ncep-pr-BC12km_full_res_annual_extremes_nday1.nc").data[2,...],mask=mask)
-    sdm.mask[~np.isfinite(sdm)]=True
-    sdm.mask[sdm>1e5]=True
-    ca=np.ma.array(myio.read_nc(stats_location+zeromm_loc+"CA-ncep-pr-BC12km_full_res_annual_extremes_nday1.nc").data[2,...],mask=mask)
-    obs=np.ma.array(myio.read_nc(stats_location+zeromm_loc+"obs-maurer.125-pr_full_res_annual_extremes_nday1.nc").data[2,...],mask=mask)
-    print("AR    extremes_nday1= "+str(sar.mean())[:5])
-    print('  pvalue = {0}'.format(round(ttest(sar[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    print("BCSDd extremes_nday1= "+str(sdd.mean())[:5])
-    print('  pvalue = {0}'.format(round(ttest(sdd[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    print("BCSDm extremes_nday1= "+str(sdm.mean())[:5])
-    print('  pvalue = {0}'.format(round(ttest(sdm[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    print("BCCA  extremes_nday1= "+str( ca.mean())[:5])
-    print('  pvalue = {0}'.format(round(ttest(ca[mask==False], obs[mask==False])[1]*1000.0)/1000.0))
-    print("Obs   extremes_nday1= "+str(obs.mean())[:5])
     print("")
-
     
+    for stat in ["MAP","wetfrac","wetspell","dryspell","extremes_nday1"]:
+        print("\n{}\n".format(stat))
+        print_this_stat(stat)
+        for i in range(len(sub_locs)):
+            print("\n{}\n".format(subdomain_names[i]))
+            print_this_stat(stat,i)
+        
+def huc_map():
+    from stat_down import plot_hucs
+    plot_hucs.main()
 
 def main():
     """Create figures for Journal of Climate 2013 downscaling paper"""
-    #### hucmap_fig()
+
+    function_list=[
+        # huc_map,
+        mean_annual_fig, 
+        bias_fig, 
+        changemap_fig, 
+        monthly_precip_fig, 
+        interannual_fig, 
+        monthly_interannual_fig, 
+        extreme_scaling_fig, 
+        wetfrac_map_fig, 
+        wetfrac_scale_fig, 
+        wetspell_dryspell_fig]#,
+        # print_stats]
+    
+    for f in function_list:
+        print(f.__name__)
+        try:
+            f()
+        except Exception as e:
+            print("ERROR: "+str(e))
+    
+    # huc_map()
     # mean_annual_fig()
     # bias_fig()
-    # agu_6panel_fig()
     # changemap_fig()
     # monthly_precip_fig()
     # interannual_fig()
     # monthly_interannual_fig()
-    extreme_scaling_fig()
-    wetfrac_map_fig()
+    # extreme_scaling_fig()
+    # wetfrac_map_fig()
     # wetfrac_scale_fig()
     # wetspell_dryspell_fig()
     #### geostats_fig()
     #### obs_wetfrac_fig()
     
-    print_stats()
+    # print_stats()
+        
 
 if __name__ == '__main__':
     main()
