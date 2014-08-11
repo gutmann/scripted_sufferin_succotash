@@ -1,0 +1,13 @@
+#!/bin/bash
+
+if [[ $1 ]]; then
+	export TARGET_DIR=$1
+else
+	export TARGET_DIR=/CHLIU/HW_2010/4KM_1OCT06-1OCT07/
+	# export TARGET_DIR=/KYOKO/wrf/snowpack/HW2010/CTRL/hydro_study/NARR_WRFOUT_T2_04km*.gz
+	# export TARGET_DIR=/KYOKO/wrf/snowpack/HW2010/PGW/hydro_study/PGW_WRFOUT_T2_04km*.gz
+fi
+# echo $TARGET_DIR
+export ticketname=`klist | head -1 | sed -e"s/:/ /g" | awk '{print $4 }'`
+
+hsi -P -c $ticketname  ls -PR $TARGET_DIR |  awk  'BEGIN { FS = "\t"};{ if($1 == "FILE") print $6, $2}' | sort

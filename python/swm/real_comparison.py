@@ -262,9 +262,12 @@ def make_subplot(data,ny,nx,curplot,v,extra_title):
     plt.title(v+extra_title)
     
 
-def make_plots(data1,data2,date):
+def make_plots(data1,data2,date,fig=None):
     plt.close("all")
-    plt.figure(figsize=(24,14));
+    if fig==None:
+        fig=plt.figure(figsize=(24,14));
+    else:
+        fig.clear()
     ny=3
     nx=4
     curplot=0
@@ -274,6 +277,8 @@ def make_plots(data1,data2,date):
         make_subplot(data1[v],ny,nx,curplot,v," "+str(date)[:14])
         curplot+=1
         make_subplot(data2[v],ny,nx,curplot,v," "+str(date)[:14])
+    
+    return fig
     
 
 def main(swm_dir="output/",output_dir="./"):
@@ -285,15 +290,15 @@ def main(swm_dir="output/",output_dir="./"):
     
     wrf_data=DataReader(wrf_files,datatype="WRF")
     swm_data=DataReader(swm_files,datatype="SWM")
-    
+    fig=plt.figure(figsize=(24,14));
     for i in range(len(wrf_data)):
         wrf=wrf_data.next()
         swm=swm_data.next()
         print(str(wrf.date),str(swm.date))
         sys.stdout.flush()
         
-        make_plots(swm,wrf,wrf.date)
-        plt.savefig(output_filename.format(str(wrf.date).replace(" ","_")))
+        fig=make_plots(swm,wrf,wrf.date,fig=fig)
+        fig.savefig(output_filename.format(str(wrf.date).replace(" ","_")))
     
 
 
