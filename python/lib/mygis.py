@@ -275,7 +275,7 @@ def read_files(pattern,var="data",returnNCvar=False,axis=None):
     return d
     
 
-def read_nc(filename,var="data",proj=None,returnNCvar=False):
+def read_nc(filesearch,var="data",proj=None,returnNCvar=False):
     '''read a netCDF file and return the specified variable
 
     output is a structure :
@@ -286,6 +286,9 @@ def read_nc(filename,var="data",proj=None,returnNCvar=False):
         representation of the variable is returned instead of being read into 
         memory immediately.  
     '''
+    filename=glob.glob(filesearch)[0]
+    if not filename: 
+        print(filesearch)
     d=Dataset(filename, mode='r',format="NETCDF4")
     outputdata=None
     if var != None:

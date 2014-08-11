@@ -48,7 +48,8 @@ def write_data(filename,data):
     odata[:]=data.data
     odata.setncatts(data.attributes)
     
-    newhistory="Daily data created:"+time.strftime("%Y/%m/%d %H:%M:%S")+\
+    #alt format = ("%Y/%m/%d %H:%M:%S")
+    newhistory="Daily data created:"+time.strftime("%c")\
                 " by:"+os.environ["USER"]+\
                 " using script:"+__file__+"\n"
     copy_atts(data.ncdata,nc,addhistory=newhistory)

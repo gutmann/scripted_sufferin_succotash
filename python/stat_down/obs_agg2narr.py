@@ -9,24 +9,31 @@ import regrid_hi2low
 from bunch import Bunch
 
 # process_var="tasmin"
-# process_var="tasmax"
-process_var="tas"
+process_var="tasmax"
+# process_var="tas"
 # process_var="pr"
 
 # narr_samplefile="/Volumes/G-SAFE/usbr/statistical/narr_sample.nc"
-if process_var=="pr":
-    narr_samplefile="/d5/gutmann/cc-downscaling-test/ccsm/pr/prate.run5.complete.1960-2080.nc"
-elif process_var=="tas":
-    narr_samplefile="/d5/gutmann/cc-downscaling-test/ccsm/tas/tas.run5.complete.1960-2080.nc"
+def get_sample_file(process_var):
+    narr_samplefile=None
+    if process_var=="pr":
+        narr_samplefile="/d5/gutmann/cc-downscaling-test/ccsm/pr/prate.run5.complete.1960-2080.nc"
+    elif process_var=="tas":
+        narr_samplefile="/d5/gutmann/cc-downscaling-test/ccsm/tas/tas.run5.complete.1960-2080.nc"
+    elif process_var=="tasmin":
+        narr_samplefile="/d5/gutmann/cc-downscaling-test/ccsm/tasmin/tmin.run5.complete.1900-2080.nc"
+    elif process_var=="tasmax":
+        narr_samplefile="/d5/gutmann/cc-downscaling-test/ccsm/tasmax/tmax.run5.complete.1900-2080.nc"
+    return narr_samplefile
 # obs_filesearch="*"+process_var+".*.nc"
-# meta=Bunch(title="Observed regridded to NARR projection",
-#     creator=os.environ['USER']+" using obs_agg2narr.py",
-#     source="UW via USBR", conventions="None")
-
-obs_filesearch="nldas_met*.nc"
-meta=Bunch(title="Observed regridded to NARR projection",
+meta=Bunch(title="Observed regridded to model forcing projection",
     creator=os.environ['USER']+" using obs_agg2narr.py",
-    source="Maurer via USBR", conventions="None")
+    source="UW via USBR", conventions="None")
+
+# obs_filesearch="nldas_met*.nc"
+# meta=Bunch(title="Observed regridded to model forcing projection",
+    # creator=os.environ['USER']+" using obs_agg2narr.py",
+    # source="Maurer via USBR", conventions="None")
 
 
 def read_base(filename):
@@ -36,7 +43,7 @@ def read_base(filename):
     variables=Bunch()
     for k in f.variables.keys():
         curvar=f.variables[k]
-        if (k!="pr") and (k!="tasmin") and (k!="tasmax"):
+        if (k!="pr") and (k!="tasmin") and (k!="tasmax") and (k!="TREFMN") and (k!="TREFMX") and (k!="tas"):
             data=Bunch(data=curvar[:])
         else:
             data=Bunch()
@@ -77,7 +84,10 @@ def write_data(filename,data,nbase,obase,outputvar="pr",fillvalue=None):
         
         # Create the variable in the output netcdf file
         curvar=nbase.variables[var]
-        if (var!="pr") and (var!="tas") and (var!="tasmax") and (var!="tasmin"):
+        ovar=var
+        if var=="TREFMN":ovar="tasmin"
+        if var=="TREFMX":ovar="tasmax"
+        if (var!="pr") and (var!="tasmin") and (var!="tasmax") and (var!="TREFMN") and (var!="TREFMX") and (var!="tas"):
             if var=="time":
                 try:
                     curvar=obase.variables[var]
@@ -87,9 +97,9 @@ def write_data(filename,data,nbase,obase,outputvar="pr",fillvalue=None):
             elif var=="time_bnds":
                 pass
             else:
-                outvar=of.createVariable(var,curvar.dtype,tuple(curvar.dims))
+                outvar=of.createVariable(ovar,curvar.dtype,tuple(curvar.dims))
         else:
-            curvar=obase.variables[var]
+            curvar=obase.variables[ovar]
             outputdims=[]
             for thisdim in curvar.dims:
                 if thisdim=="latitude":
@@ -107,7 +117,7 @@ def write_data(filename,data,nbase,obase,outputvar="pr",fillvalue=None):
                     setattr(outvar,k,curvar.atts[k])
         
         # finally copy the data in
-        if (var=="pr") or (var=="tasmin") or (var=="tasmax") or (var=="tas"):
+        if (var=="pr") or (var=="tasmin") or (var=="tasmax") or (var=="TREFMN") or (var=="TREFMX") or (var=="tas"):
             try:
                 setattr(outvar,"units",getattr(obase.variables,outputvar).atts["units"])
             except:
@@ -137,14 +147,17 @@ def main(root_dir=None,var=None,filesearch=None):
         obs_filesearch=root_dir+obs_filesearch
     else:
         root_dir=""
-    narrgeo=mygis.read_geo(narr_samplefile)
-    narrbase=read_base(narr_samplefile)
+    
     files=glob.glob(obs_filesearch)
     obsgeo=mygis.read_geo(files[0])
     if len(obsgeo.lon.shape)==1:
         obslon,obslat=np.meshgrid(obsgeo.lon,obsgeo.lat)
     else:
         obslon,obslat=(obsgeo.lon,obsgeo.lat)
+    
+    narr_samplefile=get_sample_file(var)
+    narrgeo=mygis.read_geo(narr_samplefile)
+    narrbase=read_base(narr_samplefile)
     print("computing Geo LUT")
     geoLUT=regrid_hi2low.load_geoLUT(obslat,obslon,narrgeo.lat,narrgeo.lon)
         

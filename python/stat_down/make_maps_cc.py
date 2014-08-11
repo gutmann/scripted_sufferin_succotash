@@ -8,7 +8,7 @@ from bunch import Bunch
 import mygis
 from stat_down import map_vis
 
-wrfloc="/d5/gutmann/cc-downscaling-test/wrfoutput/"
+wrfloc="/d5/gutmann/cc-downscaling-test/wrfoutput/pr/"
 sdloc="/d5/gutmann/cc-downscaling-test/SDdata/DAILY/down/"
 geo_file=sdloc+"SAR/ccsm/pr/BCSAR_pr_12km_2000.nc"
 
@@ -173,7 +173,7 @@ def main():
     print(bounds)
     
     fig=None
-    timeonly=True
+    timeonly=False
     for t in times:
         for p in patterns:
             print(t,p)

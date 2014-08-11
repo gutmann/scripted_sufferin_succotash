@@ -175,7 +175,7 @@ def calc_extreme_value(params,distribution,nyear,datafraction=1.0):
     return distribution.ppf(1-probability,*params)
 
 
-def extremes(data, dist_name="gamma",verbose=True,year_intervals=None):
+def extremes(data, dist_name="gamma",verbose=True,year_intervals=None,minval=None):
     """Calculate the 2, 5, 10 and 50yr return intervals for data using a specified distribution
     
     data = 3D grid of e.g. precip data [time, lat, lon]
@@ -218,9 +218,12 @@ def extremes(data, dist_name="gamma",verbose=True,year_intervals=None):
                 curdata=data[:,i,j]
             else:
                 curdata=data[:,i]
-            # just use the top half of the non-zero values in data
-            medianval=np.median(curdata[curdata>0])
-            # medianval=np.median(curdata[curdata>medianval])
+            if minval:
+                medianval=minval
+            else:
+                # just use the top half of the non-zero values in data
+                medianval=np.median(curdata[curdata>0])
+                # medianval=np.median(curdata[curdata>medianval])
             usevals=np.where(curdata>=medianval)[0]
             if len(usevals)>0:
                 # assuming there were some data to fit, fit the data
