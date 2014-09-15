@@ -59,6 +59,7 @@ import matplotlib.pyplot as plt
 
 
 def std_over_dates(data1,date1,date2):
+    """Useful for calculating wind speed [speed = f(sqrt(stddev)) ]"""
     start=0
     current=0
     outputdata=np.zeros(len(date2))
@@ -101,6 +102,11 @@ def load_data(filename,ncols=None):
     f=open(filename)
     d=[]
     dates=[]
+    d=None
+    ntimes=25920000 # 30days of 10hz data
+    additional_time=ntimes
+    
+    i=long(0)
     for l in f:
         try:
             curdate=dtfromstring(l.split(",")[0])
@@ -109,11 +115,26 @@ def load_data(filename,ncols=None):
                 ncols=len(curdata)
             if len(curdata)==ncols:
                 dates.append(curdate)
-                d.append(curdata)
+                if d==None:
+                    d=np.zeros((ntimes,ncols),dtype=np.int32)
+                
+                if (i>=ntimes):
+                    print(str(ntimes)+" "+str(curdate))
+                    ntimes+=additional_time # add ~one month of memory ~1.5GB at a time (avoids doubling near the last call and requireing 128GB of RAM)
+                    
+                    newd=np.zeros((ntimes,ncols),dtype=np.int32)
+                    newd[:i,:]=d
+                    del d # help the gc out, this could be a LOT of data ~20GB
+                    d=newd
+                    del newd
+                if (i%86400)
+                d[i,:]=curdata
+                i+=1
         except:
-            print(l)
+            print(l[:min(len("YYYY/MM/DD 00:00"),len(l))])
     f.close()
-    return (dates,np.array(d))
+    
+    return (dates,d[:i,:])
 
 def calc_scargle_frequencies(data,time):
     import scargle

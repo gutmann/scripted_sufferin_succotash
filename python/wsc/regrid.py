@@ -14,7 +14,7 @@ def agg_lut(lathi,lonhi,latlo,lonlo):
     nx=lathi.shape[1]
     ny=lathi.shape[0]
 
-    maxdist=((latlo[0,0]-latlo[1,1])**2 + (lonlo[0,0]-lonlo[1,1])**2)/1.9
+    maxdist=((latlo[0,0]-latlo[1,1])**2 + (lonlo[0,0]-lonlo[1,1])**2)/1.5
     
     for i in range(ny):
         dists=(latlo-lathi[i,0])**2+(lonlo-lonhi[i,0])**2

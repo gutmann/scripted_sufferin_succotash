@@ -14,15 +14,19 @@ if flushprint.in_ipython():
 else:
     sys.stdout=flushprint.Flushfile(sys.stdout)
 
+NLCD_FOREST_TYPE=1
+NLCD_EXPOSED_TYPE=0
 nlcd_file="/d2/gutmann/nldc/NLCD2006_landcover.tif"
 snodas_file="/d2/gutmann/wsc/snodas/SWE_Daily0600UTC_WesternUS_2010.dat"
-# nlcd_subset=[25000,75000,30000,63000] #large area, takes too long to run
-# nlcd_subset=[35000,52000,46000,58500] # _1 approximate area of CO Rockies
-# nlcd_subset=[52000,60000,46000,50000] # _2 approximate area of CO Rockies
-# nlcd_subset=[60000,69000,46000,50000] # _3 approximate area of CO Rockies
-# nlcd_subset=[52000,60000,50000,58000] # _4 approximate area of CO Rockies
-# nlcd_subset=[60000,69000,50000,58000] # _5 approximate area of CO Rockies
-# nlcd_subset=[50000,51000,56000,56500] # fast debugging test case
+subset_list=[]
+subset_list.append([25000,75000,30000,63000]) #large area, takes too long to run
+subset_list.append([35000,52000,46000,58500]) # _1 approximate area of CO Rockies
+subset_list.append([52000,60000,46000,50000]) # _2 approximate area of CO Rockies
+subset_list.append([60000,69000,46000,50000]) # _3 approximate area of CO Rockies
+subset_list.append([52000,60000,50000,58000]) # _4 approximate area of CO Rockies
+subset_list.append([60000,69000,50000,58000]) # _5 approximate area of CO Rockies
+nlcd_subset=[50000,51000,56000,56500] # fast debugging test case
+# nlcd_subset=[50000, 55000, 47000, 53000] #san juans
 snodas_subset=[0,None,1200,None]
 
 dims=("lat","lon")
@@ -41,7 +45,7 @@ data_info=Bunch(data=None,name="data",dims=dims,dtype="f",attributes=data_atts)
 # nlcd_subset=[44000,46000,55000,56000]
 # snodas_subset=[850,900,1980,2030]
 
-def geo2lat_lon(data):
+def geo2lat_lon(data,geo_geographic=False,reverse_lat=False):
     """calculate xy points in data projection then convert to lat/lon"""
     left=data.geo[0]
     top=data.geo[3]
@@ -53,22 +57,26 @@ def geo2lat_lon(data):
     
     x=np.arange(left,left+dx*nx,dx)[nlcd_subset[2]:nlcd_subset[3]].astype(np.int32)
     y=np.arange(top, top +dy*ny,dy)[nlcd_subset[0]:nlcd_subset[1]].astype(np.int32)
+    if reverse_lat:
+        y=y[::-1]
 
-    return Bunch(x=x,y=y)
+    if not geo_geographic:
+        return Bunch(x=x,y=y)
     
-    # nx=nlcd_subset[3]-nlcd_subset[2]
-    # ny=nlcd_subset[1]-nlcd_subset[0]
-    # x,y=np.meshgrid(x,y)
-    # x=x.reshape((nx*ny))
-    # y=y.reshape((nx*ny))
-    # 
-    # points=np.concatenate([x[:,np.newaxis],y[:,np.newaxis]],axis=1)
-    # 
-    # print("Converting Points from albers to lat/lon")
-    # lat,lon=mygis.proj2ll(points=points,proj=data.proj)
-    # lat=lat.reshape((ny,nx))
-    # lon=lon.reshape((ny,nx))
-    # return Bunch(lat=lat,lon=lon)
+    nx=nlcd_subset[3]-nlcd_subset[2]
+    ny=nlcd_subset[1]-nlcd_subset[0]
+    x,y=np.meshgrid(x,y)
+    x=x.reshape((nx*ny))
+    y=y.reshape((nx*ny))
+
+    points=np.concatenate([x[:,np.newaxis],y[:,np.newaxis]],axis=1)
+
+    print("Converting Points from map projection (albers) to lat/lon")
+    print(str(data.proj))
+    lat,lon=mygis.proj2ll(points=points,proj=data.proj)
+    lat=lat.reshape((ny,nx))
+    lon=lon.reshape((ny,nx))
+    return Bunch(lat=lat,lon=lon)
 
 def subset_a2b(data,geoin,geoout,subset):
     """subset both data (returned) and geoin to the range of geoout
@@ -137,7 +145,28 @@ def write(filename,data,geo):
     mygis.write(filename,output_data,varname=data_info.name,dtype=data_info.dtype,dims=data_info.dims,
                attributes=data_info.attributes,extravars=extra_vars,history="wsc/nlcd.py")
     
-
+def load_forest(subset=0):
+    """docstring for load_data"""
+    global nlcd_subset
+    if type(subset)==list:
+        nlcd_subset=subset
+    elif subset==None:
+        pass
+    else:
+        nlcd_subset=subset_list[subset]
+    
+    lc_data=mygis.read_tiff(nlcd_file)
+    print("setting up geo data")
+    lc_geo=geo2lat_lon(lc_data,geo_geographic=True,reverse_lat=True)
+    # print("first subset")
+    subdata=lc_data.data[nlcd_subset[1]:nlcd_subset[0]:-1,nlcd_subset[2]:nlcd_subset[3]]
+    
+    lc_forest=np.zeros(subdata.shape)
+    lc_forest[np.where((subdata>40)&(subdata<44))]=NLCD_FOREST_TYPE
+    
+    # these are huge datasets, so help the garbage collector out?
+    del subdata, lc_data.data, lc_data
+    return Bunch(data=lc_forest, lat=lc_geo.lat,lon=lc_geo.lon)
 
 def forest_cover(geo_data=None):
     print("Loading NLCD file")
@@ -161,7 +190,7 @@ def forest_cover(geo_data=None):
     
     print("Creating high res forest mask")
     lc_forest=np.zeros(subdata.shape)
-    lc_forest[np.where((subdata>40)&(subdata<44))]=1
+    lc_forest[np.where((subdata>40)&(subdata<44))]=NLCD_FOREST_TYPE
     
     print("Lowering resolution")
     output_data=lower_resolution(lc_forest,lc_geo,geo_data,lc_data.proj)

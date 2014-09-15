@@ -112,7 +112,7 @@ def read_good_days(filename="dateselect.txt"):
 # VARS 1
 # SCA 0 1 SCA []
 # ENDVARS
-def load(filename,startyear=2008):
+def load(filename,startyear=2008,all_days=False):
     """Load a MODSCAG SCA file from disk
     
     Assumes a flat binary file as described in the comments above.
@@ -135,9 +135,11 @@ def load(filename,startyear=2008):
     dates=[startdate+datetime.timedelta(i) for i in range(ntimes)]
     
     dateselectfile="/".join(filename.split("/")[:-1])+"/dateselect.txt"
-    gooddates=read_good_days(dateselectfile)
+    if all_days:
+        gooddates=np.arange(ntimes)
+    else:
+        gooddates=read_good_days(dateselectfile)
     
     # fill(data)
-    
     return Bunch(data=d.reshape((ntimes,nlat,nlon)),lat=lat,lon=lon,dates=dates,gooddates=gooddates)
 

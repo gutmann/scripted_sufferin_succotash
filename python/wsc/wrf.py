@@ -110,14 +110,45 @@ def load(filename, startyear=2000,startdate=None,extractday=None):
     
     return Bunch(data=data/1000.0,lat=lat,lon=lon,dates=dates,dem=dem,lc=mask)
 
+def load_base_data(swefile="SWE_daily.nc",info="4km_wrf_output.nc",res=4):
+    # wrf.load_base_data(swefile="wrfout_d01_2008-05-01_00:00:00",res=2)
+    
+    if res==2:
+        forest=[11,12,13,14,18]
+        exposed=[1,2,3,4,5,7,8,9,10,16,17,19,20,22,23,24,25,26,27,15,21] #warning 15 and 21 sound like they should be forest, but on the map they are in open areas
+        mayday=0
+        info=swefile
+        dz=100
+    else:
+        forest=[1,5]
+        exposed=[7,10]
+        mayday=212
+        for i in range(year):
+            mayday+=365
+        mayday+=np.floor(year/4)
+        
+    print("Loading data")
+    vegclass=myio.read_nc(info,"IVGTYP").data[0,...]
+    mask=np.zeros(vegclass.shape)
+    for f in forest:
+        forested=np.where(vegclass==f)
+        mask[forested]=1
+    for e in exposed:
+        exposed=np.where(vegclass==e)
+        mask[exposed]=2
+    lat=myio.read_nc(info,"XLAT").data[0,...]
+    lon=myio.read_nc(info,"XLONG").data[0,...]
+    dem=myio.read_nc(info,"HGT").data[0,...]
+    snow=myio.read_nc(swefile,"SNOW").data[mayday,:,:]/1000
+    return Bunch(data=snow, lat=lat,lon=lon, dem=dem, lc=mask)
 
 def load_elev_comparison(swefile="SWE_daily.nc",info="4km_wrf_output.nc",res=4,outputfile="wrf_by_elev.png",year=7,domain="FullDomain"):
     # wrf.load_elev_comparison(swefile="wrfout_d01_2008-05-01_00:00:00",res=2,outputfile="wrf_by_elev_2km_FullDomain_May2008.png")
     import wsc.compare2lidar as c2l
     
     if res==2:
-        forest=[11,12,13,14,15,18,21]
-        exposed=[1,2,3,4,5,7,8,9,10,16,17,19,20,22,23,24,25,26,27]
+        forest=[11,12,13,14,18]
+        exposed=[1,2,3,4,5,7,8,9,10,16,17,19,20,22,23,24,25,26,27,15,21] #warning 15 and 21 sound like they should be forest, but on the map they are in open areas
         mayday=0
         if domain=="FullDomain":
             xmin=200
@@ -152,6 +183,8 @@ def load_elev_comparison(swefile="SWE_daily.nc",info="4km_wrf_output.nc",res=4,o
             ymin=149
             ymax=175
             dz=300
+        # xmin=70;xmax=108;ymin=170;ymax=190 # Uinta Mountains
+        # xmin=77;xmax=120;ymin=215;ymax=259 # Wind River Mountains
         
     print("Loading data")
     vegclass=myio.read_nc(info,"IVGTYP").data[0,...]
