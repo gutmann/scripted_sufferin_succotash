@@ -5,7 +5,7 @@ from mpl_toolkits.basemap import Basemap
 
 def vis(data,geo=[25,52.7,-124.7,-67],title="",vmin=None,vmax=None,ylim=None,xlim=None,proj='cyl',
         cmap=None,colorbar=True,latstep=5.0,lonstep=10.0,m=None,lat=None,lon=None,clim=None,
-        reproject=False,width=None,height=None):
+        reproject=False,width=None,height=None,cbar_label=None):
     """Plot a map of data using the bounds in geo=[lower_lat,upper_lat,left_lon,right_lon]
     
     Optionally specify a map title, min and max color values, colormap, projection,
@@ -82,7 +82,9 @@ def vis(data,geo=[25,52.7,-124.7,-67],title="",vmin=None,vmax=None,ylim=None,xli
     m.drawcoastlines(linewidth=1.5)
     
     if colorbar:
-        m.colorbar()
+        cb=m.colorbar()
+        if cbar_label:
+            cb.set_label(cbar_label)
     if title:
         plt.title(title)
     if xlim:

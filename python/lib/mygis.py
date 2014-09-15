@@ -404,7 +404,7 @@ def addvar(NCfile,data,varname,dims,dtype='f',attributes=None):
                 NCfile.variables[varname].__setattr__(k,attributes[k])
 
 def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes=None,
-          lat=None,lon=None,extravars=None,history=""):
+          lat=None,lon=None,extravars=None,history="",global_attributes=None):
     """write a netcdf file 
     
     filename = name of output netcdf file (.nc will be appended automatically)
@@ -431,7 +431,7 @@ def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes
             attribues: bunch/dictionary with key/values pairs to be added as attributes
     """
     history = 'Created : ' + time.ctime() +'\nusing simple io.write by:'+os.environ['USER']+"  "+history
-    NCfile=Dataset(filename,mode="w",format="NETCDF4",history=history)
+    NCfile=Dataset(filename,mode="w",format="NETCDF4")#,history=history)
     if len(data.shape)==1:
         if dims==None:
            dims=('x',)
@@ -465,7 +465,15 @@ def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes
     if extravars:
         for e in extravars:
             addvar(NCfile,e.data,e.name,e.dims,e.dtype,e.attributes)
-    
+
+    if global_attributes!=None:
+        for k in global_attributes.keys():
+            if k=="history":
+                NCfile.__setattr__(k,history+global_attributes[k])
+            else:
+                NCfile.__setattr__(k,global_attributes[k])
+    else:
+        NCfile.history=history
     NCfile.close()
 
 
