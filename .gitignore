@@ -3,6 +3,7 @@ python/site-packages/site.py
 *.egg
 *.pyc
 downscale
+icar
 swim_real
 swim_2_real
 noahmp
