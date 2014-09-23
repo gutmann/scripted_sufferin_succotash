@@ -60,23 +60,31 @@ def load_hi_res_dem():
     """docstring for load_hi_res_dem"""
     dem_file="/d2/gutmann/wsc/dem/DEM_CO_NHDPlus_1_arc_seconds.nc"
     x0=2500;x1=4000;y0=12000;y1=10500
-    x0=0;x1=None;y0=-1;y1=0
-    # dem=mygis.read_nc(dem_file,"elev_m").data[y0:y1:-1,x0:x1]
-    dem=mygis.read_nc(dem_file,"elev_m").data[::-1,:]
-    lat=mygis.read_nc(dem_file,"lat").data[::-1]
-    lon=mygis.read_nc(dem_file,"lon").data
+    # x0=0;x1=None;y0=-1;y1=0
+    demf=mygis.read_nc(dem_file,"elev_m",returnNCvar=True)
+    dem=demf.data[y0:y1:-1,x0:x1]
+    demf.ncfile.close
+    latf=mygis.read_nc(dem_file,"lat",returnNCvar=True)
+    lat=latf.data[y0:y1:-1]
+    latf.ncfile.close()
+    lonf=mygis.read_nc(dem_file,"lon",returnNCvar=True)
+    lon=lonf.data[x0:x1]
+    lonf.ncfile.close()
+    # dem=mygis.read_nc(dem_file,"elev_m").data[::-1,:]
+    # lat=mygis.read_nc(dem_file,"lat").data[::-1]
+    # lon=mygis.read_nc(dem_file,"lon").data
     lon,lat=np.meshgrid(lon,lat)
     return Bunch(data=dem,lat=lat,lon=lon)
 
 def write_lc_dem(filename,d1,d2,lat,lon):
     """docstring for write_lc_dem"""
-    outputdata=np.zeros((2,d1.shape[0],d1.shape[1]))
-    outputdata[0,...]=d1
-    outputdata[1,...]=d2
-    geo_data=[Bunch(data=lat,dims=("lat","lon"),name="lat"),
-              Bunch(data=lon,dims=("lat","lon"),name="lon")]
+    outputdata=np.zeros((2,d1.data.shape[0],d1.data.shape[1]))
+    outputdata[0,...]=d1.data
+    outputdata[1,...]=d2.data
+    geo_data=[Bunch(data=lat,dims=("lat","lon"),name="lat",dtype="f",attributes=Bunch(longname="latitude",units="degrees"),
+              Bunch(data=lon,dims=("lat","lon"),name="lon",dtype="f",attributes=Bunch(longname="longitude",units="degrees")]
     
-    mygis.write(output_file,outputdata,varname="dem",dims=('lc','lat','lon'),extravars=geo_data)
+    mygis.write(filename,outputdata,varname="dem",dims=('lc','lat','lon'),extravars=geo_data)
 
 def create_lc_dem(output_file):
     """docstring for create_lc_dem"""
@@ -110,16 +118,21 @@ def load_lc_dem(filename):
 
 def load_info():
     """docstring for load_info"""
-    lc_dem_file="LC_dem_data"
+    lc_dem_file="LC_dem_data.nc"
     try:
         return load_lc_dem(lc_dem_file)
     except:
+        print("Creating LC-based DEM")
         return create_lc_dem(lc_dem_file)
 
 def main():
     """convert/downscale snodas and WRF data to modscag grid"""
     modscag_info=load_info()
-    data=load_data()
+    print(modscag_info.lat.shape)
+    print(modscag_info.lon.shape)
+    print(modscag_info.forest.shape)
+    print(modscag_info.exposed.shape)
+    # data=load_data()
     
     # output_data=rescale(data,modscag_info)
     # write_data(output_data)

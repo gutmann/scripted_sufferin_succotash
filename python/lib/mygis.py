@@ -159,7 +159,7 @@ def ll2proj(lon=None,lat=None,points=None,proj=None):
     else:
         x,y,z=transform.TransformPoint(lon,lat)
         
-    return lat,lon
+    return x,y
 
 
 
@@ -197,7 +197,7 @@ def read_img(filename):
     else:
         raise ImportError("GDAL not available")
 
-def read_tiff(filename,xmin=None,xmax=None,ymin=None,ymax=None,bounds=None):
+def read_tiff(filename,xmin=0,xmax=None,ymin=0,ymax=None,bounds=None):
     '''read a GeoTIFF and return the data and geographic information
     
     output is a structure :
@@ -212,7 +212,13 @@ def read_tiff(filename,xmin=None,xmax=None,ymin=None,ymax=None,bounds=None):
         raise ImportError("GDAL not available")
 
     dataset = gdal.Open(filename, GDC.GA_ReadOnly)
-    data=dataset.ReadAsArray()
+    xsize=None
+    ysize=None
+    if xmax:
+        xsize=xmax-xmin+1
+    if ymax:
+        ysize=ymax-ymin+1
+    data=dataset.ReadAsArray(xoff=xmin,yoff=ymin,xsize=xsize,ysize=ysize)
     geo=dataset.GetGeoTransform()
     projWKT=dataset.GetProjection()
     proj=osr.SpatialReference()
