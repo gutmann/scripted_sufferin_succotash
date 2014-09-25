@@ -8,9 +8,9 @@ var_list=["hus","ta","va","ua"]#,"ps"] #WARNING: not clear how to get ps data, i
 
 # model="ccsm"
 # model="cnrm"
-# model="miroc"
+model="miroc"
 # model="mri_cgcm3"
-model="miroc_esm"
+# model="miroc_esm"
 
 # experiment="historical"
 experiment="rcp85"
@@ -31,9 +31,12 @@ hist_urls=dict(ccsm="http://tds.ucar.edu/thredds/fileServer/datazone/cmip5_data/
 rcp85_urls=dict(mri_cgcm3="http://dias-esg-nd.tkl.iis.u-tokyo.ac.jp/thredds/fileServer/esg_dataroot/outgoing/output1/"
                 +"MRI/MRI-CGCM3/rcp85/6hr/atmos/6hrLev/r1i1p1/v20120516/__VAR__/__NCFILE__",
                 miroc_esm="http://dias-esg-nd.tkl.iis.u-tokyo.ac.jp/thredds/fileServer/esg_dataroot/outgoing/output1/"
-                +"MIROC/MIROC-ESM/rcp85/6hr/atmos/6hrLev/r1i1p1/v20111129/__VAR__/__NCFILE__")
+                +"MIROC/MIROC-ESM/rcp85/6hr/atmos/6hrLev/r1i1p1/v20111129/__VAR__/__NCFILE__",
+                miroc="http://dias-esg-nd.tkl.iis.u-tokyo.ac.jp/thredds/fileServer/esg_dataroot/outgoing/output1/"
+                +"MIROC/MIROC5/rcp85/6hr/atmos/6hrLev/r1i1p1/v20111124/__VAR__/__NCFILE__")
 all_urls=dict(historical=hist_urls,rcp85=rcp85_urls)
 urls=all_urls[experiment]
+base_url=urls[model]
 
 Gregorian_object=None #needs to be a class that responds to __getitem__(Year,Month) with ndays... or something like that
 calender=dict(ccsm="noleap",cnrm="noleap",miroc="noleap",miroc_esm="gregorian",mri_cgcm3="gregorian")
@@ -42,8 +45,8 @@ days_per_month=dict(noleap=[31,28,31,30,31,30,31,31,30,31,30,31],
                    gregorian=Gregorian_object)
 
 dpm=days_per_month[calender[model]]
-base_url=urls[model]
 generate_monthly=monthly_req[model]
+
 if experiment=="historical":
     start_year=1950
     end_year=2005
@@ -52,7 +55,7 @@ else:
     end_year=2100
     
 
-def mri_cgcm3_month_based_filename(base,year,month):
+def zed_2_18_month_based_filename(base,year,month):
     from datetime import datetime, timedelta
     curdate=datetime(year,month,01,00,00)
     if month==12:
@@ -65,7 +68,7 @@ def mri_cgcm3_month_based_filename(base,year,month):
     greg_date_range="_{0}{1:02}0100-{2}{3:02}{4:02}18.nc\n"
     return base+greg_date_range.format(year,month,nextdate.year,nextdate.month,nextdate.day)
     
-def miroc_esm_month_based_filename(base,year,month):
+def six_2_zed_month_based_filename(base,year,month):
     from datetime import datetime, timedelta
     curdate=datetime(year,month,01,00,00)
     if month==12:
@@ -77,9 +80,9 @@ def miroc_esm_month_based_filename(base,year,month):
     return base+greg_date_range.format(curdate,nextdate)
 
 
-monthly_function=dict(mri_cgcm3=mri_cgcm3_month_based_filename,
-                       miroc_esm=miroc_esm_month_based_filename,
-                       ccsm=None,miroc=None,cnrm=None)[model]
+monthly_function=dict(mri_cgcm3=zed_2_18_month_based_filename,
+                       miroc_esm=six_2_zed_month_based_filename,
+                       miroc=None,ccsm=None,cnrm=None)[model]
 
 
 def create_monthly(filename,template_file):
