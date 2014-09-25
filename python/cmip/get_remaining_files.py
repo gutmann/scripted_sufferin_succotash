@@ -6,29 +6,33 @@ all_files="wget_complete"
 base_filename="wget_example"
 var_list=["hus","ta","va","ua"]#,"ps"] #WARNING: not clear how to get ps data, in most cases these all downloaded, or can be read from another file?
 
-# model="ccsm"
+model="ccsm"
 # model="cnrm"
-model="miroc"
+# model="miroc"
 # model="mri_cgcm3"
 # model="miroc_esm"
 
-# experiment="historical"
-experiment="rcp85"
+experiment="historical"
+# experiment="rcp85"
 
-hist_monthly_req =dict(ccsm=False,cnrm=False,miroc=True,mri_cgcm3=False,miroc_esm=True)
+hist_monthly_req =dict(ccsm=False,cnrm=False,miroc=True,mri_cgcm3=False,miroc_esm=False)
 rcp85_monthly_req=dict(ccsm=False,cnrm=False,miroc=True,mri_cgcm3=True, miroc_esm=True)
 monthly_req=dict(historical=hist_monthly_req,rcp85=rcp85_monthly_req)[experiment]
 
 hist_urls=dict(ccsm="http://tds.ucar.edu/thredds/fileServer/datazone/cmip5_data/cmip5/output1/"
-                +"NCAR/CCSM4/rcp85/6hr/atmos/6hrLev/r6i1p1/v20121031/__VAR__/__NCFILE__",
+                +"NCAR/CCSM4/historical/6hr/atmos/6hrLev/r6i1p1/v20121031/__VAR__/__NCFILE__",
                 cnrm="http://esg.cnrm-game-meteo.fr/thredds/fileServer/esg_dataroot1/CMIP5/output1/"
                 +"CNRM-CERFACS/CNRM-CM5/historical/6hr/atmos/6hrLev/r1i1p1/v20110701/__VAR__/__NCFILE__",
                 miroc="http://dias-esg-nd.tkl.iis.u-tokyo.ac.jp/thredds/fileServer/esg_dataroot/outgoing/output1/"
                 +"MIROC/MIROC5/historical/6hr/atmos/6hrLev/r1i1p1/v20111124/__VAR__/__NCFILE__",
                 mri_cgcm3="http://dias-esg-nd.tkl.iis.u-tokyo.ac.jp/thredds/fileServer/esg_dataroot/outgoing/output1/"
-                +"MRI/MRI-CGCM3/historical/6hr/atmos/6hrLev/r1i1p1/v20120516/__VAR__/__NCFILE__")
+                +"MRI/MRI-CGCM3/historical/6hr/atmos/6hrLev/r1i1p1/v20120516/__VAR__/__NCFILE__",
+                miroc_esm="http://dias-esg-nd.tkl.iis.u-tokyo.ac.jp/thredds/fileServer/esg_dataroot/outgoing/output1/"
+                +"MIROC/MIROC-ESM/historical/6hr/atmos/6hrLev/r1i1p1/v20111129/__VAR__/__NCFILE__")
 
-rcp85_urls=dict(mri_cgcm3="http://dias-esg-nd.tkl.iis.u-tokyo.ac.jp/thredds/fileServer/esg_dataroot/outgoing/output1/"
+rcp85_urls=dict(ccsm="http://tds.ucar.edu/thredds/fileServer/datazone/cmip5_data/cmip5/output1/"
+                +"NCAR/CCSM4/rcp85/6hr/atmos/6hrLev/r6i1p1/v20121031/__VAR__/__NCFILE__",
+                mri_cgcm3="http://dias-esg-nd.tkl.iis.u-tokyo.ac.jp/thredds/fileServer/esg_dataroot/outgoing/output1/"
                 +"MRI/MRI-CGCM3/rcp85/6hr/atmos/6hrLev/r1i1p1/v20120516/__VAR__/__NCFILE__",
                 miroc_esm="http://dias-esg-nd.tkl.iis.u-tokyo.ac.jp/thredds/fileServer/esg_dataroot/outgoing/output1/"
                 +"MIROC/MIROC-ESM/rcp85/6hr/atmos/6hrLev/r1i1p1/v20111129/__VAR__/__NCFILE__",
