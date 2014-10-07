@@ -113,6 +113,56 @@ def proj2ll(x=None,y=None,points=None,proj=None):
     return lat,lon
 
 
+def ll2proj(lon=None,lat=None,points=None,proj=None):
+    '''Convert latitude and longitude to an arbitrary projection point. 
+    
+    (x,y)=ll2proj(lon,lat,proj)
+    
+    where proj is either: 
+        <osgeo.osr.SpatialReference> object
+        Well Known Text (WKT)
+        Proj4
+        EPSG
+    
+    Assumes a WGS84 datum/spheroid for both
+    '''
+    if not gdalloaded:
+        raise ImportError("OSR not available")
+    
+    if proj==None:
+        raise TypeError("Must specify a projection")
+    
+    if type(proj)==str:
+        projWKT=proj
+        proj=osr.SpatialReference()
+        try:
+            proj.ImportFromWkt(projWKT)
+        except:
+            proj.ImportFromProj4(projWKT)
+            
+    if type(proj)==int:
+        projEPSG=proj
+        proj=osr.SpatialReference()
+        proj.ImportFromEPSG(projEPSG)
+    
+    # create a geographic reference in WGS84
+    geog_ref=osr.SpatialReference()
+    geog_ref.ImportFromEPSG(4326)
+    
+    # create a transfomration object between the two reference systems
+    transform=osr.CoordinateTransformation(geog_ref,proj)
+    # transform the input coordinates to lat lon
+    if points!=None:
+        data=np.array(transform.TransformPoints(points))
+        x=data[:,0]
+        y=data[:,1]
+    else:
+        x,y,z=transform.TransformPoint(lon,lat)
+        
+    return x,y
+
+
+
 def utm2ll(utmx,utmy,zone=13,north=1):
     '''Convert a given UTM point to latitude and longitude. 
     
@@ -147,7 +197,7 @@ def read_img(filename):
     else:
         raise ImportError("GDAL not available")
 
-def read_tiff(filename,xmin=None,xmax=None,ymin=None,ymax=None,bounds=None):
+def read_tiff(filename,xmin=0,xmax=None,ymin=0,ymax=None,bounds=None):
     '''read a GeoTIFF and return the data and geographic information
     
     output is a structure :
@@ -162,7 +212,13 @@ def read_tiff(filename,xmin=None,xmax=None,ymin=None,ymax=None,bounds=None):
         raise ImportError("GDAL not available")
 
     dataset = gdal.Open(filename, GDC.GA_ReadOnly)
-    data=dataset.ReadAsArray()
+    xsize=None
+    ysize=None
+    if xmax:
+        xsize=xmax-xmin+1
+    if ymax:
+        ysize=ymax-ymin+1
+    data=dataset.ReadAsArray(xoff=xmin,yoff=ymin,xsize=xsize,ysize=ysize)
     geo=dataset.GetGeoTransform()
     projWKT=dataset.GetProjection()
     proj=osr.SpatialReference()
