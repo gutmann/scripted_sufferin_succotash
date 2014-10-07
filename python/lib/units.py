@@ -25,7 +25,27 @@ def rtod(angle):
     return angle*360.0/(2*np.pi)
 def dtor(angle):
     return angle/360.0*(2*np.pi)
-    
+
+def exner(p):
+    """docstring for exner"""
+    Rd=287.058
+    cp=1003.5
+    p0=1000.0
+    try:
+        if p.max()>1200:
+            p0*=100.0
+    except:
+        if p>1200:
+            p0*=100.0
+            
+    return (p/p0)**(Rd/cp)
+
+def z2p(p,h):
+    '''Convert p [Pa] at elevation h [m] by shifting its elevation by dz [m]'''
+    # p    in pascals (or hPa or...)
+    # h    in meters
+    return p*(1 - 2.25577E-5*h)**5.25588
+
 def xy2a(x,y):
     '''
     convert an x,y coordinate to the angle to that coordinate (0-360)
@@ -66,12 +86,28 @@ def t2vp(t):
     T in degrees C or K'''
     if np.array(t).max()>150:
         tIsInK=True
-        t-=273.15
     else:
-        tIsInK=False
-    vp=6.112*np.exp(17.67*t/(t+243.5)) #*10**((7.5*t)/(237.7+t))
-    if tIsInK:
         t+=273.15
+        tIsInK=False
+    freezing=273.15
+    
+    if type(t)==np.ndarray:
+        a=np.zeros(t.shape)+17.2693882
+        b=np.zeros(t.shape)+35.86
+        a[np.where(t<freezing)]=21.8745584
+        b[np.where(t<freezing)]=7.66
+    else:
+        if (t<freezing):
+            a=21.8745584
+            b=7.66
+        else:
+            a=17.2693882
+            b=35.86
+    
+    vp = 6.1078* np.exp(a*(t-273.16)/(t-b)) #(hPa)
+    # vp=6.112*np.exp(17.67*t/(t+243.5)) #*10**((7.5*t)/(237.7+t))
+    if not tIsInK:
+        t-=273.15
     return vp
 
 def sh2rh(t,p,sh):
