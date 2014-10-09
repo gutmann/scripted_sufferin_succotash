@@ -117,7 +117,18 @@ def create_monthly(filename,template_file):
                 else:
                     f.write(monthly_function(file_base,y,m))
 
-def create_test_file(filename):
+def create_annual(filename,template_file):
+    """docstring for create_annual"""
+    # strip off the variable name at the beginning e.g. "hus_"
+    # and the date range from the end e.g. "_1996010100-1996013118.nc"
+    file_base="_".join(template_file.split("_")[1:-1])
+    file_base="__VARNAME___"+file_base
+    date_range="_{0}010100-{0}123118.nc\n"
+    with open(filename,"w") as f:
+        for y in range(start_year,end_year+1):
+            f.write(file_base+date_range.format(y))
+
+def create_test_file(filename,annual_ps):
     """docstring for create_test_file"""
     max_nfiles=0
     for v in var_list:
@@ -126,8 +137,12 @@ def create_test_file(filename):
             max_nfiles=len(curfiles)
             curfiles.sort()
             filelist=[f.replace(v,"__VARNAME__") for f in curfiles]
-    
-    if generate_monthly:
+    if annual_ps:
+        print("Creating an annual list")
+        tmpfile=filelist[0].replace("__VARNAME__",var_list[0])
+        create_annual(filename,tmpfile)
+    elif generate_monthly:
+        print("Creating a monthly list")
         tmpfile=filelist[0].replace("__VARNAME__",var_list[0])
         create_monthly(filename,tmpfile)
     else:
@@ -138,16 +153,22 @@ def create_test_file(filename):
     
     
 
-def make_complete_file_list(filename):
+def make_complete_file_list(filename,annual_ps):
     """create a file with all dates and variables"""
     complete_file=all_files
     if not glob.glob(filename):
-        create_test_file(filename)
+        print("Creating file...")
+        create_test_file(filename,annual_ps)
+    else:
+        print("Using existing file:"+filename)
     with open(filename,"rU") as f:
         fout=open(complete_file,"w")
         for l in f:
-            for v in var_list:
-                fout.write(l.replace("__VARNAME__",v))
+            if annual_ps:
+                fout.write(l.replace("__VARNAME__","ps"))
+            else:
+                for v in var_list:
+                    fout.write(l.replace("__VARNAME__",v))
         fout.close()
         
     return complete_file
@@ -198,7 +219,7 @@ def make_fill_file(filename):
     return filename+"_fill"
     
 
-def main(model="ccsm",experiment="historical",base=None,all_files=None, unique_filename=None, fill_missing=False):
+def main(model="ccsm",experiment="historical",base=None,all_files=None, unique_filename=None, fill_missing=False,annual_ps=False):
     """Set up an input file for wget"""
     print("""
              -----------------------------------------------------------------------
@@ -217,7 +238,7 @@ def main(model="ccsm",experiment="historical",base=None,all_files=None, unique_f
     
     if (unique_filename==None) and (not fill_missing):
         if all_files==None:
-            all_files=make_complete_file_list(base_filename)
+            all_files=make_complete_file_list(base_filename,annual_ps)
         unique_filename=make_unique(all_files)
     if (fill_missing==True):
         print("Filling")
@@ -257,6 +278,8 @@ if __name__ == '__main__':
                             default=False, dest="print_models",help="Print available internal model names.")
         parser.add_argument ('--verbose', action='store_true',
                 default=False, help='verbose output', dest='verbose')
+        parser.add_argument ('--annual_ps', action='store_true',
+                default=False, help='write ps files as annual', dest='annual_ps')
         args = parser.parse_args()
         
         if args.print_models:
@@ -268,7 +291,8 @@ if __name__ == '__main__':
                          base=args.base_filename,
                          all_files=args.all_files,
                          unique_filename=args.unique_file, 
-                         fill_missing=args.fill)
+                         fill_missing=args.fill,
+                         annual_ps=args.annual_ps)
         if exit_code is None:
             exit_code = 0
         sys.exit(exit_code)
