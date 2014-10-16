@@ -127,7 +127,8 @@ def load_data(filename,ncols=None):
                     del d # help the gc out, this could be a LOT of data ~20GB
                     d=newd
                     del newd
-                if (i%86400)
+                if ((i%864000)==0):
+                    print(dates[i])
                 d[i,:]=curdata
                 i+=1
         except:

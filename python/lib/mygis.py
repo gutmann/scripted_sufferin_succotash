@@ -21,7 +21,15 @@ try:
     gdalloaded=True
 except:
     gdalloaded=False
-from netCDF4 import Dataset
+
+NETCDF4="netCDF4"
+NIO="Nio"
+try:
+    from netCDF4 import Dataset
+    nclib=NETCDF4
+except ImportError:
+    import Nio
+    nclib=NIO
 
 from bunch import Bunch
 import numpy as np
@@ -330,6 +338,21 @@ def read_files(pattern,var="data",returnNCvar=False,axis=None):
         d=np.concatenate(d,axis=axis)
     return d
     
+def read_attr(filename,attribute_name):
+    """docstring for read_attr"""
+    if nclib==NETCDF4:
+        ncfile=Dataset(filename)
+        att_val=ncfile.getncattr(attribute_name)
+        ncfile.close()
+        
+    elif nclib==NIO:
+        ncfile=Nio.open_file(filename,format="nc")
+        att_val=ncfile.__dict__[attribute_name]
+        ncfile.close()
+    
+    return att_val
+        
+    
 
 def read_nc(filesearch,var="data",proj=None,returnNCvar=False):
     '''read a netCDF file and return the specified variable
@@ -345,7 +368,10 @@ def read_nc(filesearch,var="data",proj=None,returnNCvar=False):
     filename=glob.glob(filesearch)[0]
     if not filename: 
         print(filesearch)
-    d=Dataset(filename, mode='r',format="NETCDF4")
+    if nclib==NETCDF4:
+        d=Dataset(filename, mode='r',format="NETCDF4")
+    else:
+        d=Nio.open_file(filename,format="nc")
     outputdata=None
     if var != None:
         data=d.variables[var]
@@ -487,6 +513,10 @@ def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes
             attribues: bunch/dictionary with key/values pairs to be added as attributes
     """
     history = 'Created : ' + time.ctime() +'\nusing simple io.write by:'+os.environ['USER']+"  "+history
+    if nclib==NIO:
+        return _write_nio(filename,data,dtype,varname,dims,units,attributes,lat,lon,extravars,history,global_attributes)
+    
+    
     NCfile=Dataset(filename,mode="w",format="NETCDF4")#,history=history)
     if len(data.shape)==1:
         if dims==None:
@@ -530,6 +560,29 @@ def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes
                 NCfile.__setattr__(k,global_attributes[k])
     else:
         NCfile.history=history
+    NCfile.close()
+
+    
+def _write_nio(filename,data,dtype,varname,dims,units,attributes,lat,lon,extravars,history,global_attributes):
+    NCfile=Nio.open_file(filename,mode="w",format="nc",history=history)
+    
+    for n,dim in zip(data.shape,dims):
+        NCfile.create_dimension(dim, n)
+    NCfile.create_variable(varname,dtype,dims)
+    NCfile.variables[varname][:]=data.astype(dtype)
+    
+    if extravars:
+        for e in extravars:
+            _nio_addvar(NCfile,e.data,e.name,e.dims,e.dtype,e.attributes)
+
+    if global_attributes!=None:
+        for k in global_attributes.keys():
+            # if k=="history":
+            #     NCfile.__setattr__(k,history+global_attributes[k])
+            # else:
+            NCfile.__setattr__(k,global_attributes[k])
+    
+    
     NCfile.close()
 
 
