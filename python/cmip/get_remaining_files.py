@@ -5,7 +5,7 @@ import glob
 
 all_files="wget_complete"
 base_filename="wget_example"
-var_list=["hus","ta","va","ua"]#,"ps"] #WARNING: not clear how to get ps data, in most cases these all downloaded, or can be read from another file?
+var_list=["hus","ta","va","ua","ps"] #WARNING: not clear how to get ps data, in most cases these all downloaded, or can be read from another file?
 
 hist_urls=dict(ccsm="http://tds.ucar.edu/thredds/fileServer/datazone/cmip5_data/cmip5/output1/"
                 +"NCAR/CCSM4/historical/6hr/atmos/6hrLev/r6i1p1/v20121031/__VAR__/__NCFILE__",
@@ -27,13 +27,18 @@ rcp85_urls=dict(ccsm="http://tds.ucar.edu/thredds/fileServer/datazone/cmip5_data
                 miroc_esm="http://dias-esg-nd.tkl.iis.u-tokyo.ac.jp/thredds/fileServer/esg_dataroot/outgoing/output1/"
                 +"MIROC/MIROC-ESM/rcp85/6hr/atmos/6hrLev/r1i1p1/v20111129/__VAR__/__NCFILE__",
                 miroc="http://dias-esg-nd.tkl.iis.u-tokyo.ac.jp/thredds/fileServer/esg_dataroot/outgoing/output1/"
-                +"MIROC/MIROC5/rcp85/6hr/atmos/6hrLev/r1i1p1/v20111124/__VAR__/__NCFILE__")
+                +"MIROC/MIROC5/rcp85/6hr/atmos/6hrLev/r1i1p1/v20111124/__VAR__/__NCFILE__",
+                cnrm="http://esg.cnrm-game-meteo.fr/thredds/fileServer/esg_dataroot5/CMIP5/output1/"
+                +"CNRM-CERFACS/CNRM-CM5/rcp85/6hr/atmos/6hrLev/r1i1p1/v20120525/__VAR__/__NCFILE__",
+                hadgem="http://cmip-dn1.badc.rl.ac.uk/thredds/fileServer/esg_dataroot/cmip5/output1/"
+                +"MOHC/HadGEM2-ES/rcp85/6hr/atmos/6hrLev/r1i1p1/v20101208/__VAR__/__NCFILE__")
+
 all_urls=dict(historical=hist_urls,rcp85=rcp85_urls)
 hist_monthly_req =dict(ccsm=False,cnrm=False,miroc=True,mri_cgcm3=False,miroc_esm=False,bcc=False)
-rcp85_monthly_req=dict(ccsm=False,cnrm=False,miroc=True,mri_cgcm3=True, miroc_esm=True,bcc=False)
+rcp85_monthly_req=dict(ccsm=False,cnrm=True,miroc=True,mri_cgcm3=True, miroc_esm=True,bcc=False,hadgem=False)
 
 Gregorian_object=None #Should be a class that responds to __getitem__(Year,Month) with ndays... or something like that
-calendar=dict(ccsm="noleap",cnrm="noleap",miroc="noleap",miroc_esm="gregorian",mri_cgcm3="gregorian",bcc="noleap")
+calendar=dict(ccsm="noleap",cnrm="noleap",miroc="noleap",miroc_esm="gregorian",mri_cgcm3="gregorian",bcc="noleap",hadgem="day360")
 days_per_month=dict(noleap=[31,28,31,30,31,30,31,31,30,31,30,31],
                    day360=[30]*12,
                    gregorian=Gregorian_object)
@@ -74,7 +79,7 @@ def global_setup(model="ccsm",experiment="historial"):
     global monthly_req
     global urls, base_url
     global dpm, generate_monthly
-    global start_year, end_year
+    global start_year, end_year, monthly_function
     
     monthly_req=dict(historical=hist_monthly_req,rcp85=rcp85_monthly_req)[experiment]
 
@@ -82,6 +87,8 @@ def global_setup(model="ccsm",experiment="historial"):
     base_url=urls[model]
 
     dpm=days_per_month[calendar[model]]
+    if model=="cnrm" and experiment=="rcp85":
+        dpm=None
     generate_monthly=monthly_req[model]
 
     if experiment=="historical":
@@ -93,7 +100,8 @@ def global_setup(model="ccsm",experiment="historial"):
     
     monthly_function=dict(mri_cgcm3=zed_2_18_month_based_filename,
                            miroc_esm=six_2_zed_month_based_filename,
-                           miroc=None,ccsm=None,cnrm=None,bcc=None)[model]
+                           cnrm=six_2_zed_month_based_filename,
+                           miroc=None,ccsm=None,bcc=None,hadgem=None)[model]
 
 
 def create_monthly(filename,template_file):

@@ -6,14 +6,11 @@ import copy
 import time
 
 import numpy as np
-import nio
+# import nio
 import netCDF4
 
 import regrid_hi2low
 from bunch import Bunch
-# process_var="tasmin"
-process_var="tasmax"
-# process_var="pr"
 
 meta=Bunch(title="WRF regridded to low-resolution projection",
     creator=os.environ['USER']+" using wrf_agg2obs.py",
@@ -26,7 +23,8 @@ samplefile="/glade/p/work/mizukami/usbr/original/downscaled/domain_UCO_12k.nc"
 
 def read_base(filename):
     """Read all variable names attibutes dimensions..."""
-    f=nio.open_file(filename,mode="r")
+    # f=nio.open_file(filename,mode="r")
+    f=netCDF4.Dataset(filename,mode="r")
     output=Bunch()
 
     variables=Bunch()
@@ -66,7 +64,8 @@ def read_geo(filename):
 
 def write_data(filename,data,base,geo,inputtimes=None,fillvalue=-9999):
     """Write data to filename with attributes from base and lat-lon from geo"""
-    of=nio.open_file(filename,mode='w',format="nc")
+    # of=nio.open_file(filename,mode='w',format="nc")
+    of=netCDF4.Dataset(filename,mode='w',format="nc")
     of.title=meta.title
     of.creator=meta.creator
     of.creation_date=time.ctime()
@@ -127,14 +126,16 @@ def write_data(filename,data,base,geo,inputtimes=None,fillvalue=-9999):
     
 def read_obs(filename,var="pr"):
     """read a variable from a net cdf file"""
-    f=nio.open_file(filename,mode="r")
+    # f=nio.open_file(filename,mode="r")
+    f=netCDF4.Dataset(filename,mode="r")
     data=f.variables[var][:]
     f.close()
     return data
 
 def read_wrf(filename,var="pr"):
     """read a variable from a net cdf file"""
-    f=nio.open_file(filename,mode="r")
+    # f=nio.open_file(filename,mode="r")
+    f=netCDF4.Dataset(filename,mode="r")
     data=f.variables[var][:]
     f.close()
     return data
@@ -198,6 +199,10 @@ def add_a_buffer(geo,buffersize):
     
 
 def main(root_dir=None,var=None,filesearch=None):
+    # WRF hourly 4km files should be in : 
+    # /glade/p/ral/RHAP/asd000/HW2010.2/
+    #      pgw/wrfout/wrfout*
+    #      ctrl/wrfout/wrfout*
     wrffilesearch="*.nc"
     if var==None:
         var=var_list
