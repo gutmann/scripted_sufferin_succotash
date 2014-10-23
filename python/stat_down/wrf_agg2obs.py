@@ -6,7 +6,7 @@ import copy
 import time
 
 import numpy as np
-# import nio
+import nio
 import netCDF4
 
 import regrid_hi2low
@@ -18,13 +18,15 @@ meta=Bunch(title="WRF regridded to low-resolution projection",
 
 # var_list=["Q2","RAINNC"]#,"T2","PSFC","U10","V10","SWDOWN","GLW"]
 var_list=["Q2","RAINNC","T2","PSFC","U10","V10","SWDOWN","GLW"]
-samplefile="/glade/p/work/mizukami/usbr/original/downscaled/domain_UCO_12k.nc"
+# samplefile="/glade/p/work/mizukami/usbr/original/downscaled/domain_UCO_12k.nc"
+# samplefile="/d3/mizukami/domain_huc/domain_UCO_12k.nc"
+samplefile="/glade/scratch/gutmann/usbr/domain_UCO_12k.nc"
 
 
 def read_base(filename):
     """Read all variable names attibutes dimensions..."""
-    # f=nio.open_file(filename,mode="r")
-    f=netCDF4.Dataset(filename,mode="r")
+    f=nio.open_file(filename,mode="r")
+    # f=netCDF4.Dataset(filename,mode="r")
     output=Bunch()
 
     variables=Bunch()
@@ -64,8 +66,8 @@ def read_geo(filename):
 
 def write_data(filename,data,base,geo,inputtimes=None,fillvalue=-9999):
     """Write data to filename with attributes from base and lat-lon from geo"""
-    # of=nio.open_file(filename,mode='w',format="nc")
-    of=netCDF4.Dataset(filename,mode='w',format="nc")
+    of=nio.open_file(filename,mode='w',format="nc")
+    # of=netCDF4.Dataset(filename,mode='w',format="nc")
     of.title=meta.title
     of.creator=meta.creator
     of.creation_date=time.ctime()
@@ -126,16 +128,16 @@ def write_data(filename,data,base,geo,inputtimes=None,fillvalue=-9999):
     
 def read_obs(filename,var="pr"):
     """read a variable from a net cdf file"""
-    # f=nio.open_file(filename,mode="r")
-    f=netCDF4.Dataset(filename,mode="r")
+    f=nio.open_file(filename,mode="r")
+    # f=netCDF4.Dataset(filename,mode="r")
     data=f.variables[var][:]
     f.close()
     return data
 
 def read_wrf(filename,var="pr"):
     """read a variable from a net cdf file"""
-    # f=nio.open_file(filename,mode="r")
-    f=netCDF4.Dataset(filename,mode="r")
+    f=nio.open_file(filename,mode="r")
+    # f=netCDF4.Dataset(filename,mode="r")
     data=f.variables[var][:]
     f.close()
     return data

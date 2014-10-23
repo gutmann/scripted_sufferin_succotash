@@ -1,5 +1,6 @@
 '''The main external function is regrid, at the bottom'''
 import numpy as np
+from bunch import Bunch
 
 def bilin_weights(yi,y,xi,x):
     '''Compute the bilinear weights for points surrounding xi,yi'''
@@ -21,6 +22,10 @@ def load_geoLUT(lat1,lon1,lat2,lon2,subset=None):
         lat2/lon2 = high resolution output grid
     '''
     # (lon2,lat2)=read_geo_latlon(georef,subset=subset)
+    if len(lat1.shape)==1:
+        lon1,lat1=np.meshgrid(lon1,lat1)
+    if len(lat2.shape)==1:
+        lon2,lat2=np.meshgrid(lon2,lat2)
     N=lat2.shape
     Nhi=lat1.shape
     # output data
@@ -111,7 +116,7 @@ def load_geoLUT(lat1,lon1,lat2,lon2,subset=None):
             geoLUT[j,i,:,2]=weights
     return geoLUT
     
-def regrid(data,lat1,lon1,lat2,lon2,geoLUT=None,ymin=0,xmin=0):
+def regrid(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,ymin=0,xmin=0):
     '''Regrid a dataset from the lat1,lon1 grid to the lat2,lon2 grid
     
     data: low resolution data to be regridded
@@ -128,7 +133,7 @@ def regrid(data,lat1,lon1,lat2,lon2,geoLUT=None,ymin=0,xmin=0):
     '''
 
     # if we weren't given a Geographic Look up table, create it now
-    if not geoLUT:
+    if geoLUT==None:
         # if lat lon are linear instead of gridded, make them into grids
         if len(lat1.shape)==1:
             (lon1,lat1)=np.meshgrid(lon1,lat1)
@@ -146,3 +151,126 @@ def regrid(data,lat1,lon1,lat2,lon2,geoLUT=None,ymin=0,xmin=0):
         x=geoLUT[:,:,i,1].astype('i')-xmin
         outputdata+=np.float32(data[:,y,x]*geoLUT[np.newaxis,:,:,i,2])
     return outputdata
+
+def get_geometry(z):
+    """docstring for get_geometry"""
+    if z[0]>z[-1]:
+        return Bunch(bottom=len(z)-1,top=0,step=-1)
+    else:
+        return Bunch(bottom=0,top=len(z)-1,step=1)
+        
+
+def vLUT_1d_to_1d(inputz,outputz,geom_in=None,geom_out=None):
+    """docstring for vLUT_1d_to_1d"""
+    
+    outputLUT=np.zeros((outputz.shape[0],3)) # 3 elements are point 1, point2, weight for point1 (w2=1-w1)
+    
+    if geom_in==None:
+        geom_in=get_geometry(inputz)
+    if geom_out==None:
+        geom_out=get_geometry(outputz)
+        
+    for i in range(geom_out.bottom,geom_out.top+geom_out.step,geom_out.step):
+        curz=outputz[i]
+        if inputz[geom_in.bottom]>=curz:
+            outputLUT[i,:]=np.array([geom_in.bottom,0,1.0])
+        elif inputz[geom_in.top]<=curz:
+            outputLUT[i,:]=np.array([geom_in.top,0,1.0])
+        else:
+            for z in range(geom_in.bottom,geom_in.top,geom_in.step):
+                nextz=z+geom_in.step
+                if inputz[nextz]>curz:
+                    weight=1-(curz-inputz[z])/(inputz[nextz]-inputz[z])
+                    outputLUT[i,:]=np.array([z,nextz,weight])
+                    break
+                    
+    return outputLUT
+
+def vLUT_1d_to_3d(inputz,outputz):
+    outputshape=np.zeros(4)
+    outputshape[:3]=outputz.shape
+    outputshape[3]=3
+    outputLUT=np.zeros(outputshape)
+    
+    for i in range(outputz.shape[1]):
+        for j in range(outputz.shape[2]):
+            outputLUT[:,i,j,:]=vLUT_1d_to_1d(inputz,outputz[:,i,j])
+    
+    return outputLUT
+
+def vLUT_3d_to_3d(inputz,outputz):
+    for i in range(1,3):
+        if inputz.shape[i]!=outputz.shape[i]:
+            raise ValueError("Shapes must match in last two dimensions.")
+            
+    outputshape=np.zeros(4)
+    outputshape[:3]=outputz.shape
+    outputshape[3]=3
+    outputLUT=np.zeros(outputshape)
+    
+    for i in range(outputz.shape[1]):
+        for j in range(outputz.shape[2]):
+            outputLUT[:,i,j,:]=vLUT_1d_to_1d(inputz[:,i,j],outputz[:,i,j])
+    
+    return outputLUT
+    
+        
+def load_vLUT(inputz,outputz):
+    """docstring for load_vLUT"""
+    if len(inputz.shape)==1:
+        if len(outputz.shape)==3:
+            return vLUT_1d_to_3d(inputz,outputz)
+        if len(outputz.shape)==1:
+            return vLUT_1d_to_1d(inputz,outputz)
+
+    if len(inputz.shape)==3:
+        if len(outputz.shape)==3:
+            return vLUT_3d_to_3d(inputz,outputz)
+    
+    else:
+        raise ValueError("Invalid dimensions (valid dimensionality:1D->1D, 1D->3D, 3D->3D)")
+
+
+def vinterp(data,inputz=None,outputz=None,vLUT=None):
+    """docstring for vinterp(era_on_gcm_grid,vLUT=pLUT)"""
+    if vLUT==None:
+        vLUT=load_vLUT(inputz,outputz)
+        
+    if len(vLUT.shape)==4:
+        outputdata=np.zeros(vLUT.shape[:-1])
+        nz,ny,nx=outputdata.shape
+        for k in range(nz):
+            for i in range(ny):
+                for j in range(nx):
+                    z1=vLUT[k,i,j,0]
+                    z2=vLUT[k,i,j,1]
+                    w=vLUT[k,i,j,2]
+                    outputdata[k,i,j]=data[z1,i,j]*w+data[z2,i,j]*(1-w)
+                    
+    elif len(vLUT.shape)==2:
+        if len(data.shape)==3:
+            outputdata=np.zeros((vLUT.shape[0],data.shape[1],data.shape[2]))
+            nz,ny,nx=outputdata.shape
+            for k in range(nz):
+                for i in range(ny):
+                    for j in range(nx):
+                        z1=vLUT[k,0]
+                        z2=vLUT[k,1]
+                        w=vLUT[k,2]
+                        outputdata[k,i,j]=data[z1,i,j]*w+data[z2,i,j]*(1-w)
+        if len(data.shape)==1:
+            outputdata=np.zeros(vLUT.shape[0])
+            nz=outputdata.shape
+            for k in range(nz):
+                z1=vLUT[k,0]
+                z2=vLUT[k,1]
+                w=vLUT[k,2]
+                outputdata[k]=data[z1]*w+data[z2]*(1-w)
+            
+    else:
+        raise ValueError("Invalid vLUT dimensions 1D or 3D only")
+    
+    
+    return outputdata
+    
+    

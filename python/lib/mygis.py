@@ -380,7 +380,10 @@ def read_nc(filesearch,var="data",proj=None,returnNCvar=False):
             outputdata=data
         else:
             if len(data.shape)==0:
-                outputdata=data.get_value()
+                if nclib==NIO:
+                    outputdata=data.get_value()
+                else:
+                    outputdata=data[:]
             else:
                 outputdata=data[:]
     outputproj=None
@@ -395,66 +398,12 @@ def read_nc(filesearch,var="data",proj=None,returnNCvar=False):
     return Bunch(data=outputdata,proj=outputproj,atts=attributes)
 
 
-def _write1d(NCfile,data,varname="data",units=None,dtype='f',dims=('x',),attributes=None):
-    nx=data.size
-    NCfile.createDimension(dims[0], nx)
-    try:
-        fill_value=attributes["_FillValue"]
-    except:
-        fill_value=None
-    NCfile.createVariable(varname,dtype,dims,fill_value=fill_value)
-    NCfile.variables[varname][:]=data.astype(dtype)
-    if units!=None:
-        NCfile.variables[varname].units=units
-    if attributes:
-        for k in attributes.keys():
-            if k!="_FillValue":
-                NCfile.variables[varname].__setattr__(k,attributes[k])
-
-def _write2d(NCfile,data,varname="data",units=None,dtype='f',dims=('y','x'),attributes=None):
-    (ny,nx)=data.shape
-    if dims[0]=="time":ny=0
-    NCfile.createDimension(dims[1], nx)
-    NCfile.createDimension(dims[0], ny)
-    try:
-        fill_value=attributes["_FillValue"]
-    except:
-        fill_value=None
-    NCfile.createVariable(varname,dtype,dims,fill_value=fill_value)
-    NCfile.variables[varname][:]=data.astype(dtype)
-    if units!=None:
-        NCfile.variables[varname].units=units
-    if attributes:
-        for k in attributes.keys():
-            if k!="_FillValue":
-                NCfile.variables[varname].__setattr__(k,attributes[k])
-
-def _write3d(NCfile,data,varname="data",units=None,dtype='f',dims=('z','y','x'),attributes=None):
-    (nz,ny,nx)=data.shape
-    if dims[0]=="time":nz=0
-    NCfile.createDimension(dims[2], nx)
-    NCfile.createDimension(dims[1], ny)
-    NCfile.createDimension(dims[0], nz)
-    try:
-        fill_value=attributes["_FillValue"]
-    except:
-        fill_value=None
-    NCfile.createVariable(varname,dtype,dims,fill_value=fill_value)
-    NCfile.variables[varname][:]=data.astype(dtype)
-    if units!=None:
-        NCfile.variables[varname].units=units
-    if attributes:
-        for k in attributes.keys():
-            if k!="_FillValue":
-                NCfile.variables[varname].__setattr__(k,attributes[k])
-
-def _write4d(NCfile,data,varname="data",units=None,dtype='f',dims=('t','z','y','x'),attributes=None):
-    (nt,nz,ny,nx)=data.shape
-    if dims[0]=="time":nt=0
-    NCfile.createDimension(dims[3], nx)
-    NCfile.createDimension(dims[2], ny)
-    NCfile.createDimension(dims[1], nz)
-    NCfile.createDimension(dims[0], nt)
+def _write_one_var(NCfile,data,varname="data",units=None,dtype='f',dims=('t','z','y','x'),attributes=None):
+    dimlen=list(data.shape)
+    if dims[0]=="time":dimlen[0]=0
+    dimlen=tuple(dimlen)
+    for n,dim in zip(dimlen,dims):
+        NCfile.createDimension(dim, n)
     try:
         fill_value=attributes["_FillValue"]
     except:
@@ -513,35 +462,34 @@ def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes
             attribues: bunch/dictionary with key/values pairs to be added as attributes
     """
     history = 'Created : ' + time.ctime() +'\nusing simple io.write by:'+os.environ['USER']+"  "+history
+    
+    
+    if dims==None:
+        if len(data.shape)==1:
+            dims=('x',)
+        if len(data.shape)==2:
+            dims=('y','x')
+        if len(data.shape)==3:
+            dims=('z','y','x')
+        if len(data.shape)==4:
+            dims=('t','z','y','x')
+        if len(data.shape)>4:
+            dims=tuple([chr(dimname) for dimname in range(97,97+len(data.shape))])
     if nclib==NIO:
         return _write_nio(filename,data,dtype,varname,dims,units,attributes,lat,lon,extravars,history,global_attributes)
-    
-    
-    NCfile=Dataset(filename,mode="w",format="NETCDF4")#,history=history)
-    if len(data.shape)==1:
-        if dims==None:
-           dims=('x',)
-        _write1d(NCfile,data,varname=varname,units=units,dtype=dtype,dims=dims,attributes=attributes)
-    if len(data.shape)==2:
-        if dims==None:
-           dims=('y','x')
-        _write2d(NCfile,data,varname=varname,units=units,dtype=dtype,dims=dims,attributes=attributes)
-    if len(data.shape)==3:
-        if dims==None:
-           dims=('z','y','x')
-        _write3d(NCfile,data,varname=varname,units=units,dtype=dtype,dims=dims,attributes=attributes)
-    if len(data.shape)==4:
-        if dims==None:
-           dims=('t','z','y','x')
-        _write4d(NCfile,data,varname=varname,units=units,dtype=dtype,dims=dims,attributes=attributes)
+    else:
+        NCfile=Dataset(filename,mode="w",format="NETCDF4")
+        _write_one_var(NCfile,data,varname=varname,units=units,dtype=dtype,dims=dims,attributes=attributes)
     
     if lat!=None:
+        print("WARNING: explicitly passing lat is deprecated, use extravars")
         if len(lat.shape)>1:
             NCfile.createVariable("lat",'f',(dims[-2],dims[-1]))
         else:
             NCfile.createVariable("lat",'f',(dims[-2],))
         NCfile.variables["lat"][:]=lat.astype('f')
     if lon!=None:
+        print("WARNING: explicitly passing lon is deprecated, use extravars")
         if len(lon.shape)>1:
             NCfile.createVariable("lon",'f',(dims[-2],dims[-1]))
         else:
@@ -577,9 +525,6 @@ def _write_nio(filename,data,dtype,varname,dims,units,attributes,lat,lon,extrava
 
     if global_attributes!=None:
         for k in global_attributes.keys():
-            # if k=="history":
-            #     NCfile.__setattr__(k,history+global_attributes[k])
-            # else:
             NCfile.__setattr__(k,global_attributes[k])
     
     
