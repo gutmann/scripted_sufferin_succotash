@@ -2,7 +2,7 @@
 import numpy as np
 from bunch import Bunch
 
-def bilin_weights(yi,y,xi,x):
+def bilin_weights(yi,y,xi,x,mask=None,xj=None,yj=None,case=None):
     '''Compute the bilinear weights for points surrounding xi,yi'''
     x0=np.abs((xi-x[0])/(x[1]-x[0]))
     x1=1-x0 # equivalent to np.abs((xi-x[1])/(x[1]-x[0]))
@@ -10,17 +10,36 @@ def bilin_weights(yi,y,xi,x):
     x3=1-x2 # equivalent to np.abs((xi-x[3])/(x[3]-x[2]))
     y5=y[0]*x1+y[1]*x0
     y6=y[2]*x3+y[3]*x2
+    if (y6-y5)==0:
+        raise ValueError("Divide by zero, increase window size")
+        # print(y)
+        # print(x1,x0,x3,x2)
+        # print(x)
+        # print(yi,xi)
+        # print(xj,yj)
+        # print(case)
+        # print("-"*20)
+        
     f1=(yi-y5)/(y6-y5)
     f2=1-f1# equivalent to (y6-yi)/(y6-y5)
-    return np.array([x1*f2,x0*f2,x3*f1,x2*f1])
+    if mask==None:
+        return np.array([x1*f2,x0*f2,x3*f1,x2*f1])
+    else:
+        weights=np.array([x1*f2,x0*f2,x3*f1,x2*f1])
+        weights[mask]=0
+        if weights.max()>0:
+            goodpoints=weights>0
+            weights[goodpoints]/=np.sum(weights[goodpoints])
+        return weights
 
-def load_geoLUT(lat1,lon1,lat2,lon2,subset=None):
+def load_geoLUT(lat1,lon1,lat2,lon2,subset=None,mask=None,winhalfsize=5):
     '''Create a Geographic Look Up Table
     
     lat/lon inputs should be grids of latitude and longitude
         lat1/lon1 = low resolution input grid
         lat2/lon2 = high resolution output grid
     '''
+    # winhalfsize=7 # search window for next data point 5 is faster, but 7 is safer - one case failed on 5
     # (lon2,lat2)=read_geo_latlon(georef,subset=subset)
     if len(lat1.shape)==1:
         lon1,lat1=np.meshgrid(lon1,lat1)
@@ -34,7 +53,6 @@ def load_geoLUT(lat1,lon1,lat2,lon2,subset=None):
     # intermediate variables
     x=np.zeros(4).astype('i')
     y=np.zeros(4).astype('i')
-    winhalfsize=5 # search window for next data point
     
     # figure out which direction is positive in latitude and longitude (just in case)
     dxinc=np.sign(lon1[1,1]-lon1[0,0]).astype('i')
@@ -86,6 +104,7 @@ def load_geoLUT(lat1,lon1,lat2,lon2,subset=None):
                     y[1]=newy
                     y[2]=max(min(newy+dyinc,winsz[0]-1),0)
                     y[3]=max(min(newy+dyinc,winsz[0]-1),0)
+                    case=0
                 else:
                     x[1]=max(min(newx-dxinc,winsz[1]-1),0)
                     x[2]=newx
@@ -93,6 +112,7 @@ def load_geoLUT(lat1,lon1,lat2,lon2,subset=None):
                     y[1]=newy
                     y[2]=max(min(newy+dyinc,winsz[0]-1),0)
                     y[3]=max(min(newy+dyinc,winsz[0]-1),0)
+                    case=1
             else:
                 if lonwin[newy,newx]<lon2[j,i]:
                     x[1]=max(min(newx+dxinc,winsz[1]-1),0)
@@ -101,6 +121,7 @@ def load_geoLUT(lat1,lon1,lat2,lon2,subset=None):
                     y[1]=newy
                     y[2]=max(min(newy-dyinc,winsz[0]-1),0)
                     y[3]=max(min(newy-dyinc,winsz[0]-1),0)
+                    case=2
                 else:
                     x[1]=max(min(newx-dxinc,winsz[1]-1),0)
                     x[2]=newx
@@ -108,15 +129,19 @@ def load_geoLUT(lat1,lon1,lat2,lon2,subset=None):
                     y[1]=newy
                     y[2]=max(min(newy-dyinc,winsz[0]-1),0)
                     y[3]=max(min(newy-dyinc,winsz[0]-1),0)
+                    case=3
             # finally compute the weights for each of the four surrounding points for a bilinear interpolation
-            weights=bilin_weights(lat2[j,i],latwin[y,x],lon2[j,i],lonwin[y,x])
+            if mask!=None:
+                weights=bilin_weights(lat2[j,i],latwin[y,x],lon2[j,i],lonwin[y,x],mask=mask[y+y0,x+x0],xj=x,yj=y,case=case)
+            else:
+                weights=bilin_weights(lat2[j,i],latwin[y,x],lon2[j,i],lonwin[y,x])
             # store the current results in the output array
             geoLUT[j,i,:,0]=y+y0
             geoLUT[j,i,:,1]=x+x0
             geoLUT[j,i,:,2]=weights
     return geoLUT
     
-def regrid(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,ymin=0,xmin=0):
+def regrid(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,ymin=0,xmin=0,output_geoLUT=False,missing=None):
     '''Regrid a dataset from the lat1,lon1 grid to the lat2,lon2 grid
     
     data: low resolution data to be regridded
@@ -131,6 +156,10 @@ def regrid(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,ymin=0,xmin=
         if the output grid is too short, process it in N time slices.  
         Calculate geoLUT first and pass it on each iteration to save time
     '''
+    if missing!=None:
+        mask=data[0,...]==missing
+    else:
+        mask=None
 
     # if we weren't given a Geographic Look up table, create it now
     if geoLUT==None:
@@ -139,8 +168,8 @@ def regrid(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,ymin=0,xmin=
             (lon1,lat1)=np.meshgrid(lon1,lat1)
         if len(lat2.shape)==1:
             (lon2,lat2)=np.meshgrid(lon2,lat2)
-        geoLUT=load_geoLUT(lat1,lon1,lat2,lon2)
-    
+        geoLUT=load_geoLUT(lat1,lon1,lat2,lon2,mask=mask)
+        
     # set up the output dataset 
     # WARNING: this could be HUGE, you may want to process the data in chunks so it will fit in memory
     outputdata=np.zeros((data.shape[0],geoLUT.shape[0],geoLUT.shape[1]),dtype=np.float32)
@@ -150,7 +179,11 @@ def regrid(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,ymin=0,xmin=
         y=geoLUT[:,:,i,0].astype('i')-ymin
         x=geoLUT[:,:,i,1].astype('i')-xmin
         outputdata+=np.float32(data[:,y,x]*geoLUT[np.newaxis,:,:,i,2])
-    return outputdata
+    
+    if output_geoLUT:
+        return outputdata,geoLUT
+    else:
+        return outputdata
 
 def get_geometry(z):
     """docstring for get_geometry"""

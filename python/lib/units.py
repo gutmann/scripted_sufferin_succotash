@@ -7,13 +7,17 @@ converts between various formulations of atmospheric humidity
     specific humidity (sh)
     relative humidity (rh)
     dewpoint (dp)
-
+    
+    calculate saturated vapor pressure from a temperature
+    
     xy2a = convert x,y point (or u/v vector) to the corresponding angle (0,0) to (x,y)
-
-    for atmospheric (LOP/SWIM) purposes can compute lifting condensation level (LCL) 
+    
+    Various utilities to calculate elevation as a function of pressure, temperature, humidity, and sea level pressure
+    
+    for atmospheric purposes can compute lifting condensation level (LCL) 
     and the temperature at the LCL
 
-    could also add
+    could also explicitly add
     vapor pressure (vp)
 
 Created by Ethan Gutmann on 2011-08-15.
@@ -40,11 +44,225 @@ def exner(p):
             
     return (p/p0)**(Rd/cp)
 
+# def p2z(p,t,p0=101325.0):
+#     '''Calculate elevation [m] for a given pressure [Pa] and column mean temperature [K],
+#         and optionally sea level pressure (p0 [Pa])
+#
+#         Based off Babinet's Formula (doesn't seem to work.)
+#         '''
+#     z=np.zeros(p.shape)
+#
+#     z[0,...]=(16000.0+64.0*t[0,...])*(p0-p[0,...])/(p0+p[0,...]) #Babinet's Formula
+#     for i in range(1,z.shape[0]):
+#         p0=p[i-1,...]
+#         z[i,...]=(16000.0+64.0*t[i,...])*(p0-p[i,...])/(p0+p[i,...])+z[i-1,...] #Babinet's Formula
+#
+#     return z
+
+def calc_tv(t,mr=None,e=None,p=None):
+    '''calculate the virtual temperature
+    
+    Uses a real temperature and mixing ratio or (vapor pressure and barometric pressure)
+    
+    t [=] K
+    mr[=] kg/kg
+    e [=] any (same as p)
+    p [=] any (same as e)
+    '''
+    # from http://en.wikipedia.org/wiki/Virtual_temperature
+    RoR = 0.622 # Rdry / Rvapor
+    
+    # if mixing ratio was specified:
+    if mr!=None: 
+        return t*(mr+RoR)/(RoR*(1+mr))
+    # if vapor pressure and barometric pressure were given:
+    if (e!=None) and (p!=None):
+        T/(1-e/p*(1-RoR))
+
+def calc_z(slp,p,t,mr):
+    """Calculate geopotential height [m] from a 3D atm field and sea level pressure
+    the 3D fields must include pressure, temperature, and humidity.
+
+    slp = sea level pressure    [Pa]
+    p   = 3D pressure field     [Pa]
+    ta  = 3D temperature field  [K]
+    hus = 3D specific humidity  [kg/kg]
+
+    returns z = 3D geopotential height field [m]
+    
+    based off WMO CIMO guide: http://www.wmo.int/pages/prog/www/IMOP/CIMO-Guide.html
+                    Part I Chapter 3
+    """
+    tv=calc_tv(t,mr=mr)
+    Kp = 0.0148275 # K / gpm
+    if len(tv.shape)<=2:
+        return tv*np.log10(slp/p)/Kp
+
+    z=np.zeros(tv.shape)
+    z[0]=tv[0]*np.log10(slp/p[0])/Kp
+    for i in range(1,z.shape[0]):
+        z[i]=(tv[i]+tv[i-1])/2  * np.log10(p[i-1]/p[i])/Kp + z[i-1]
+    return z
+
+
 def z2p(p,h):
     '''Convert p [Pa] at elevation h [m] by shifting its elevation by dz [m]'''
     # p    in pascals (or hPa or...)
     # h    in meters
     return p*(1 - 2.25577E-5*h)**5.25588
+
+def zt2p(z,p0=101325.0,t0=288.15,dtdz= -0.0065):
+    # p0=101325    #Pa
+    # t0=288.15   #K
+    # dtdz= -0.0065 #K/m
+    g=9.807
+    M=0.029
+    R=8.314
+    if len(t0.shape)==3:
+        p= p0*(t0/(t0+dtdz*z))**((g*M)/(R*dtdz))
+    else:
+        p=np.zeros(t0.shape)
+        for i in range(t0.shape[1]):
+            p[:,i,...]=p0*(t0[:,i,...]/(t0[:,i,...]+dtdz*z[:,i,...]))**((g*M)/(R*dtdz))
+    
+    return p
+    
+# def calc_z(slp,p,t,hus):
+#     """Calculate geopotential height [m] from a 3D atm field and sea level pressure
+#     the 3D fields must include pressure, temperature, and humidity.
+#
+#     slp = sea level pressure    [Pa]
+#     p   = 3D pressure field     [Pa]
+#     ta  = 3D temperature field  [K]
+#     hus = 3D specific humidity  [kg/kg]
+#
+#     returns z = 3D geopotential height field [m]
+#
+#     Based off equation found on http://www.meteormetrics.com/correctiontosealevel.htm
+#     Which states that it comes from:
+#         WMO tech note 91, Methods in use for the reduction of atmospheric pressure
+#
+#     """
+#
+#     z0 = p2z(p,t,p0=slp) # rough first guess
+#     z=np.zeros(p.shape)
+#
+#     dtdz=np.diff(t,axis=0)/np.diff(z0,axis=0)
+#     K = 18400.0 # barometric / hypsometric constant
+#     alpha = 0.0037 # thermal expansion coefficient for air
+#     b = (p[0,...]+slp)/2 #mean barometric pressure of the air column
+#     asphericity=1.00045 # = correction for asphericity of the earth at 40 degrees latitude
+#     # asphericity = 1/(1-0.0026*cos(2*latitude))
+#     mr=hus/(1-hus)
+#     e=mr*p/(0.62197+mr)
+#
+#     z[0] = K * (1+alpha*t[0]+dtdz[0]*z0[0]/2) * 1.0/(1-0.378*e[0]/b) * asphericity * np.log10(slp/p[0])
+#     for i in range(1,z.shape[0]):
+#         b=(p[i]+p[i-1])/2
+#         z[i] = K * (1+alpha*(t[i]+t[i-1])/2) * 1.0/(1-0.378*(e[i-1]+e[i])/2/b) * asphericity * np.log10(p[i-1]/p[i])+z[i-1]
+#
+#     return z,z0,e,dtdz
+        
+    
+    
+
+def calc_slp(ps,z,ts=288.15,dtdz= -0.0065,mr=None,e=None,sh=None,latitude=None,method=1):
+    """ Calculate sea level pressure from as much information as available
+    
+    based off the WMO handbook:
+    http://www.wmo.int/pages/prog/www/IMOP/meetings/SI/ET-Stand-1/Doc-10_Pressure-red.pdf
+    excerpt from CIMO Guide, Part I, Chapter 3 (Edition 2008, Updated in 2010)
+    equation 3.2
+    see also: http://www.meteormetrics.com/correctiontosealevel.htm
+    
+    ps   = station pressure [Pa or hPa, output slp will have the same units]
+    z    = station elevation [m]
+    ts   = station temperature [K or C]   OPTIONAL
+    dtdz = assumed fictitious temperature lapse rate down to sea level [K/m]   OPTIONAL
+    mr   = station water vapor mixing ratio [kg/kg]   OPTIONAL
+    e    = station water vapor pressure [Pa or hPa (consistent with ps)]   OPTIONAL
+    sh   = station specific humidity [kg/kg]   OPTIONAL
+    latitude=station latitude [deg] OPTIONAL
+    """
+    # p0=101325    #Pa
+    # t0=288.15   #K
+    # dtdz= -0.0065 #K/m
+    g=9.80665
+    M=0.029
+    R=287.05
+    
+    #############################################
+    #
+    # This section is for converting units
+    #
+    p_inhPa=False
+    if type(ps)==np.ndarray:
+        if ps.max()<1200:
+            ps*=100
+            p_inhPa=True
+    else:
+        if ps<1200: # assume ps is in Pa, not hPa
+            ps*=100
+            p_inhPa=True
+    
+    if sh!=None:
+        mr=sh/(1-sh)
+    if mr!=None:
+        #assumes mr is in kg/kg
+        e=mr*ps/(0.62197+mr)
+
+    if e==None:
+        mr=0.01
+        e=mr*ps/(0.62197+mr)
+    
+    T_inC=False
+    if type(ts)==np.ndarray:
+        if ts.min()<100:
+            ts+=273.15
+            T_inC=True
+    else:
+        if ts<100:
+            ts+=273.15
+            T_inC=True
+    #
+    # End of unit convertions
+    #
+    #############################################
+    
+    Ch = 0.0012 # K/Pa
+    
+    Hp=z # geopotential height
+    a= dtdz # K/gpm
+    
+    # if latitude != None:
+    #     # N.B. this may not be correct... removing for now
+    #     k=0.0026 # earth shape factor
+    #     lat_factor=1/(1-k*np.cos(2*dtor(latitude)))
+    # else:
+    #     lat_factor=1
+    
+    # convert p back to hPa
+    if p_inhPa:
+        ps/=100
+    
+    # these both come from CIMO Guide, and one would think they would be identical...
+    if method==1:
+        slp= ps*np.exp(((g/R)*Hp) / (ts - a*Hp/2.0 + e*Ch))
+    elif method==2:
+        Kp = 0.0148275 # K / gpm
+        # based off the virtual temperature instead
+        if mr!=None:
+            tv=calc_tv(ts,mr=mr)
+        elif e!=None:
+            tv=calc_tv(ts,e=e,p=ps)
+        slp= ps*10**(Kp*Hp/tv)
+    
+    # convert t back into degrees C
+    if T_inC:
+        t-=273.15
+        
+    return slp
+    
 
 def xy2a(x,y):
     '''

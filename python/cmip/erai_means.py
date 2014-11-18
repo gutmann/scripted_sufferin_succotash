@@ -8,21 +8,26 @@ import glob
 
 filesearch_dict=dict(uv="ei.moda.an.pl/ncfiles/ei.moda.an.pl.regn128uv.????{0:02}*.nc",
                      sc="ei.moda.an.pl/ncfiles/ei.moda.an.pl.regn128sc.????{0:02}*.nc",
-                     ml="ei.moda.an.ml/ncfiles/ei.moda.an.ml.regn128sc.????{0:02}*.nc")
+                     ml="ei.moda.an.ml/ncfiles/ei.moda.an.ml.regn128sc.????{0:02}*.nc",
+                     sfc="ei.moda.an.sfc/ncfiles/ei.moda.an.sfc.regn128sc.????{0:02}*.nc")
 
 pl_suf="_GDS4_ISBL_S123"
 ml_suf="_GDS4_HYBL_S123"
+sfc_suf="_GDS4_SFC_S123"
 varlist_dict=dict(uv=["U"+pl_suf,"V"+pl_suf],
                   sc=["Z"+pl_suf,"Q"+pl_suf,"R"+pl_suf,"T"+pl_suf],
-                  ml=["LNSP"+ml_suf])
+                  ml=["LNSP"+ml_suf],
+                  sfc=["SSTK"+sfc_suf,"MSL"+sfc_suf])
              
 geovars_dict=dict(uv=Bunch(lat="g4_lat_1",lon="g4_lon_2",p="lv_ISBL0"),
                   sc=Bunch(lat="g4_lat_1",lon="g4_lon_2",p="lv_ISBL0"),
-                  ml=Bunch(lat="g4_lat_0",lon="g4_lon_1"))
+                  ml=Bunch(lat="g4_lat_0",lon="g4_lon_1"),
+                  sfc=Bunch(lat="g4_lat_0",lon="g4_lon_1"))
 
 outputfile_dict=dict(uv="UV_month{0:02}_mean.nc",
                      sc="SC_month{0:02}_mean.nc",
-                     ml="PS_month{0:02}_mean.nc")
+                     ml="PS_month{0:02}_mean.nc",
+                     sfc="SF_month{0:02}_mean.nc")
 
 global_atts=dict()
 global_atts["U"+pl_suf]=dict(long_name="Eastward Wind",units="m s**-1")
@@ -32,6 +37,8 @@ global_atts["Q"+pl_suf]=dict(long_name="Specific Humidity",units="kg kg**-1")
 global_atts["R"+pl_suf]=dict(long_name="Relative Humidity",units="%")
 global_atts["T"+pl_suf]=dict(long_name="Temperature",units="K")
 global_atts["LNSP"+ml_suf]=dict(long_name="Surface Pressure",units="hPa")
+global_atts["MSL"+sfc_suf]=dict(long_name="Mean Sea Level Pressure",units="Pa")
+global_atts["SSTK"+sfc_suf]=dict(long_name="Sea Surface Temperature",units="K")
 global_atts["lat"]=dict(long_name="latitude",units="degrees_north")
 global_atts["lon"]=dict(long_name="longitude",units="degrees_east")
 global_atts["p"]=dict(long_name="pressure",units="hPa")
@@ -49,6 +56,8 @@ global_dims["Q"+pl_suf]=dim3d
 global_dims["R"+pl_suf]=dim3d
 global_dims["T"+pl_suf]=dim3d
 global_dims["LNSP"+ml_suf]=dim2d
+global_dims["MSL"+sfc_suf]=dim2d
+global_dims["SSTK"+sfc_suf]=dim2d
 global_dims["lat"]=latdim
 global_dims["lon"]=londim
 global_dims["p"]=dim1d
@@ -140,7 +149,7 @@ def main(etype="ml"):
 
 if __name__ == '__main__':
     print("""Set var to run:
-             sc  ml  uv""")
+             sc  ml  uv sfc""")
     if len(sys.argv)>1:
         etype=sys.argv[1]
     else:

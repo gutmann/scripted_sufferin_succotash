@@ -325,7 +325,7 @@ def read_geo(filename,outputdim=2):
     return Bunch(lat=latdat,lon=londat)
 
 
-def read_files(pattern,var="data",returnNCvar=False,axis=None):
+def read_files(pattern,var="data",returnNCvar=False,axis=None,catch_exceptions=False,adddim=False):
     if type(pattern)==list:
         files=pattern
     else:
@@ -333,25 +333,60 @@ def read_files(pattern,var="data",returnNCvar=False,axis=None):
     files.sort()
     d=[]
     for f in files:
-        d.append(read_nc(f,var=var,returnNCvar=returnNCvar).data)
+        try:
+            d.append(read_nc(f,var=var,returnNCvar=returnNCvar).data)
+            if adddim:
+                d[-1]=d[-1][np.newaxis,...]
+        except Exception as e:
+            if not catch_exceptions:
+                raise e
+            else:
+                pass
     if axis!=None:
         d=np.concatenate(d,axis=axis)
     return d
     
-def read_attr(filename,attribute_name):
+def read_attr(filename,attribute_name,varname=None):
     """docstring for read_attr"""
     if nclib==NETCDF4:
         ncfile=Dataset(filename)
-        att_val=ncfile.getncattr(attribute_name)
-        ncfile.close()
+        if varname==None:
+            att_val=ncfile.getncattr(attribute_name)
+        else:
+            att_val=ncfile.variables[varname].getncattr(attribute_name)
         
     elif nclib==NIO:
         ncfile=Nio.open_file(filename,format="nc")
-        att_val=ncfile.__dict__[attribute_name]
-        ncfile.close()
-    
+        if varname==None:
+            att_val=ncfile.__dict__[attribute_name]
+        else:
+            att_val=ncfile.variables[varname].__dict__[attribute_name]
+            
+    ncfile.close()
     return att_val
+
+def read_atts(filename,varname=None,global_atts=False):
+    if varname==None and not global_atts:
+        print("WARNING: no variable name or global attributes requested")
+        return Bunch()
+    
+    atts=Bunch()
+    if nclib==NETCDF4:
+        ncfile=Dataset(filename)
+    elif nclib==NIO:
+        ncfile=Nio.open_file(filename,format="nc")
         
+    if varname!=None:
+        data=ncfile.variables[varname]
+    if global_atts:
+        data=ncfile
+    
+    
+    for k in data.__dict__.keys():
+        atts[k]=data.__dict__[k]
+    
+    ncfile.close()
+    return atts
     
 
 def read_nc(filesearch,var="data",proj=None,returnNCvar=False):
