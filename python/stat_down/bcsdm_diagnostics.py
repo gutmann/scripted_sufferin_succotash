@@ -16,6 +16,7 @@ fut_end_time   = dt.datetime(2056,10,1)
 
 month_lengths=np.array([31,28.25,31,30,31,30,31,31,30,31,30,31])
 output_dir="/glade/u/home/gutmann/scratch/usbr/stat_data/cc_test/bcsdm_diagnosis/forcing/"
+output_dir="./"
 # data stored in : /glade/p/ral/RHAP/naoki/hydro_ccsm/vic/models/vic/output/netcdf/BCSDdisag12K/UCO
 xlabels=["J","F","M","A","M","J","J","A","S","O","N","D"]
 
@@ -32,7 +33,7 @@ def plot_runoff_delta(varname="runoff",extra_var=None,aggregation=np.sum,monthly
         # to fake a 365 day calendar
         times=[dt.datetime(1980,10,1,0,0)+dt.timedelta(np.floor(i/365.0*365.25)) for i in range(data.shape[0])]
     else:
-        times=[dt.datetime(1979,1,1,0,0)+dt.timedelta(i) for i in range(data.shape[0])]
+        times=[dt.datetime(1960,1,1,0,0)+dt.timedelta(i) for i in range(data.shape[0])]
     
     # summary data (12 months of no data to begin with)
     n_cur = [0]*12
@@ -78,7 +79,7 @@ def plot_runoff_delta(varname="runoff",extra_var=None,aggregation=np.sum,monthly
         
         # make a map of the current monthly changes
         plt.clf()
-        if varname[0]=="T":
+        if varname[0].lower()=="t":
             cmap=plt.cm.seismic
         else:
             cmap=plt.cm.seismic_r    
@@ -134,8 +135,8 @@ def main():
     method=os.getcwd().split("/")[-1]
     method="BCSDdisag_12km"
     # plot_runoff_delta("Prec",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian")
-    # plot_runoff_delta("tasmax",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian",monthly_total=False)
-    plot_runoff_delta("pr",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian",monthly_total=False)
+    plot_runoff_delta("tasmax",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian",monthly_total=False)
+    # plot_runoff_delta("pr",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian",monthly_total=False)
     # plot_runoff_delta("Tmax",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian",monthly_total=False)
     # plot_runoff_delta("Tmin",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian",monthly_total=False)
     

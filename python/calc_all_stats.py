@@ -54,6 +54,7 @@ def load_data(files,varname,extra,res,minval=-100,maxval=600):
     files.sort()
     # if we don't have a geomatchfile then use nearest neighbor resampling
     usenn=(geo_matchfile==None)
+    usenn=True # force nearest neighbor resampling even on e.g. CCSM/NCEP data
     if geo_matchfile!=None:
         glatvar="latitude"
         glonvar="longitude"
@@ -168,14 +169,18 @@ def temp_stats(names,data1,data2,info):
             year_starts = indicies into tmin/tmax for the starting point of each year
                     used to calculate e.g. internanual variability, growing season length, etc"""
     for n,tmax,tmin in zip(names,data1,data2):
+        if tmax.min()>100:
+            tmax-=273.15
+        if tmin.min()>100:
+            tmin-=273.15
         out=info.output_base+"_"+n
         tave=(tmax+tmin)/2
         dtr=tmax-tmin
         print(out)
-        
         for thisvar,t in zip(["tmin","tmax","tave","dtr"],[tmin,tmax,tave,dtr]):
             print("MAT "+thisvar)
-            mean_annual_temp=stats.mean(t,nyears=t.shape[0])
+            print(t.shape)
+            mean_annual_temp=stats.mean(t,nyears=t.shape[0]) #note nyears makes more sense for precip where you want to accumulated precip
             print(mean_annual_temp.mean())
             io.write(out+"_mean_"+thisvar,mean_annual_temp)
     
@@ -376,12 +381,12 @@ def calc_stats(files,v,output_base,info,extra):
         
         # enforce Tmax>Tmin if not reverse them
         # this may actually make data look better than they are, but it is common practice. 
-        for a1,a2 in zip(alldata,alldata2):
-            tmp=np.where(a1<a2)
-            if len(tmp[0])>0:
-                bada1=a1[tmp].copy()
-                a1[tmp]=a2[tmp]
-                a2[tmp]=bada1
+        # for a1,a2 in zip(alldata,alldata2):
+        #     tmp=np.where(a1<a2)
+        #     if len(tmp[0])>0:
+        #         bada1=a1[tmp].copy()
+        #         a1[tmp]=a2[tmp]
+        #         a2[tmp]=bada1
         
     dates=calc_dates(files,alldata[0].shape[0],info[2])
     print(len(dates.month))
@@ -570,7 +575,7 @@ if __name__ == '__main__':
                     extra=[distribution,pr_threshold,geosubset,outputdir,hucfile,georeffile], #passed to calc_stats
                     methods=args.methods,   # list of SD methods to run
                     BCs=args.BC,            # list of BC/noBC
-                    models=args.models,     # list of forcing models ([NCEP,NARR])
+                    models=args.models,     # list of forcing models ([NCEP,NARR,ccsm])
                     resolutions=args.resolution,# list of resolutions ([6km,12km])
                     variables=args.variable,    # list of variables ([pr,tasmax,tasmin])
                     extendedmethods=False)  #extendedmethods includes hot,dry,wet,cold experiments (don't use)
