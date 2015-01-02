@@ -226,8 +226,8 @@ def main():
     
     patterns=["tmean"]
     times=["month{:02}".format(month+1) for month in range(12)]
-    # times.append("annual")
-    # times=["annual"]
+    times.append("annual")
+    times=["annual"]
     
     timeseries=[]
     wftimeseries=[]

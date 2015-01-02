@@ -9,6 +9,7 @@ from bunch import Bunch
 import mygis
 from stat_down import map_vis
 
+plot_percentage=False
 wrfloc="/d5/gutmann/cc-downscaling-test/wrfoutput/pr/"
 sdloc="/d5/gutmann/cc-downscaling-test/SDdata/DAILY/down/"
 geo_file=sdloc+"SAR/ccsm/pr/BCSAR_pr_12km_2000.nc"
@@ -64,6 +65,7 @@ def load_sd_data(stat,time,bounds=None):
     """load downscaling methods statistic for time"""
     output=[]
     means=[]
+    curdata=[]
     print("SD data loaded from pre-calculated summary files")
     for sd in sd_methods:
         try:
@@ -85,13 +87,16 @@ def load_sd_data(stat,time,bounds=None):
             if stat=="MAP":
                 current*=86400
                 future*=86400
-        data=future-current
+        if stat=="MAP":
+            current[current<1]=1
+        data=(future-current)
         
         if bounds:
             means.append(data[bounds[0]:bounds[1],bounds[2]:bounds[3]].mean())
         output.append(Bunch(data=data,name=name,label=plot_labels[name],color=line_plot_colors[name]))
+        curdata.append(current[bounds[0]:bounds[1],bounds[2]:bounds[3]])
         
-    return output,means
+    return output,means,curdata
 
 
 
@@ -126,7 +131,9 @@ def load_wrf_data(stat,time):
         mygis.write(wrfloc+"current_"+output_wrf_file,current)
         mygis.write(wrfloc+"future_"+output_wrf_file,future)
         
-    return future-current
+    # if stat=="MAP":
+    #     current[current<1e-4]=1e-4
+    return (future-current),current
 
 def find_range(data):
     """docstring for find_range"""
@@ -240,22 +247,30 @@ def main():
     print(bounds)
     
     fig=None
-    timeonly=False
+    timeonly=True
     for t in times:
         for v in variable_names:
             print(t,v)
             print("Loading SD data")
-            sd,means=load_sd_data(v,t,bounds=bounds)
+            sd,means,cursd=load_sd_data(v,t,bounds=bounds)
             print("Loading WRF data")
             try:
-                wrf=load_wrf_data(v,t)
+                wrf,curwrf=load_wrf_data(v,t)
             except:
-                wrf=load_wrf_data("MAP",t)
+                wrf,curwrf=load_wrf_data("MAP",t)
                 
             
             if t!="annual":
-                means.append(wrf.mean())
                 if v=="MAP":
+                    if plot_percentage:
+                        for i in range(len(means)):
+                            print(means[i],cursd[i].mean())
+                            means[i]/=cursd[i].mean()
+                        print(wrf.mean(),curwrf.mean())
+                        means.append(wrf.mean()/curwrf.mean())
+                    else:
+                        means.append(wrf.mean())
+                        
                     timeseries.append(means)
                 elif v=="wetfrac":
                     wftimeseries.append(means)
