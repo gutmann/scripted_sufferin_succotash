@@ -1,0 +1,4 @@
+#!/bin/sh
+git diff --name-only "$@" | while read filename; do
+    git difftool "$@" --no-prompt "$filename" &
+done

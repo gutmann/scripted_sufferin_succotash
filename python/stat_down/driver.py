@@ -71,15 +71,22 @@ def drive(foo,yearsearch="200*",obs=True,stat=True,runforce=False,extra=[None],
                             if ((m[:3]=="SAR") or (m[:3]=="SDm")) and b=="":
                                 pass
                             else:
+                                if (v[-2:]=="ax"):
+                                    var_directory="t*max"
+                                elif (v[-2:]=="in"):
+                                    var_directory="t*min"
+                                else:
+                                    var_directory=v
+                                    
                                 if type(yearsearch)==list:
                                     files=[]
                                     for ys in yearsearch:
-                                        filesearch=m+"/"+forc+"/"+v+"/"+b+m[:2]+"*"+r+"*"+gridtype+"*"+ys+"*.nc"
+                                        filesearch=m+"/"+forc+"/"+var_directory+"/"+b+m[:2]+"*"+r+"*"+gridtype+"*"+ys+"*.nc"
                                         files.extend(glob.glob(filesearch))
                                 else:
-                                    filesearch=m+"/"+forc+"/"+v+"/"+b+m[:2]+"*"+r+"*"+gridtype+"*"+yearsearch+"*.nc"
+                                    filesearch=m+"/"+forc+"/"+var_directory+"/"+b+m[:2]+"*"+r+"*"+gridtype+"*"+yearsearch+"*.nc"
                                     files=glob.glob(filesearch)
-                                    
+                                files.sort() #probably doesn't matter...    
                                 output_base="-".join([m,forc,v,b+r])
                                 print(len(files),output_base)
                                 if len(files)>1:

@@ -118,6 +118,9 @@ def zt2p(z,p0=101325.0,t0=288.15,dtdz= -0.0065):
     g=9.807
     M=0.029
     R=8.314
+    if (type(t0)!=np.ndarray) and (type(t0)!=np.ma.core.ndarray):
+        p= p0*(t0/(t0+dtdz*z))**((g*M)/(R*dtdz))
+        return p
     if len(t0.shape)==3:
         p= p0*(t0/(t0+dtdz*z))**((g*M)/(R*dtdz))
     else:
