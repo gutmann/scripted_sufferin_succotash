@@ -17,6 +17,7 @@ fut_end_time   = dt.datetime(2056,10,1)
 
 month_lengths=np.array([31,28.25,31,30,31,30,31,31,30,31,30,31])
 output_dir="/glade/u/home/gutmann/scratch/usbr/stat_data/cc_test/bcsdm_diagnosis/forcing/"
+output_dir="./"
 # data stored in : /glade/p/ral/RHAP/naoki/hydro_ccsm/vic/models/vic/output/netcdf/BCSDdisag12K/UCO
 xlabels=["J","F","M","A","M","J","J","A","S","O","N","D"]
 

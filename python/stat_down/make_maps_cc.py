@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import glob
+import re
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,17 +9,46 @@ from bunch import Bunch
 import mygis
 from stat_down import map_vis
 
+plot_percentage=False
 wrfloc="/d5/gutmann/cc-downscaling-test/wrfoutput/pr/"
 sdloc="/d5/gutmann/cc-downscaling-test/SDdata/DAILY/down/"
 geo_file=sdloc+"SAR/ccsm/pr/BCSAR_pr_12km_2000.nc"
 
 sd_methods=["forcing-ccsm","CA-ccsm","SAR-ccsm","SD-ccsm","SDmon-ccsm"]
-clims=dict(MAP=(-300,300),wetfrac=[-0.1,0.1])
+clims=dict(MAP=(-300,300),
+           wetfrac=[-0.1,0.1],
+           # dryspell = (-5,5),
+           # wetspell = (-5,5),
+           # mean_dtr = (-9999,9999),
+           # mean_tave = (0,10),
+           # mean_tmax = (0,10),
+           # mean_tmin = (0,10)
+           )
+           # extremes_nday1 = (-9999,9999),
+           # interannual = (-9999,9999),
+           # frostdays = (-9999,9999),
+           # growing_season = (-9999,9999),
+           # interannual_dtr = (-9999,9999),
+           # interannual_tave = (-9999,9999),
+           # interannual_tmax = (-9999,9999),
+           # interannual_tmin = (-9999,9999),
 ndays_dict=dict(annual=365.25,
                 month01=31,month02=28.25,month03=31,
                 month04=30,month05=31   ,month06=30,
                 month07=31,month08=31   ,month09=30,
                 month10=31,month11=30   ,month12=31)
+
+plot_labels=dict(CCSM="CCSM",
+                      CA="BCCA",
+                      SAR="AR",
+                      SD="BCSDd",
+                      SDmon="BCSDm")
+
+line_plot_colors=dict(CCSM="grey",
+                      CA="blue",
+                      SAR="green",
+                      SD="darkred",
+                      SDmon="red")
 
 
 def calc_wetfrac(data,threshold=0.0):
@@ -35,10 +65,20 @@ def load_sd_data(stat,time,bounds=None):
     """load downscaling methods statistic for time"""
     output=[]
     means=[]
+    curdata=[]
+    print("SD data loaded from pre-calculated summary files")
     for sd in sd_methods:
-        curfile=glob.glob(sdloc+"current/"+sd+"*full_res_"+time+"_"+stat)[0]
+        try:
+            curfile=glob.glob(sdloc+"current/"+sd+"*full_res_"+time+"_"+stat)[0]
+        except IndexError as e:
+            print(sdloc+"current/"+sd+"*full_res_"+time+"_"+stat)
+            raise IndexError
         current=mygis.read_nc(curfile).data
-        futfile=glob.glob(sdloc+"future/"+sd+"*full_res_"+time+"_"+stat)[0]
+        try:
+            futfile=glob.glob(sdloc+"future/"+sd+"*full_res_"+time+"_"+stat)[0]
+        except IndexError as e:
+            print(sdloc+"future/"+sd+"*full_res_"+time+"_"+stat)
+            raise e
         future=mygis.read_nc(futfile).data
         
         name=sd.split("-")[0]
@@ -47,12 +87,16 @@ def load_sd_data(stat,time,bounds=None):
             if stat=="MAP":
                 current*=86400
                 future*=86400
-        data=future-current
+        if stat=="MAP":
+            current[current<1]=1
+        data=(future-current)
+        
         if bounds:
             means.append(data[bounds[0]:bounds[1],bounds[2]:bounds[3]].mean())
-        output.append(Bunch(data=data,name=name))
+        output.append(Bunch(data=data,name=name,label=plot_labels[name],color=line_plot_colors[name]))
+        curdata.append(current[bounds[0]:bounds[1],bounds[2]:bounds[3]])
         
-    return output,means
+    return output,means,curdata
 
 
 
@@ -62,6 +106,7 @@ def load_wrf_data(stat,time):
     try:
         current=mygis.read_nc(wrfloc+"current_"+output_wrf_file).data
         future=mygis.read_nc(wrfloc+"future_"+output_wrf_file).data
+        print("WRF data loaded from pre-calculated summary files")
     except:
         print("    Reading raw data...")
         if time=="annual":
@@ -80,24 +125,38 @@ def load_wrf_data(stat,time):
         elif stat=="wetfrac":
             current=calc_wetfrac(current)
             future=calc_wetfrac(future)
-        
+        else:
+            raise KeyError("stat not created for WRF:"+stat)
         print("    Writing stat for future reference")
         mygis.write(wrfloc+"current_"+output_wrf_file,current)
         mygis.write(wrfloc+"future_"+output_wrf_file,future)
         
-    return future-current
+    # if stat=="MAP":
+    #     current[current<1e-4]=1e-4
+    return (future-current),current
 
+def find_range(data):
+    """docstring for find_range"""
+    vmin=1e10
+    vmax=-1e10
+    for d in data:
+        vmin=min(vmin,d.data.min())
+        vmax=max(vmax,d.data.max())
+    fullrange=max(abs(vmin),abs(vmax))
     
+    return -fullrange,fullrange
 
 def visualize(stat,time,sddata,wrfdata,geo,fig=None):
     """docstring for visualize"""
     
     vmin,vmax=clims[stat]
+    if vmin==-9999:
+        vmin,vmax=find_range(sddata)
     if time!="annual":
         if stat=="MAP":
             vmin/=5
             vmax/=5
-        else:
+        elif stat=="wetfrac":
             vmin*=2
             vmax*=2
     clim=(vmin,vmax)
@@ -107,16 +166,25 @@ def visualize(stat,time,sddata,wrfdata,geo,fig=None):
     else:
         fig.clf()
     plt.subplot(3,2,1)
-    m=map_vis.vis(wrfdata,title="WRF",cmap=plt.cm.seismic_r,proj="lcc",clim=clim,
+    if (stat=="MAP") or (stat=="wetfrac") or (stat=="wetspell"):
+        cmap=plt.cm.seismic_r
+    elif re.match("mean_t...",stat):
+        cmap=plt.cm.jet
+    else:
+        cmap=plt.cm.seismic
+        
+        
+    m=map_vis.vis(wrfdata,title="WRF",cmap=cmap,proj="lcc",clim=clim,
                     latstep=2.0,lonstep=5.0)
     
     for i,sd in enumerate(sddata):
         plt.subplot(3,2,i+2)
-        map_vis.vis(sd.data,title=sd.name,cmap=plt.cm.seismic_r,clim=clim,
+        map_vis.vis(sd.data,title=sd.label,cmap=cmap,clim=clim,
                     m=m,reproject=True,lat=geo.lat,lon=geo.lon,
                     latstep=2.0,lonstep=5.0)
     
-    fig.savefig(time+"_"+stat+".png",dpi=200)
+    fig.savefig(time+"_"+stat+".png",dpi=300)
+    # fig.savefig(time+"_"+stat+".pdf",dpi=300)
     return fig
 
 def get_bounds(geo):
@@ -133,15 +201,17 @@ def plot_timeseries(timeseries,sdinfo,stat):
     plt.close()
     x=range(1,13)
     
-    wrftime=[t[-1] for t in timeseries]
+    reorder=np.argsort([3,4,5,6,7,8,9,10,11,0,1,2])
+    
+    wrftime=np.array([t[-1] for t in timeseries])
     for i in range(len(sdinfo)):
-        sdtime=[t[i] for t in timeseries]
+        sdtime=np.array([t[i] for t in timeseries])
         if sdinfo[i].name=="CCSM":
-            plt.plot(x,sdtime,label=sdinfo[i].name,linewidth=2)
+            plt.plot(x,sdtime[reorder],label=sdinfo[i].label,linewidth=2,color=sdinfo[i].color)
         else:
-            plt.plot(x,sdtime,label=sdinfo[i].name)
+            plt.plot(x,sdtime[reorder],label=sdinfo[i].label,color=sdinfo[i].color)
         
-    plt.plot(x,wrftime,label="WRF",color="black",linewidth=2)
+    plt.plot(x,wrftime[reorder],label="WRF",color="black",linewidth=2)
     plt.legend(ncol=2)
     
     plt.plot([0,13],[0,0],":",color="grey")
@@ -149,15 +219,19 @@ def plot_timeseries(timeseries,sdinfo,stat):
     plt.xlim(0.1,12.9)
     plt.xlabel("Month")
     plt.ylabel("Change in "+stat)
+    xlabels=np.array(["J","F","M","A","M","J","J","A","S","O","N","D"])
+    plt.xticks(x,xlabels[reorder])
     
-    plt.savefig(stat.replace(" ","_")+"_timeseries.png",dpi=100)
+    plt.savefig(stat.replace(" ","_")+"_timeseries.pdf",dpi=300)
+    plt.savefig(stat.replace(" ","_")+"_timeseries.png",dpi=300)
     
 
 def main():
     """Plot a series of maps comparing different downscaling methods climate change portrayals"""
     
-    patterns=["wetfrac","MAP"]
-    # patterns=["MAP"]
+    variable_names=["wetfrac","MAP"]
+    variable_names=clims.keys()
+    # variable_names=["MAP"]
     times=["month{:02}".format(month+1) for month in range(12)]
     times.append("annual")
     # times=["annual"]
@@ -173,25 +247,37 @@ def main():
     print(bounds)
     
     fig=None
-    timeonly=False
+    timeonly=True
     for t in times:
-        for p in patterns:
-            print(t,p)
+        for v in variable_names:
+            print(t,v)
             print("Loading SD data")
-            sd,means=load_sd_data(p,t,bounds=bounds)
+            sd,means,cursd=load_sd_data(v,t,bounds=bounds)
             print("Loading WRF data")
-            wrf=load_wrf_data(p,t)
+            try:
+                wrf,curwrf=load_wrf_data(v,t)
+            except:
+                wrf,curwrf=load_wrf_data("MAP",t)
+                
             
             if t!="annual":
-                means.append(wrf.mean())
-                if p=="MAP":
+                if v=="MAP":
+                    if plot_percentage:
+                        for i in range(len(means)):
+                            print(means[i],cursd[i].mean())
+                            means[i]/=cursd[i].mean()
+                        print(wrf.mean(),curwrf.mean())
+                        means.append(wrf.mean()/curwrf.mean())
+                    else:
+                        means.append(wrf.mean())
+                        
                     timeseries.append(means)
-                elif p=="wetfrac":
+                elif v=="wetfrac":
                     wftimeseries.append(means)
             
             if not timeonly:
                 print("visualizing...")
-                fig=visualize(p,t,sd,wrf,geo,fig=fig)
+                fig=visualize(v,t,sd,wrf,geo,fig=fig)
 
     plot_timeseries(timeseries,sd,"Mean Precipitation")
     plot_timeseries(wftimeseries,sd,"Wet Day Fraction")

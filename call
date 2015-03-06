@@ -1,0 +1,30 @@
+#!/usr/bin/perl --
+# call: enhanced Perl version of the old NCAR call(1) utility.
+# Tres Hofmeister <tres@rap.ucar.edu>  Tue Nov  7 17:20:15 2000
+
+# Updated: do not colorize if STDOUT is not attached to a terminal.
+# Tres Hofmeister <tres@ucar.edu>  Mon Sep 23 17:25:15 MDT 2002
+
+# This version uses ANSI escape codes to highlight search terms.
+# See the Perl documentation for Term::ANSIColor.  For example:
+# print "\e[1m\e[34mThis text is in bold blue.\e[0m\e[0m\n";
+
+$master = "/home/gutmann/usr/local/lib/phonedir";
+@private = split(' ', $ENV{'PHONEDIR'}) if $ENV{'PHONEDIR'};
+
+foreach $dir (@private, $master) {
+    print STDERR "\n* Searching $dir\n" if $debug;
+    open(DIR, $dir) || warn "open: $dir: $!";
+    while (<DIR>) {
+	foreach $term (@ARGV) {
+	    # Is standard output connected to a tty?  If so, colorize.
+	    if (-t STDOUT) {
+		s/($term)/\e[1m\e[34m$1\e[0m\e[0m/ig, print if /$term/i;
+	    }
+	    # If not, just print the result.
+	    else {
+		print if /$term/i;
+	    }
+	}
+    }
+}

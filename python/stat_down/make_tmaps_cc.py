@@ -27,6 +27,22 @@ ndays_dict=dict(annual=365.25,
                 month07=31,month08=31   ,month09=30,
                 month10=31,month11=30   ,month12=31)
 
+line_plot_colors=dict(ccsm="grey",
+                      CA="blue",
+                      SAR="green",
+                      SD="darkred",
+                      SDmon="red")
+
+plot_labels=dict(ccsm="CCSM",
+                 CA="BCCA",
+                 SAR="AR",
+                 SD="BCSDd",
+                 SDmon="BCSDm")
+
+
+
+
+
 def get_time_bounds(timeperiod):
     """docstring for get_time_bounds"""
     if timeperiod=="annual":
@@ -45,7 +61,6 @@ def get_time_bounds(timeperiod):
 
 def load_time_period(files,varname,timeperiod):
     start,stop=get_time_bounds(timeperiod)
-    print(start,stop,timeperiod)
     data=[]
     for f in files:
         curdata=mygis.read_nc(f,varname,returnNCvar=True)
@@ -64,14 +79,12 @@ def load_sd_data(stat,time,bounds=None):
         curfiles=glob.glob(sdloc+sd+"*199[5-9]*")
         curfiles.extend(glob.glob(sdloc+sd+"*200[0-5]*"))
         curfiles.sort()
-        print(curfiles[0])
         current=load_time_period(curfiles,sdvar,time)
         
         #load future climate data from 2045-2055
         futfiles=glob.glob(sdloc+sd+"*204[5-9]*")
         futfiles.extend(glob.glob(sdloc+sd+"*205[0-5]*"))
         futfiles.sort()
-        print(futfiles[0])
         future=load_time_period(futfiles,sdvar,time)
         
         #calculate the mean climate change over this time period
@@ -80,17 +93,14 @@ def load_sd_data(stat,time,bounds=None):
         #subset the domain spatially if desired
         if bounds:
             if sd[:5]=="model":
-                print("CCSM")
                 means.append(data[bounds[0][0]:bounds[0][1],bounds[0][2]:bounds[0][3]].mean())
             else:
-                print("Downscaled")
                 means.append(data[bounds[1][0]:bounds[1][1],bounds[1][2]:bounds[1][3]].mean())
-                print(means[-1])
         
         #save the name of the current method
         name=sd.split("/")[1]
         
-        output.append(Bunch(data=data,name=name))
+        output.append(Bunch(data=data,name=name,label=plot_labels[name],color=line_plot_colors[name]))
         
     return output,means
 
@@ -159,15 +169,16 @@ def visualize(stat,time,sddata,wrfdata,geo,fig=None,m=None):
     for i,sd in enumerate(sddata):
         plt.subplot(3,2,i+2)
         if sd.name=="ccsm":
-            map_vis.vis(sd.data,title=sd.name,cmap=cmap,clim=clim,proj="lcc",
+            map_vis.vis(sd.data,title=sd.label,cmap=cmap,clim=clim,#proj="lcc",
                         m=m,reproject=True,lat=ccsm_geo.lat,lon=ccsm_geo.lon,
                         latstep=2.0,lonstep=5.0)
         else:
-            map_vis.vis(sd.data,title=sd.name,cmap=cmap,clim=clim,
+            map_vis.vis(sd.data,title=sd.label,cmap=cmap,clim=clim,
                         m=m,reproject=True,lat=sd_geo.lat,lon=sd_geo.lon,
                         latstep=2.0,lonstep=5.0)
     
-    fig.savefig(time+"_"+stat+".png",dpi=200)
+    fig.savefig(time+"_"+stat+".png",dpi=300)
+    # fig.savefig(time+"_"+stat+".pdf",dpi=300)
     #return the figure so it can be reused... would returning the basemap instance help too? 
     return fig,m
 
@@ -184,25 +195,30 @@ def get_bounds(geo):
 def plot_timeseries(timeseries,sdinfo,stat):
     plt.close()
     x=range(1,13)
+    reorder=np.argsort([3,4,5,6,7,8,9,10,11,0,1,2])
     
-    wrftime=[t[-1] for t in timeseries]
+    wrftime=np.array([t[-1] for t in timeseries])
     for i in range(len(sdinfo)):
-        sdtime=[t[i] for t in timeseries]
+        sdtime=np.array([t[i] for t in timeseries])
         if sdinfo[i].name=="ccsm":
-            plt.plot(x,sdtime,label=sdinfo[i].name,linewidth=2)
+            plt.plot(x,sdtime[reorder],label=sdinfo[i].label,linewidth=2,color=sdinfo[i].color)
         else:
-            plt.plot(x,sdtime,label=sdinfo[i].name)
+            plt.plot(x,sdtime[reorder],label=sdinfo[i].label,color=sdinfo[i].color)
         
-    plt.plot(x,wrftime,label="WRF",color="black",linewidth=2)
+    plt.plot(x,wrftime[reorder],label="WRF",color="black",linewidth=2)
     plt.legend(ncol=2)
     
     plt.plot([0,13],[0,0],":",color="grey")
     
     plt.xlim(0.1,12.9)
+    plt.ylim(0,4)
     plt.xlabel("Month")
     plt.ylabel("Change in "+stat)
+    xlabels=np.array(["J","F","M","A","M","J","J","A","S","O","N","D"])
+    plt.xticks(x,xlabels[reorder])
     
-    plt.savefig(stat.replace(" ","_")+"_timeseries.png",dpi=100)
+    plt.savefig(stat.replace(" ","_")+"_timeseries.pdf",dpi=300)
+    plt.savefig(stat.replace(" ","_")+"_timeseries.png",dpi=300)
     
 
 def main():
@@ -211,7 +227,7 @@ def main():
     patterns=["tmean"]
     times=["month{:02}".format(month+1) for month in range(12)]
     times.append("annual")
-    # times=["annual"]
+    times=["annual"]
     
     timeseries=[]
     wftimeseries=[]
