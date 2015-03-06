@@ -37,7 +37,7 @@ hostname=`hostname`
 filepath=""
 
 host="${RMATE_HOST:-localhost}"
-port="${RMATE_PORT:-52698}"
+port="${RMATE_PORT:-60143}"
 selection=""
 displayname=""
 filetype=""
