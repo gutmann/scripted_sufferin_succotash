@@ -114,16 +114,20 @@ def test_topo():
     # zs[2,...]+=2000
     return (zs,Fzs)
 
-def linear_winds(Fzs, U,V,z,dx=4000.0,dy=4000.0,Ndsq  = 1E-8,outputP=False):
+def linear_winds(Fzs, U,V,z,dx=4000.0,dy=4000.0,Ndsq  = 2.5E-5,outputP=False,f=9.37e-5):
     # see Appendix A of Barstad and Gronas (2006) Tellus,58A,2-18
     # -------------------------------------------------------------------------------
     # Ndsq  = 0.003**2      # dry BV freq sq. was 0.01**2 initially, Idar suggested 0.005**2
     # 1E-8 keeps it relatively stable, no wild oscillations in u,v
-    # but 1E-8 doesn't damp vertical winds with height very fast
+    # but 1E-8 doesn't damp vertical winds with height very fast, 6e-5 might be better
     # could/should be calculated from the real atm profile with limits
-    f  = 9.37e-5           # rad/s Coriolis frequency for 40deg north
+    # f  = 9.37e-5           # rad/s Coriolis frequency for 40deg north
     # ---------------------------------------------------------------------------------
-    
+    print("WARNING WARNING WARNING WARNING ")
+    print("WARNING THIS DOES NOT SEEM TO BE GIVING GOOD ANSWERS...")
+    print("WARNING THIS DOES NOT SEEM TO BE GIVING GOOD ANSWERS...")
+    print("WARNING WARNING WARNING WARNING ")
+    print("Try an even number of x samples?")
     (Ny,Nx)=Fzs.shape
     # % Compute 2D k and l wavenumber fields (this could be done once not on every pass)
     # (meshgrid may be faster?)
@@ -169,10 +173,11 @@ def linear_winds(Fzs, U,V,z,dx=4000.0,dy=4000.0,Ndsq  = 1E-8,outputP=False):
         P=Ny*Nx*np.real(fft.ifft2(fft.ifftshift(FPterm)))
         P[P<0]=0
         
+    # temporarily removed coriolis term
     ineta/=kl/(-m*sig)
     u_hat=k*ineta
     v_hat=l*ineta
-    # temporarily removed coriolis term
+    # note, -m*sig/kl has been wrapped into the ineta term above
     # u_hat = -m*(sig*k)*i*neta/kl
     # v_hat = -m*(sig*l)*i*neta/kl
     # with coriolis : 

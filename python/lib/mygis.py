@@ -325,7 +325,7 @@ def read_geo(filename,outputdim=2):
     return Bunch(lat=latdat,lon=londat)
 
 
-def read_files(pattern,var="data",returnNCvar=False,axis=None,catch_exceptions=False,adddim=False):
+def read_files(pattern,var="data",returnNCvar=False,axis=None,catch_exceptions=False,adddim=False,verbose=False):
     if type(pattern)==list:
         files=pattern
     else:
@@ -333,6 +333,8 @@ def read_files(pattern,var="data",returnNCvar=False,axis=None,catch_exceptions=F
     files.sort()
     d=[]
     for f in files:
+        if verbose:
+            print(f)
         try:
             d.append(read_nc(f,var=var,returnNCvar=returnNCvar).data)
             if adddim:

@@ -1,0 +1,2 @@
+#!/bin/bash
+scp $1 dablam.rap.ucar.edu:$2

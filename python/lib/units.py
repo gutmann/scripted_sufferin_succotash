@@ -31,7 +31,9 @@ def dtor(angle):
     return angle/360.0*(2*np.pi)
 
 def exner(p):
-    """docstring for exner"""
+    """use this to get the exner function
+    exner * potential temperature = real temperature
+    """
     Rd=287.058
     cp=1003.5
     p0=1000.0
@@ -59,6 +61,21 @@ def exner(p):
 #
 #     return z
 
+# return the moist / saturated adiabatic lapse rate for a given
+# Temperature and mixing ratio (really MR could be calculated as f(T))
+# from http://glossary.ametsoc.org/wiki/Saturation-adiabatic_lapse_rate
+def sat_lapse_rate(T,mr):
+	L=2.5e6
+	g=9.8
+	Rd=287
+	Rw=461.5
+	ratio=Rd/Rw
+	cp=1003.5
+	
+	return g*((1 + (L*mr) / (Rd*T))
+			/ (cp + (L*L*mr*ratio) / (Rd*T*T) ))
+
+
 def calc_tv(t,mr=None,e=None,p=None):
     '''calculate the virtual temperature
     
@@ -66,8 +83,8 @@ def calc_tv(t,mr=None,e=None,p=None):
     
     t [=] K
     mr[=] kg/kg
-    e [=] any (same as p)
-    p [=] any (same as e)
+    e [=] any (same as p) e.g. Pa, hPa
+    p [=] any (same as e) 
     '''
     # from http://en.wikipedia.org/wiki/Virtual_temperature
     RoR = 0.622 # Rdry / Rvapor
@@ -87,6 +104,7 @@ def calc_z(slp,p,t,mr):
     p   = 3D pressure field     [Pa]
     ta  = 3D temperature field  [K]
     hus = 3D specific humidity  [kg/kg]
+    mr  = 3D mixing ratio       [kg/kg]
 
     returns z = 3D geopotential height field [m]
     
@@ -355,12 +373,13 @@ def mr2rh(t,p,mr):
 def rh2mr(t,p,rh):
     '''T(deg.C or K), p(mb), rh(0-1 or 0-100 assumed if max is over 1.5)'''
     if np.array(rh).max()>1.5:
-        rh/=100.0
-        rhIsPercent
-    e=t2vp(t)*rh
+        multiplier=1/100.0
+    else:
+        multiplier=1.0
+        
+    e=t2vp(t)*rh*multiplier
     mr=0.62197*e/(p-e)
-    if rhIsPercent:
-        rh*=100.0
+    
     return mr
 
 def dp2mr(t,p,dp):

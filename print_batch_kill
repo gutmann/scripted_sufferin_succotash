@@ -1,0 +1,3 @@
+#!/bin/bash
+bjobs
+bjobs | grep regular | awk '{print "bkill " $1}'

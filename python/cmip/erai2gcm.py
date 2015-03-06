@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import glob,sys
+import glob,sys,os
 
 import numpy as np
 
@@ -49,7 +49,10 @@ def read_gcm_geo(filename,pfile):
     lon=geo.lon
     if lon.max()>180:
         lon=lon-360
-    p=mygis.read_nc(pfile,"pressure").data
+    if os.path.isfile(pfile):
+        p=mygis.read_nc(pfile,"pressure").data
+    else:
+        p=None
     return Bunch(p=p,lat=lat,lon=lon)
 
 def read_erai_geo(filename):
@@ -71,9 +74,14 @@ def write_output(outputfile,data,geo):
     ]
     # for v in vardata:
     #     print(v.name,v.dims,v.data.shape)
-    vardata.append(Bunch(data=geo.lat,name="lat",dtype="f",attributes=latatts,dims=latdim))
-    vardata.append(Bunch(data=geo.lon,name="lon",dtype="f",attributes=lonatts,dims=londim))
-    # vardata.append(Bunch(data=geo.p,name="p",dtype="f",attributes=patts,dims=pdims))
+    vardata.insert(0,Bunch(data=geo.lon,name="lon",dtype="f",attributes=lonatts,dims=londim))
+    vardata.insert(0,Bunch(data=geo.lat,name="lat",dtype="f",attributes=latatts,dims=latdim))
+    # if geo.p!=None:
+    #     vardata.append(Bunch(data=geo.p,name="p",dtype="f",attributes=patts,dims=pdim))
+    
+    if len(geo.p.shape)==1:
+        ny,nx=geo.lat.shape
+        geo.p=geo.p[:,np.newaxis,np.newaxis].repeat(ny,axis=1).repeat(nx,axis=2)
     
     mygis.write(outputfile,data=geo.p,varname="p",dtype="f",attributes=patts,dims=pdim,
                 history="Regridding performed by cmip/era2gcm.py",extravars=vardata)
@@ -88,8 +96,9 @@ def main(gcm="ccsm"):
     for month in range(1,13):
         print("Month: "+str(month))
         gcm_geo=read_gcm_geo(gcmd+"geo.nc",gcmd+gcm+"_month{0:02}_mean_plevel.nc".format(month))
-        print("Creating Vertical Look up table")
-        pLUT=bilin_regrid.load_vLUT(erai_geo.p*100,gcm_geo.p)
+        if gcm_geo.p!=None:
+            print("Creating Vertical Look up table")
+            pLUT=bilin_regrid.load_vLUT(erai_geo.p*100,gcm_geo.p)
         
         output_era_data=dict()
         for i,(p,v) in enumerate(zip(erai_fileprefixes,erai_varnames)):
@@ -100,11 +109,15 @@ def main(gcm="ccsm"):
                 output_era_data[v]=bilin_regrid.regrid(raw_era_data[np.newaxis,:,:],geoLUT=geoLUT)[0,...]
             else:
                 era_on_gcm_grid=bilin_regrid.regrid(raw_era_data,geoLUT=geoLUT)
-                output_era_data[v]=bilin_regrid.vinterp(era_on_gcm_grid,vLUT=pLUT)
+                if gcm_geo.p!=None:
+                    output_era_data[v]=bilin_regrid.vinterp(era_on_gcm_grid,vLUT=pLUT)
+                else:
+                    output_era_data[v]=era_on_gcm_grid
             if v=="Z_GDS4_ISBL_S123":
                 output_era_data[v]/=9.8
             # gcm_data=mygis.read_nc(gcmd+gcm_filename.format(gcm=gcm,month=month,varname=gcm_varnames[i]),gcm_varnames[i]).data
-        
+        if gcm_geo.p==None:
+            gcm_geo.p=erai_geo.p*100
         print("Writing data")
         write_output(global_outputfile.format(month=month,gcm=gcm),output_era_data,gcm_geo)
         

@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import print_function
+import glob
 import os,sys
 import datetime as dt
 
@@ -23,16 +24,22 @@ def plot_runoff_delta(varname="runoff",extra_var=None,aggregation=np.sum,monthly
     """docstring for plot_runoff_delta"""
     print("Loading data :"+varname)
     # read in runoff from all of the netcdf files in the current directory and concatenate them along axis 0 (time)
-    data  = mygis.read_files(method+"_*[1-2]*.nc",varname,axis=0)*multiplier # mm/s * 86400 s/day = mm/day)
+    if varname=="tasmax":extra="tmax"
+    if varname=="tasmin":extra="tmin"
+    files=glob.glob(method+"_*"+extra+"*[1-2]*.nc")
+    files.sort()
+    first_year=int(files[0].split(".")[-2][-4:]) # assumes file name ends in yyyy.nc
+    print(first_year)
+    data  = mygis.read_files(method+"_*"+extra+"*[1-2]*.nc",varname,axis=0)*multiplier # mm/s * 86400 s/day = mm/day)
     if (extra_var!=None):
         data += mygis.read_files(method+"_[1-2]*.nc",extra_var,axis=0)*multiplier # mm/s * 86400 s/day = mm/day)
     data=data[:,60:150,80:200]
     # create a list of datetime objects to match the netcdf data
     if calendar=="noleap":
         # to fake a 365 day calendar
-        times=[dt.datetime(1980,10,1,0,0)+dt.timedelta(np.floor(i/365.0*365.25)) for i in range(data.shape[0])]
+        times=[dt.datetime(first_year,10,1,0,0)+dt.timedelta(np.floor(i/365.0*365.25)) for i in range(data.shape[0])]
     else:
-        times=[dt.datetime(1979,1,1,0,0)+dt.timedelta(i) for i in range(data.shape[0])]
+        times=[dt.datetime(first_year,1,1,0,0)+dt.timedelta(i) for i in range(data.shape[0])]
     
     # summary data (12 months of no data to begin with)
     n_cur = [0]*12
@@ -78,14 +85,14 @@ def plot_runoff_delta(varname="runoff",extra_var=None,aggregation=np.sum,monthly
         
         # make a map of the current monthly changes
         plt.clf()
-        if varname[0]=="T":
+        if varname[0].lower()=="t":
             cmap=plt.cm.seismic
+            max_range=5
         else:
             cmap=plt.cm.seismic_r    
+            max_range=np.max(np.abs(futdata[i] - curdata[i]))
         plt.imshow(futdata[i] - curdata[i],cmap=cmap)
-        max_range=np.max(np.abs(futdata[i] - curdata[i]))
         plt.clim(-max_range,max_range)
-        # plt.clim(-150,150)
         plt.colorbar()
         plt.title(varname+"_"+method+" delta month{0:02}".format(i+1))
         plt.savefig(output_dir+varname+"_"+method+"_delta_month{0:02}.png".format(i+1))
@@ -134,8 +141,9 @@ def main():
     method=os.getcwd().split("/")[-1]
     method="BCSDdisag_12km"
     # plot_runoff_delta("Prec",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian")
-    # plot_runoff_delta("tasmax",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian",monthly_total=False)
-    plot_runoff_delta("pr",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian",monthly_total=False)
+    plot_runoff_delta("tasmax",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian",monthly_total=False)
+    plot_runoff_delta("tasmin",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian",monthly_total=False)
+    # plot_runoff_delta("pr",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian",monthly_total=False)
     # plot_runoff_delta("Tmax",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian",monthly_total=False)
     # plot_runoff_delta("Tmin",aggregation=np.mean,method=method,multiplier=1.0,calendar="gregorian",monthly_total=False)
     
