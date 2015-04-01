@@ -9,7 +9,7 @@ import nc_reader
 output_file="probabilistic_precip"
 prcpfile="grid_prcp_norm.nc"
 probfile="grid_prob_prcp_norm.nc"
-randfilesearch="scrf/sprand_p_00001*.nc"
+randfilesearch="scrf/sprand_p_00001_*.nc"
 rand_files=glob.glob(randfilesearch)
 rand_files.sort()
 
@@ -56,11 +56,15 @@ def load_gefs(date,geo_file,geolut=None):
 
 def main():
     """convert probability coefficients to precip amounts"""
+    print("Reading Time data")
     timeseconds=mygis.read_nc(probfile,"time").data
     time=[base_date+datetime.timedelta(i/86400.0) for i in timeseconds]
+    print("Reading Spatial data")
     lat=mygis.read_nc(probfile,"latitude").data
     lon=mygis.read_nc(probfile,"longitude").data
+    print("Reading Probability regressions")
     prob=mygis.read_nc(probfile,"coefficient").data
+    print("Reading Precip regressions")
     prcp=mygis.read_nc(prcpfile,"coefficient").data
     nx=prob.shape[-1]
     ny=prob.shape[-2]
@@ -94,7 +98,7 @@ def main():
         # curprec[norm.cdf(rand_data)<curprob]=0
         # output_data[i,...]=curprec
         # output_data2[i,...]=curprob
-        curprob/=100.0
+        curprob/=200.0
         curprob[curprob<norm.cdf(rand_data)]=0
         output_data3[i,...]=curprob
         # anywhere the probability of precip is less than the random number, set precip to 0
