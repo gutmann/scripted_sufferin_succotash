@@ -4,10 +4,10 @@ import glob
 from bunch import Bunch
 import mygis
 
-# cur_file="prob_stn*_prcp_norm.nc"
-# global_output_file="grid_"+"prob_prcp_norm.nc"
-cur_file="stn*_prcp_norm.nc"
-global_output_file="grid_"+"prcp_norm.nc"
+cur_file="prob_stn*_prcp_norm.nc"
+global_output_file="grid_"+"prob_prcp_norm.nc"
+# cur_file="stn*_prcp_norm.nc"
+# global_output_file="grid_"+"prcp_norm.nc"
 global_basefile="/d2/gutmann/usbr/stat_data/DAILY/obs/maurer.125/pr/nldas_met_update.obs.daily.pr.2000.nc"
 # data_dir="processing_*/"
 data_dir=""
@@ -78,7 +78,7 @@ def get_xy(filename,geo):
     return xy
     
 
-def main(start_date="19940104"):
+def main(start_date="19900101"):
     """convert a file (or files) from downscaling code to maps"""
     files=find_files(start_date)
     files.sort()

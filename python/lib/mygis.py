@@ -297,11 +297,13 @@ def write_tiff(filename,data,res=None,origin=None,zone=None):
     dst_ds=None
 
 
-def read_geo(filename,outputdim=2):
+def read_geo(filesearch,outputdim=2):
     latnames=["lat","latitude","XLAT","XLAT_M"]
     lonnames=["lon","longitude","XLONG","XLONG_M"]
     latdat=None
     londat=None
+    
+    filename=glob.glob(filesearch)[0]
     
     for lat,lon in zip(latnames,lonnames):
         try:
