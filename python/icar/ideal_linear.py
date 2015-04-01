@@ -17,7 +17,7 @@ import Nio                  # NCAR python io library
 # also sets up parameters for the linear model (e.g. tauf,c, cw)
 #    tauf = average hydrometeor fall time (seconds) ~500s? for rain w/Hw=5000, 1500s? for snow w/Hw=3000
 #    tauc = average hydrometeor formation time (seconds) ~500s for rain, longer for snow, faster for warmer
-def setup_experiment(wind=2,experiment=1):
+def setup_experiment(wind=2,experiment=1, verbose=False):
     U     = [5.0,10.0,15.0,25.0][wind]       # % wind speed
     # print("wind=",U,"  exp=",experiment)
     # Ndsq  = 3.6e-5;                          # % dry BV freq sq. #original
@@ -97,19 +97,20 @@ def setup_experiment(wind=2,experiment=1):
     tauf= hw/vterm           # BS'11: =zg/Vt ( =hw/Vt for moisture level: around 500s (->750s) is normally good)
     tauc= 2000.0             # cloud->hydrometero conversion time.  probably around 500s for rain, 
                              # shorter for warmer condition, longer for snow?
-    print("   Ndsq=",Ndsq)
-    print("   Environmental lapse rate=0.004K/m")
-    print("   \"Dry\" lapse rate=0.0017K/m")
-    print("   Base MR=",base_mr)
-    print("   Scale height=",hw)
-    print("   tauc=",tauc)
-    print("   tauf=",tauf)
-    print("   cwqv=",cwqv)
+    if verbose:
+        print("   Ndsq=",Ndsq)
+        print("   Environmental lapse rate=0.004K/m")
+        print("   \"Dry\" lapse rate=0.0017K/m")
+        print("   Base MR=",base_mr)
+        print("   Scale height=",hw)
+        print("   tauc=",tauc)
+        print("   tauf=",tauf)
+        print("   cwqv=",cwqv)
     # %---------------------------------------------------------------------------------
     params=Bunch(cw=cw,cwqv=cwqv,z0=z0,tauf=tauf,tauc=tauc,hw=hw,Ndsq=Ndsq)
     return (x,zs,Fzs,U,dx,params)
 
-def get_params(T2m,U,Ndsq,zs,env_gamma):
+def get_params(T2m,U,Ndsq,zs,env_gamma,verbose=False):
     """docstring for get_params"""
     Nx    = len(zs)            # % length of domain  (grid cells)
     # hm    = [1800.0,1400.0,1040.0][experiment]    # % mnt height (m)
@@ -158,7 +159,8 @@ def get_params(T2m,U,Ndsq,zs,env_gamma):
     # % -------------------------------------------------------------------------------
     # cw  = 1.9                # sensitivity (commonly set to 1.1, see paper SB04) = cap_gamma / env_gamma
     cw  = cap_gamma/env_gamma
-    print(cap_gamma, env_gamma, cw, qs0)
+    if verbose:
+        print(cap_gamma, env_gamma, cw, qs0)
     # using base_mr from profile, but maybe it should be qs0 above?
     cwqv= cw*base_mr            # =sensitivity times q_vs (set to: 0.01 kg/kg, see paper SB04)
     # print(cwqv,cw,base_mr,qs0,p0,hw)
@@ -168,14 +170,15 @@ def get_params(T2m,U,Ndsq,zs,env_gamma):
     tauf= hw/vterm           # BS'11: =zg/Vt ( =hw/Vt for moisture level: around 500s (->750s) is normally good)
     tauc= 2000.0             # cloud->hydrometero conversion time.  probably around 500s for rain, 
                              # shorter for warmer condition, longer for snow?
-    print("   Ndsq=",Ndsq)
-    print("   Environmental lapse rate=0.004K/m")
-    print("   \"Dry\" lapse rate=0.0017K/m")
-    print("   Base MR=",base_mr)
-    print("   Scale height=",hw)
-    print("   tauc=",tauc)
-    print("   tauf=",tauf)
-    print("   cwqv=",cwqv)
+    if verbose:
+        print("   Ndsq=",Ndsq)
+        print("   Environmental lapse rate=0.004K/m")
+        print("   \"Dry\" lapse rate=0.0017K/m")
+        print("   Base MR=",base_mr)
+        print("   Scale height=",hw)
+        print("   tauc=",tauc)
+        print("   tauf=",tauf)
+        print("   cwqv=",cwqv)
     # %---------------------------------------------------------------------------------
     params=Bunch(cw=cw,cwqv=cwqv,z0=z0,tauf=tauf,tauc=tauc,hw=hw,Ndsq=Ndsq)
     return (Fzs,params)
