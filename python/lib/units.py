@@ -27,8 +27,54 @@ import numpy as np
 
 def rtod(angle):
     return angle*360.0/(2*np.pi)
+    
 def dtor(angle):
     return angle/360.0*(2*np.pi)
+
+def moist_BV_frequency_squared(t,z,p,ql):
+    # return None
+    g = 9.81 #m/s^2
+    R = 287.058 # J/kg/K
+    # L = 2260.0*1000 # J/kg
+    # L = 2.5e6 # J/kg
+    L = (2500.8 - 2.36*(t-273.15) + 0.0016*(t-273.15)**2 - 0.00006*(t-273.15)**3)*1000 # J/kg
+    
+    qs = rh2mr(t,p,1.0)
+    gamma_moist = sat_lapse_rate(t,mr=qs)
+    print("Gmoist=",gamma_moist[0])
+    print("qsat=  ",qs[0])
+    
+    dtdz = np.zeros(t.shape)
+    dtdz[:-1] = (t[1:]-t[:-1]) / (z[1:]-z[:-1])
+    dtdz[-1]=dtdz[-2]
+    print("dtdz=  ",dtdz[0])
+    
+    qw=qs+ql
+    dqwdz = np.zeros(qw.shape)
+    dqwdz[:-1] = (qw[1:]-qw[:-1]) / (z[1:]-z[:-1])
+    dqwdz[-1] = dqwdz[-2]
+    print("dqwdz= ",dqwdz[0])
+    print("t =    ",t[0])
+    print(L/R)
+    bv = g/t * (dtdz + gamma_moist) * (1 + (L*qs)/(R*t)) - (g/(1+qw))*dqwdz
+    return bv
+
+def dry_BV_frequency_squared(theta,z,bottom=0,top=None,t=None,p=None):
+    g=9.81
+    
+    if (theta==None):
+        if t!=None and p!=None:
+            theta=t/exner(p)
+        else:
+            raise ValueError("Needs either potential temperature[K] or real T[K] and P[Pa]")
+    
+    lntheta=np.log(theta)
+    if top==None:
+        bv=g * (lntheta[bottom+1:top]-lntheta[bottom:-1]) / (z[bottom+1:top] - z[bottom:-1])
+    else:
+        bv=g * (lntheta[bottom+1:top]-lntheta[bottom:top-1]) / (z[bottom+1:top] - z[bottom:top-1])
+    
+    return bv
 
 def exner(p):
     """use this to get the exner function
@@ -64,16 +110,22 @@ def exner(p):
 # return the moist / saturated adiabatic lapse rate for a given
 # Temperature and mixing ratio (really MR could be calculated as f(T))
 # from http://glossary.ametsoc.org/wiki/Saturation-adiabatic_lapse_rate
-def sat_lapse_rate(T,mr):
-	L=2.5e6
-	g=9.8
-	Rd=287
-	Rw=461.5
-	ratio=Rd/Rw
-	cp=1003.5
-	
-	return g*((1 + (L*mr) / (Rd*T))
-			/ (cp + (L*L*mr*ratio) / (Rd*T*T) ))
+def sat_lapse_rate(T,mr=None, p=None):
+    L  = 2.5e6  # J /kg
+    g  = 9.81   # m/s^2
+    Rd = 287.0    # J /kg /K
+    Rw = 461.5  # J /kg /K
+    ratio=Rd/Rw # []
+    cp = 1005.0 # J /kg /K
+    
+    # T [=] K
+    # mr[=] kg/kg
+    
+    if mr==None:
+        mr = rh2mr(T,p,100.0)
+    
+    return g* ((1 + ((L*mr) / (Rd*T)) )
+            / (cp + (((L**2)*mr*ratio) / (Rd*(T**2))) ))
 
 
 def calc_tv(t,mr=None,e=None,p=None):

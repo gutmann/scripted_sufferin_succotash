@@ -99,6 +99,7 @@ while getopts H:p:wl:m:t:fvh OPTIONS; do
 done
 
 filepath="${@:$OPTIND}"
+if [[ -h $filepath ]]; then filepath=`readlink $filepath`; fi
 
 if [ "$filepath" = "" ]; then
     showusage
