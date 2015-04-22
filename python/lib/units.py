@@ -129,7 +129,7 @@ def z2p(p,h):
     # h    in meters
     return p*(1 - 2.25577E-5*h)**5.25588
 
-def zt2p(z,p0=101325.0,t0=288.15,dtdz= -0.0065):
+def zt2p(z,p0=101325.0,t0=288.15,dtdz= -0.0065,zaxis=1,use_z_axis=None):
     # p0=101325    #Pa
     # t0=288.15   #K
     # dtdz= -0.0065 #K/m
@@ -139,12 +139,17 @@ def zt2p(z,p0=101325.0,t0=288.15,dtdz= -0.0065):
     if (type(t0)!=np.ndarray) and (type(t0)!=np.ma.core.ndarray):
         p= p0*(t0/(t0+dtdz*z))**((g*M)/(R*dtdz))
         return p
-    if len(t0.shape)==3:
-        p= p0*(t0/(t0+dtdz*z))**((g*M)/(R*dtdz))
-    else:
+        
+    if use_z_axis==None:
+        use_z_axis=len(t0.shape)>3
+        
+    if use_z_axis:
         p=np.zeros(t0.shape)
-        for i in range(t0.shape[1]):
-            p[:,i,...]=p0*(t0[:,i,...]/(t0[:,i,...]+dtdz*z[:,i,...]))**((g*M)/(R*dtdz))
+        for i in range(t0.shape[zaxis]):
+            p.take(i,axis=zaxis)=p0*(t0.take(i,axis=zaxis)/(t0.take(i,axis=zaxis)+dtdz*z.take(i,axis=zaxis)))**((g*M)/(R*dtdz))
+    else:
+        p= p0*(t0/(t0+dtdz*z))**((g*M)/(R*dtdz))
+            # p[:,i,...]=p0*(t0[:,i,...]/(t0[:,i,...]+dtdz*z[:,i,...]))**((g*M)/(R*dtdz))
     
     return p
     
