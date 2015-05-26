@@ -9,6 +9,7 @@ else
 	# export TARGET_DIR=/KYOKO/wrf/snowpack/HW2010/PGW/hydro_study/PGW_WRFOUT_T2_04km*.gz
 	# export TARGET_DIR=/KYOKO/CESM_LE/wrf361_noah/Ens030_v0/wrfout/*
 fi
-# echo $TARGET_DIR
+echo $TARGET_DIR 1>&2
 export ticketname=`klist | head -1 | sed -e"s/:/ /g" | awk '{print $4 }'`
+echo $ticketname 1>&2
 hsi -P -c $ticketname  ls -PR $TARGET_DIR |  awk  'BEGIN { FS = "\t"};{ if($1 == "FILE") print $6, $2}' | sort | awk '{print "cget", $2}'

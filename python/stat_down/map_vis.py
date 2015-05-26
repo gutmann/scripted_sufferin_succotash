@@ -5,7 +5,8 @@ from mpl_toolkits.basemap import Basemap
 
 def vis(data,geo=[25,52.7,-124.7,-67],title="",vmin=None,vmax=None,ylim=None,xlim=None,proj='cyl',
         cmap=None,colorbar=True,latstep=5.0,lonstep=10.0,m=None,lat=None,lon=None,clim=None,
-        reproject=False,width=None,height=None,cbar_label=None):
+        reproject=False,width=None,height=None,cbar_label=None, latlabels=[1,0,0,0], lonlabels=[0,0,0,1],
+        statewidth=1.5, countrywidth=1.5, coastwidth=1.5):
     """Plot a map of data using the bounds in geo=[lower_lat,upper_lat,left_lon,right_lon]
     
     Optionally specify a map title, min and max color values, colormap, projection,
@@ -75,11 +76,12 @@ def vis(data,geo=[25,52.7,-124.7,-67],title="",vmin=None,vmax=None,ylim=None,xli
         cs = m.pcolormesh(x,y,data,vmin=vmin,vmax=vmax,cmap=cmap)
     else:
         mapimg=m.imshow(data,vmin=vmin,vmax=vmax,cmap=cmap)
-    m.drawparallels(np.arange(20,60,latstep),labels=[1,0,0,0],dashes=[1,4])
-    m.drawmeridians(np.arange(-120,-65,lonstep),labels=[0,0,0,1],dashes=[1,4])
-    m.drawstates(linewidth=1.5)
-    m.drawcountries(linewidth=1.5)
-    m.drawcoastlines(linewidth=1.5)
+    
+    m.drawparallels(np.arange(-90,90,latstep),labels=latlabels,dashes=[1,4])
+    m.drawmeridians(np.arange(-180,180,lonstep),labels=lonlabels,dashes=[1,4])
+    m.drawstates(linewidth=statewidth)
+    m.drawcountries(linewidth=countrywidth)
+    m.drawcoastlines(linewidth=coastwidth)
     
     if colorbar:
         cb=m.colorbar()

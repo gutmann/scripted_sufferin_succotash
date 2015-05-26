@@ -44,7 +44,7 @@ def main (filename):
 
 if __name__ == '__main__':
     try:
-        parser= argparse.ArgumentParser(description='This is a template file for Python scripts. ')
+        parser= argparse.ArgumentParser(description='This is a template file for Python scripts. ',
                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument('filename',nargs="?", action='store', default="some_file_name")
         parser.add_argument('-f2', dest="file_two", action='store', default="a_Second_filename")
