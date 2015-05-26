@@ -6,10 +6,17 @@ import load_data
 from mpl_toolkits.basemap import Basemap
 
 global input_dir
-input_dir = "/glade/scratch/kyoko/DNV/tracker_output/{}/TC_NATL_NEW/"
-input_dir = "/scratch/WEEKLY/kyoko/tracker_output_curr/{}/TC_NATL_NEW/"
+basin="atlc"
+basin="epac"
+if basin=="atlc":
+    basin_subdir="TC_NATL_NEW2/"
+else:
+    basin_subdir="TC_EPAC_NEW2/"
+input_dir = "/glade/scratch/kyoko/DNV/tracker_output/{}/"+basin_subdir
+# input_dir = "/glade/scratch/kyoko/DNV/tracker_output_pgw/{}/"+basin_subdir
+# input_dir = "/scratch/WEEKLY/kyoko/tracker_output_curr/{}/TC_NATL_NEW/"
 # input_dir = "/scratch/WEEKLY/kyoko/tracker_output_pgw/{}/TC_NATL_NEW/"
-outputfile= "cdp_ebr64_atlc_{}.txt"
+outputfile= "cdp_ebr64_"+basin+"_{}.txt"
 km_to_naut_miles = 0.539957
 
 datecol=0
@@ -72,6 +79,7 @@ def main(ens_member):
     """docstring for main"""
     files=glob.glob(input_dir+"track-*.txt")
     output_file=outputfile.format(ens_member)
+    print(output_file)
     projection=load_projection()
     with open(output_file,"w") as output:
         for f in files:
