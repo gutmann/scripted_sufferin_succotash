@@ -4,11 +4,11 @@ from numpy.fft import fft
 import matplotlib.pyplot as plt
 
 # ## simple CLI code to load, process sway and environmental paramters and make some plots
-# import swim_io,glob,date_fun, process
+# import mygis,glob,date_fun, process
 # 
 ### LOAD INTERCEPTOMETER DATA (and calc sway)
-# d=swim_io.read_nc("newinterception.nc").data
-# mjd=swim_io.read_nc("newinterception.nc","mjd").data
+# d=mygis.read_nc("newinterception.nc").data
+# mjd=mygis.read_nc("newinterception.nc","mjd").data
 # tmpmjd=mjd[8000::10000]
 # ms=(d[:,0].copy()+32768).astype(np.ulonglong)
 # start=0
@@ -33,9 +33,9 @@ import matplotlib.pyplot as plt
 # snotel=load_data.cols("snotel_precip.txt")
 # swe=load_data.cols("snotel_swe.txt")
 # snodates=date_fun.datearr2datetime(snotel[:,1:6])
-# temperature=np.concatenate(swim_io.read_files("nwt_data/*.nc","T12"))
-# speed=np.concatenate(swim_io.read_files("nwt_data/nwt.131*","w_spd_25m"))
-# wdir=np.concatenate(swim_io.read_files("nwt_data/nwt.131*","w_dir_25m"))
+# temperature=np.concatenate(mygis.read_files("nwt_data/*.nc","T12"))
+# speed=np.concatenate(mygis.read_files("nwt_data/nwt.131*","w_spd_25m"))
+# wdir=np.concatenate(mygis.read_files("nwt_data/nwt.131*","w_dir_25m"))
 # wdates=[]
 # files=glob.glob("nwt_data/*")
 # for f in files:
@@ -88,6 +88,13 @@ def dtfromstring(datestr):
     second=datestr.split(":")[-1].strip()
     return datetime.datetime(int(year),int(month),int(day),int(hour),int(minute),int(second))
 
+def load_nc_data(filename):
+    """docstring for load_nc_data"""
+    import mygis,date_fun
+    data=mygis.read_nc(filename).data
+    dates=date_fun.mjd2datetime(mygis.read_nc(filename,"mjd").data)
+    return dates,data
+
 def load_data(filename,ncols=None):
     """Read an interceptometer data file
     
@@ -137,7 +144,7 @@ def load_data(filename,ncols=None):
     
     return (dates,d[:i,:])
 
-def calc_scargle_frequencies(data,time):
+def calc_scargle_frequencies(data,time,verbose=True):
     import scargle
     
     window=1024.0
@@ -148,8 +155,9 @@ def calc_scargle_frequencies(data,time):
     output=np.zeros((len(data)/stepsize,2))
     count=0
     for i in np.arange(0,len(data)-window,stepsize):
-        if (count%500)==0:
-            print(i,len(data),i/len(data))
+        if verbose:
+            if (count%500)==0:
+                print("cur={} of {} = {}%".format(i,len(data),int(100*i/len(data))) )
         count+=1
         
         fx,fy, nout, jmax, prob = scargle.fasper(time[i:i+window],data[i:i+window], 6., 6.)
@@ -205,7 +213,7 @@ def sway_frequencies(data):
     """
     output=[]
     # for i in range(data[1].shape[1]):
-    for i in range(4,6):
+    for i in range(3,4):
         print(i)
         freq=calc_scargle_frequencies(data[1][:,i],time=data[1][:,0])
         # freq[:,0]=1024/freq[:,0]/10.5
@@ -243,10 +251,10 @@ def convert_to_netcdf(filename="INTERCEP.TXT",outputfile="interception_data",dat
     """Convert an interceptometer text datafile (or data tuple) into netcdf
     
     This is separated out a bit from the other routines because it requires a netcdf library be installed
-    Along with my helper module (swim_io) to write the netcdf file and I'm guessing most won't use this
+    Along with my helper module (mygis) to write the netcdf file and I'm guessing most won't use this
     Also uses my date_fun module to convert the datetime objects into modified julian days (easier for netcdf)
     """
-    import mygis as swim_io
+    import mygis
     from bunch import Bunch
     import date_fun
     
@@ -265,6 +273,6 @@ def convert_to_netcdf(filename="INTERCEP.TXT",outputfile="interception_data",dat
     I'll figure out conversions for Temperature sensors later"""
     attributes=Bunch(description=desc,columns=cols,note=note)
     
-    swim_io.write(outputfile,
+    mygis.write(outputfile,
                     data[1],dtype="h",units="volts*32768/6.144",
                     extravars=extravars,attributes=attributes)
