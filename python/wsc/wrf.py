@@ -110,7 +110,7 @@ def load(filename, startyear=2000,startdate=None,extractday=None):
     
     return Bunch(data=data/1000.0,lat=lat,lon=lon,dates=dates,dem=dem,lc=mask)
 
-def load_base_data(swefile="SWE_daily.nc",info="4km_wrf_output.nc",res=4):
+def load_base_data(swefile="SWE_daily.nc",info="4km_wrf_output.nc",res=4,year=5):
     # wrf.load_base_data(swefile="wrfout_d01_2008-05-01_00:00:00",res=2)
     
     if res==2:
@@ -139,8 +139,10 @@ def load_base_data(swefile="SWE_daily.nc",info="4km_wrf_output.nc",res=4):
     lat=myio.read_nc(info,"XLAT").data[0,...]
     lon=myio.read_nc(info,"XLONG").data[0,...]
     dem=myio.read_nc(info,"HGT").data[0,...]
-    snow=myio.read_nc(swefile,"SNOW").data[mayday,:,:]/1000
-    return Bunch(data=snow, lat=lat,lon=lon, dem=dem, lc=mask)
+    all_snow=myio.read_nc(swefile,"SNOW").data/1000.0
+    snow=all_snow[mayday,:,:]
+    data_by_years=[all_snow[baseday:baseday+365,:,:] for baseday in range(0,all_snow.shape[0]-20,365)]
+    return Bunch(data=snow, lat=lat,lon=lon, dem=dem, lc=mask, yearly=data_by_years)
 
 def load_elev_comparison(swefile="SWE_daily.nc",info="4km_wrf_output.nc",res=4,outputfile="wrf_by_elev.png",year=7,domain="FullDomain"):
     # wrf.load_elev_comparison(swefile="wrfout_d01_2008-05-01_00:00:00",res=2,outputfile="wrf_by_elev_2km_FullDomain_May2008.png")
