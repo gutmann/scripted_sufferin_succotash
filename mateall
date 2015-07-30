@@ -1,2 +1,2 @@
 #!/bin/sh
-for i in $1; do echo $i; rmate -f -m $i $i; done
+for i in $1; do echo $i; rmate -f -m `basename $i` $i; done
