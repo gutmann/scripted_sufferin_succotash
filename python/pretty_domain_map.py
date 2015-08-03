@@ -9,7 +9,30 @@ from myshade import shade
 
 import sys
 
+def usage():
+    """docstring for usage"""
+    print("""
+pretty_domain_maps.py center_lat center_lon width height name rescale_shading large_output
+    
+    center_lat = latitude coordinate of map center  [default=40]
+    center_lon = longitude coordinate of map center [default=-105]
+    width      = domain width E-W (km)              [default=1000]
+    height     = domain height N-S (km)             [default=1000]
+    name       = map title (and filename)           [default='']
+    rescale_shading     Boolean flag if present shading is rescaled for local topography
+    large_output        Boolean flag if present a larger output image is created
+    
+    """)
+
 # Command line options.
+if len(sys.argv)>1:
+    if sys.argv[1]=="-h" or sys.argv[1]=="--help":
+        usage()
+        sys.exit()
+else:
+    usage()
+    sys.exit()
+
 if len(sys.argv)>2:
     center_lat=float(sys.argv[1])
     center_lon=float(sys.argv[2])
