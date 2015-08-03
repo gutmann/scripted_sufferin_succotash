@@ -198,7 +198,20 @@ def zt2p(z,p0=101325.0,t0=288.15,dtdz= -0.0065,zaxis=1,use_z_axis=None):
     if use_z_axis:
         p=np.zeros(t0.shape)
         for i in range(t0.shape[zaxis]):
-            p.take(i,axis=zaxis)=p0*(t0.take(i,axis=zaxis)/(t0.take(i,axis=zaxis)+dtdz*z.take(i,axis=zaxis)))**((g*M)/(R*dtdz))
+            if zaxis==0:
+                p[i]=p0*(t0.take(i,axis=zaxis)/(t0.take(i,axis=zaxis)+dtdz*z.take(i,axis=zaxis)))**((g*M)/(R*dtdz))
+            elif zaxis==1:
+                p[:,i]=p0*(t0.take(i,axis=zaxis)/(t0.take(i,axis=zaxis)+dtdz*z.take(i,axis=zaxis)))**((g*M)/(R*dtdz))
+            elif zaxis==2:
+                p[:,:,i]=p0*(t0.take(i,axis=zaxis)/(t0.take(i,axis=zaxis)+dtdz*z.take(i,axis=zaxis)))**((g*M)/(R*dtdz))
+            elif zaxis==3:
+                p[:,:,i]=p0*(t0.take(i,axis=zaxis)/(t0.take(i,axis=zaxis)+dtdz*z.take(i,axis=zaxis)))**((g*M)/(R*dtdz))
+            else:
+                raise ValueError("not setup to process higher axes")
+                
+                
+                
+            # p.take(i,axis=zaxis)=p0*(t0.take(i,axis=zaxis)/(t0.take(i,axis=zaxis)+dtdz*z.take(i,axis=zaxis)))**((g*M)/(R*dtdz))
     else:
         p= p0*(t0/(t0+dtdz*z))**((g*M)/(R*dtdz))
             # p[:,i,...]=p0*(t0[:,i,...]/(t0[:,i,...]+dtdz*z[:,i,...]))**((g*M)/(R*dtdz))

@@ -32,7 +32,7 @@ VERSION
 
 import numpy as np
 
-import mygis as swim_io
+import mygis
 from bunch import Bunch
 import glob
 
@@ -200,16 +200,19 @@ class NC_Reader(object):
     xmin=0;xmax=None;ymin=0;ymax=None
     # xmin=100;xmax=-100;ymin=100;ymax=-100
     
+    def __len__(self):
+        return len(self._filenames)*self.npos
+    
     def init_xy(self, geoin_file,geomatch_file,subset=None,geo_subset=None,glatvar="XLAT",glonvar="XLONG"):
         # narrfilename='/Volumes/Data2/usbr/NARR/flxnc/HGT_2006010100.nc'
         # wrffilename='/Volumes/G-SAFE/headwaters/wrf_output/terrain/2km_wrf_input_d01'
-        nlat=swim_io.read_nc(geoin_file,var=self.latvarname).data
-        nlon=swim_io.read_nc(geoin_file,var=self.lonvarname).data# -360
+        nlat=mygis.read_nc(geoin_file,var=self.latvarname).data
+        nlon=mygis.read_nc(geoin_file,var=self.lonvarname).data# -360
         if nlon.max()>180:
             nlon-=360
         if len(nlon.shape)==1:
             nlon,nlat=np.meshgrid(nlon,nlat)
-        latinfo=swim_io.read_nc(geomatch_file,var=glatvar,returnNCvar=True)
+        latinfo=mygis.read_nc(geomatch_file,var=glatvar,returnNCvar=True)
         if len(latinfo.data.shape)==3:
             wlat=latinfo.data[0,self.ymin:self.ymax,self.xmin:self.xmax]
         elif len(latinfo.data.shape)==2:
@@ -217,7 +220,7 @@ class NC_Reader(object):
         else: # len(latinfo.data.shape)==1:
             wlat=latinfo.data[self.ymin:self.ymax]
         latinfo.ncfile.close()
-        loninfo=swim_io.read_nc(geomatch_file,var=glonvar,returnNCvar=True)
+        loninfo=mygis.read_nc(geomatch_file,var=glonvar,returnNCvar=True)
         if len(loninfo.data.shape)==3:
             wlon=loninfo.data[0,self.ymin:self.ymax,self.xmin:self.xmax]
         elif len(loninfo.data.shape)==2:
@@ -266,7 +269,7 @@ class NC_Reader(object):
             self._nn=True
             self._bilin=False
         if ntimes>1:
-            d=swim_io.read_nc(self._filenames[0],var=readvars[0],returnNCvar=True)
+            d=mygis.read_nc(self._filenames[0],var=readvars[0],returnNCvar=True)
             ntimes=d.data.shape[0]
             d.ncfile.close()
             self.npos=ntimes
@@ -278,10 +281,10 @@ class NC_Reader(object):
             self.init_xy(geoin_file,geomatch_file,subset=subset,geo_subset=geo_subset,
                         glatvar=glatvar,glonvar=glonvar)
         else:
-            d=swim_io.read_nc(self._filenames[0],var=readvars[0],returnNCvar=True)
+            d=mygis.read_nc(self._filenames[0],var=readvars[0],returnNCvar=True)
             if geo_subset:
-                lat=swim_io.read_nc(self._filenames[0],var=self.latvarname).data
-                lon=swim_io.read_nc(self._filenames[0],var=self.lonvarname).data
+                lat=mygis.read_nc(self._filenames[0],var=self.latvarname).data
+                lon=mygis.read_nc(self._filenames[0],var=self.lonvarname).data
                 if lon.max()>180:
                     lon-=360
                 if len(lat.shape)==1:
@@ -330,7 +333,7 @@ class NC_Reader(object):
         cury=self.y-miny
         data=list()
         for thisvar in self._vars:
-            ncfile=swim_io.read_nc(self._filenames[curfile],var=thisvar,returnNCvar=True)
+            ncfile=mygis.read_nc(self._filenames[curfile],var=thisvar,returnNCvar=True)
             if self.npos==1:
                 data.append(ncfile.data[miny:maxy,minx:maxx][cury,curx])
             else:
@@ -343,7 +346,7 @@ class NC_Reader(object):
             self.posinfile=0
             if self.npos>1:
                 if self._curfile<len(self._filenames):
-                    d=swim_io.read_nc(self._filenames[self._curfile],var=self._vars[0],returnNCvar=True)
+                    d=mygis.read_nc(self._filenames[self._curfile],var=self._vars[0],returnNCvar=True)
                     ntimes=d.data.shape[0]
                     d.ncfile.close()
                     self.npos=ntimes
@@ -370,7 +373,7 @@ class NC_Reader(object):
         data=list()
         for thisvar in self._vars:
             thisdata=np.zeros(N)
-            ncfile=swim_io.read_nc(self._filenames[curfile],var=thisvar,returnNCvar=True)
+            ncfile=mygis.read_nc(self._filenames[curfile],var=thisvar,returnNCvar=True)
             if self.npos==1:
                 curdata=ncfile.data[miny:maxy,minx:maxx]
             else:
