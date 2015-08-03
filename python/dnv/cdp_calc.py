@@ -7,7 +7,7 @@ from mpl_toolkits.basemap import Basemap
 
 global input_dir
 basin="atlc"
-basin="epac"
+# basin="epac"
 if basin=="atlc":
     basin_subdir="TC_NATL_NEW2/"
 else:
