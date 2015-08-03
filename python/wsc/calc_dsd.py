@@ -13,6 +13,14 @@ import mygis
 
 # WARNING: these values are all over ridden by argparse, but are defined here to identify module level global variables
 #          but CHANGING THE VALUES HERE WILL HAVE NO EFFECT
+global nfilter_passes
+global filter_threshold
+global min_reliable_DSD
+global max_reliable_DSD
+global cloud_dilation_doy
+global cloud_threshold
+global snow_threshold
+global output_file
 # Cloud dilation filters
 cloud_dilation_doy=160 # day of year to begin expanding the cloud filter.
 cloud_threshold=150 # data value to use as threshold, anything greater than this must be "cloud" (actually 100?)
@@ -21,6 +29,7 @@ cloud_threshold=150 # data value to use as threshold, anything greater than this
 nfilter_passes=5    # number of times to loop over the final spatial filter
 filter_threshold=50 # number of days of difference permitted between neighbor gridcells
 min_reliable_DSD=20 # minimum number of days to snow disapearance to validate this as a "good" gridcell and use it in filtering
+max_reliable_DSD=250 # last valid date before snow may be falling again
 
 # threshold value of SCA to search for
 snow_threshold=0
@@ -51,7 +60,7 @@ def load_data(files,dates,verbose):
     raw_data=[]
     for f in files:
         if verbose:
-            print(f,end=", ")
+            print(f,end="  \r")
             sys.stdout.flush()
         raw_data.append(mygis.read_tiff(f).data)
         
@@ -70,7 +79,7 @@ def final_spatial_filter(inputdata,verbose):
     for i in range(whalf,data.shape[0]-whalf):
         if verbose:
             if (i%int(round((data.shape[0]-whalf*2)/10.0)))==0:
-                print((100*i)/(data.shape[0]-whalf*2),end="% ")
+                print("  {}".format((100*i)/(data.shape[0]-whalf*2)),end="%  \r")
                 sys.stdout.flush()
                 
         for j in range(whalf,data.shape[1]-whalf):
@@ -82,11 +91,11 @@ def final_spatial_filter(inputdata,verbose):
             if local_window.size>0:
                 # find the minimum value of the surrounding reliable points
                 local_min=local_window.min()
-                # if the current point is greate than this value by more than a given threshold
+                # if the current point is greater than this value by more than a given threshold
                 # replace the current point with the median of the surrounding good points
                 if (data[i,j]-local_min)>filter_threshold:
                     data[i,j]=np.median(local_window[local_window<data[i,j]])
-    if verbose:print("")
+    if verbose:print(" 100%  ")
     return data
             
 
@@ -104,25 +113,26 @@ def main(pattern="*.tif",ndays=2,verbose=True):
     
     last_date=0
     for date,img in zip(dates,data):
-        if verbose:
-            print(date,end=", ")
-            sys.stdout.flush()
-        snow_off_now=(img==snow_threshold)
-        #points to mark as snow off are those that had snow previously, but don't now
-        snow_off_points=np.where(snow_on & snow_off_now)
+        if date<max_reliable_DSD:
+            if verbose:
+                print("Processing Day of Year: "+str(date),end="  \r")
+                sys.stdout.flush()
+            snow_off_now=(img==snow_threshold)
+            #points to mark as snow off are those that had snow previously, but don't now
+            snow_off_points=np.where(snow_on & snow_off_now)
         
-        # at those points, set DSD as occuring between the current date and the last snow covered date
-        last_snow[snow_off_points]=(date+last_date)/2.0
-        # also mark them as no longer having snow
-        snow_on[snow_off_points]=False
-        # and set the snow on again counter to 0
-        snow_on_again[snow_off_points]=0
+            # at those points, set DSD as occuring between the current date and the last snow covered date
+            last_snow[snow_off_points]=(date+last_date)/2.0
+            # also mark them as no longer having snow
+            snow_on[snow_off_points]=False
+            # and set the snow on again counter to 0
+            snow_on_again[snow_off_points]=0
 
-        # at points that have snow, add one to the snow on again counter
-        snow_on_again[(img<cloud_threshold)&(img>snow_threshold)]+=1
-        # after more than n days in a row set snow_on flag again
-        snow_on[snow_on_again>ndays]=True
-        last_date=date
+            # at points that have snow, add one to the snow on again counter
+            snow_on_again[(img<cloud_threshold)&(img>snow_threshold)]+=1
+            # after more than n days in a row set snow_on flag again
+            snow_on[snow_on_again>ndays]=True
+            last_date=date
     
     if verbose:print("")
     
@@ -130,17 +140,11 @@ def main(pattern="*.tif",ndays=2,verbose=True):
         print("Filtering data: pass {}".format(i))
         outputdata=final_spatial_filter(last_snow,verbose)
         last_snow[:]=outputdata[:]
-    mygis.write("DSD.nc",outputdata)
+    mygis.write(output_file,outputdata)
     
     
 
 if __name__ == '__main__':
-    global nfilter_passes
-    global filter_threshold
-    global min_reliable_DSD
-    global cloud_dilation_doy
-    global cloud_threshold
-    global snow_threshold
 
     try:
         parser= argparse.ArgumentParser(description='Find the date of snow disappearance in a series of SCA images. ')
@@ -153,16 +157,20 @@ if __name__ == '__main__':
                             help="Number of spatial filter passes to run")
         parser.add_argument('-filter',type=int,nargs="?", dest='filter_threshold',action='store',default=50,
                             help="Threshold to use for allowable spatial difference in DSD")
-        parser.add_argument('-minDSD',type=int,nargs="?", dest='min_reliable_DSD',action='store',default=20,
+        parser.add_argument('-minDSD',type=int,nargs="?", dest='min_reliable_DSD',action='store',default=50,
                             help="Minimum DSD to treat as reliable for use in the filter")
+        parser.add_argument('-maxDSD',type=int,nargs="?", dest='max_reliable_DSD',action='store',default=243, # note default = Sept 1 on non-leap year
+                            help="Maximum DSD to treat as reliable (last day or year before snow begins again)")
         parser.add_argument('-cloud_threshold',type=int,nargs="?", dest='cloud_threshold',action='store',default=150,
                             help="Threshold to use to define cloud or other bad data")
         parser.add_argument('-cloud_day',type=int,nargs="?", dest='cloud_dilation_doy',action='store',default=160,
                             help="Day of the year to begin dilating bad (cloudy) data")
         parser.add_argument('-snow_threshold',type=int,nargs="?", dest='snow_threshold',action='store',default=0,
                             help="Threshold to use to define snow cover [default=0]")
+        parser.add_argument('-o',type=str,nargs="?", dest='output_file',action='store',default="DSD.nc",
+                            help="Output filename")
         parser.add_argument('-v', '--version',action='version',
-                            version='calc_dsd v1.0')
+                            version='calc_dsd v1.1')
         parser.add_argument ('--verbose', action='store_true', default=False, 
                             help='verbose output', dest='verbose')
         args = parser.parse_args()
@@ -170,8 +178,10 @@ if __name__ == '__main__':
         nfilter_passes=args.nfilter_passes
         filter_threshold=args.filter_threshold
         min_reliable_DSD=args.min_reliable_DSD
+        max_reliable_DSD=args.max_reliable_DSD
         cloud_dilation_doy=args.cloud_dilation_doy
         cloud_threshold=args.cloud_threshold
+        output_file=args.output_file
         
         snow_threshold=args.snow_threshold
 

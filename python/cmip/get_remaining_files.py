@@ -33,9 +33,10 @@ rcp85_urls=dict(ccsm="http://tds.ucar.edu/thredds/fileServer/datazone/cmip5_data
                 hadgem="http://cmip-dn1.badc.rl.ac.uk/thredds/fileServer/esg_dataroot/cmip5/output1/"
                 +"MOHC/HadGEM2-ES/rcp85/6hr/atmos/6hrLev/r1i1p1/v20101208/__VAR__/__NCFILE__")
 
-all_urls=dict(historical=hist_urls,rcp85=rcp85_urls)
-hist_monthly_req =dict(ccsm=False,cnrm=False,miroc=True,mri_cgcm3=False,miroc_esm=False,bcc=False)
-rcp85_monthly_req=dict(ccsm=False,cnrm=True,miroc=True,mri_cgcm3=True, miroc_esm=True,bcc=False,hadgem=False)
+all_urls = dict(historical=hist_urls,rcp85=rcp85_urls)
+
+hist_monthly_req  = dict(ccsm=False,cnrm=False,miroc=True,mri_cgcm3=False,miroc_esm=False,bcc=False)
+rcp85_monthly_req = dict(ccsm=False,cnrm=True,miroc=True,mri_cgcm3=True, miroc_esm=True,bcc=False,hadgem=False)
 
 Gregorian_object=None #Should be a class that responds to __getitem__(Year,Month) with ndays... or something like that
 calendar=dict(ccsm="noleap",cnrm="noleap",miroc="noleap",miroc_esm="gregorian",mri_cgcm3="gregorian",bcc="noleap",hadgem="day360")
@@ -264,8 +265,10 @@ def main(model="ccsm",experiment="historical",base=None,all_files=None, unique_f
 if __name__ == '__main__':
     try:
         parser= argparse.ArgumentParser(description='Generate a wget inputfile to additional CMIP5 data. ')
-        parser.add_argument('model',nargs="?",action='store',help="Model to process [ccsm,cnrm,mri_cgcm3,miroc,miroc_esm,etc]")
-        parser.add_argument('experiment',nargs="?",action='store',help="Experiment to process <historical,rcp85>")
+        parser.add_argument('model',nargs="?",default="ccsm",action='store',
+                            help="Model to process [ccsm,cnrm,mri_cgcm3,miroc,miroc_esm,etc]")
+        parser.add_argument('experiment',nargs="?",action='store', default="historical",
+                            help="Experiment to process <historical,rcp85>")
         parser.add_argument('-b','--base',dest='base_filename',nargs="?",action='store',default=None,
                             help="Base filename to use in creating other files")
         parser.add_argument('-a','--all',dest='all_files',nargs="?",action='store',default=None,

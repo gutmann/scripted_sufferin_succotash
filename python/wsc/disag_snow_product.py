@@ -1,5 +1,24 @@
 #!/usr/bin/env python
+"""
+usage: disag_snow_product.py [-h] [-m METHOD] [-y YEAR] [-v] [--verbose]
+
+Disaggregate WRF or SNODAS SWE data to the MODSCAG grid
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -m METHOD, --method METHOD
+                        dataset to process [wrf,snodas] (default: wrf)
+  -y YEAR, --year YEAR  Year to process [2004-2008] (default: 2004)
+  -v, --version         show program's version number and exit
+  --verbose             verbose output (default: False)
+"""
 from __future__ import print_function
+
+import sys
+import os
+import traceback
+import argparse
+
 import numpy as np
 from wsc import snodas,wrf,modscag
 
@@ -8,27 +27,37 @@ import mygis
 
 filenames=dict(wrf="wrf_high_res.nc",snodas="snodas_high_res.nc")
 
-def load_wrf():
+def load_wrf(year=2004, load_may=False):
     """docstring for load_wrf"""
     wrffilename="wrf/SWE_daily.nc"
     wrfgeofile="wrf/4km_wrf_output.nc"
-    
-    data=mygis.read_nc(wrffilename,"SNOW").data[-365:,...].max(axis=0)/1000.0
+    startpt=int((year-2001)*365.25)
+    data=mygis.read_nc(wrffilename,"SNOW").data[startpt:startpt+365,...]
+    if load_may:
+        data=data[212]/1000.0
+    else:
+        data=data.max(axis=0)/1000.0
     lat=mygis.read_nc(wrfgeofile,"XLAT").data[0,...]
     lon=mygis.read_nc(wrfgeofile,"XLONG").data[0,...]
     hgt=mygis.read_nc(wrfgeofile,"HGT").data[0,...]
     
     return Bunch(snow=data,lat=lat,lon=lon,z=hgt)
     
-def load_snodas():
+def load_snodas(year=2004, load_may=False):
     """docstring for load_snodas"""
-    snodasfilename="snodas/SWE_Daily0600UTC_WesternUS_2008.dat"
-    data=snodas.load(snodasfilename,startyear=2008,fill=True)
+    snodasfilename="snodas/SWE_Daily0600UTC_WesternUS_{year}.dat".format(year=year)
+    data=snodas.load(snodasfilename,startyear=year,fill=True)
     if len(data.lon.shape)<2:
         lon,lat=np.meshgrid(data.lon,data.lat)
     else:
         lon,lat=(data.lon,data.lat)
-    return Bunch(snow=data.data.max(axis=0),lat=lat,lon=lon,z=data.dem)
+    
+    if load_may:
+        snowdata=data.data[120]
+    else:
+        snowdata=data.data.max(axis=0)
+    
+    return Bunch(snow=snowdata,lat=lat,lon=lon,z=data.dem)
 
 def load_high_res_grid():
     """docstring for load_high_res_grid"""
@@ -96,43 +125,79 @@ def downscale_snow(data,grid):
     
     for i in range(ny):
         lasty,lastx=-1,-1
-        print("{:6.2f}%".format(100.0*i/float(ny)),end="\r")
+        if verbose: print("{:6.2f}%".format(100.0*i/float(ny)),end="\r")
         for j in range(nx):
             cury,curx=find_point(grid.lat[i,j],grid.lon[i,j],data.lat,data.lon,lasty,lastx)
             miny=max(cury-window_size,0)
             maxy=min(cury+window_size+1,ny_low)
             minx=max(curx-window_size,0)
             maxx=min(curx+window_size+1,nx_low)
+            
             slope,offset=np.polyfit(data.z[miny:maxy,minx:maxx].flat,data.snow[miny:maxy,minx:maxx].flat,deg=1)
+            if (slope<0):
+                slope=0
+                offset=data.snow[cury,curx]
+                
             exposed[i,j]=grid.exposed.z[i,j]*slope+offset
             forest[i,j] =grid.forest.z[i,j] *slope+offset
             
             lastx,lasty=curx,cury
-    print("")
+    if verbose: print("")
     return Bunch(exposed=exposed,forest=forest)
 
-def write_output(data,filename):
+def write_output(data,filename,year,may):
     """docstring for write_output"""
-    mygis.write("forest_"+filename,data.forest)
-    mygis.write("exposed_"+filename,data.exposed)
+    if may:
+        filename="May1st_"+filename
+    mygis.write("forest_{year}_{file}".format(year=year,file=filename), data.forest)
+    mygis.write("exposed_{year}_{file}".format(year=year,file=filename),data.exposed)
     
 
-def main(method="snodas"):
+def main(method="snodas", year=2004, may=False):
     """docstring for main"""
-    print("Loading low-res data")
+    if verbose: print("Loading low-res data")
     if method=="wrf":
-        data=load_wrf()
+        data=load_wrf(year,load_may=may)
     elif method=="snodas":
-        data=load_snodas()
+        data=load_snodas(year,load_may=may)
     
-    print("Loading high-res data")
+    if verbose: print("Loading high-res data")
     grid=load_high_res_grid()
     
-    print("Downscaling")
+    if verbose: print("Downscaling")
     high_res=downscale_snow(data,grid)
     
-    print("Writing output")
-    write_output(high_res,filenames[method])
+    if verbose: print("Writing output")
+    write_output(high_res,filenames[method],year,may)
+
 
 if __name__ == '__main__':
-    main()
+    try:
+        parser= argparse.ArgumentParser(description='Disaggregate WRF or SNODAS to MODSCAG grid. ',
+                                        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        parser.add_argument('-m','--method',dest="method", action='store', default="wrf", help="dataset to process [wrf,snodas]")
+        parser.add_argument('-y','--year',  dest="year",   action='store', default=2004,  help="Year to process [2004-2008]", type=int)
+        parser.add_argument ('--may', action='store_true',
+                default=False, help='Load May1st SWE instead of seasonal maximum', dest='may')
+        parser.add_argument('-v', '--version',action='version',
+                version='disag_snow_product 1.0')
+        parser.add_argument ('--verbose', action='store_true',
+                default=False, help='verbose output', dest='verbose')
+        args = parser.parse_args()
+        
+        global verbose
+        verbose=args.verbose
+
+        exit_code = main(method=args.method,year=args.year, may=args.may)
+        if exit_code is None:
+            exit_code = 0
+        sys.exit(exit_code)
+    except KeyboardInterrupt, e: # Ctrl-C
+        raise e
+    except SystemExit, e: # sys.exit()
+        raise e
+    except Exception, e:
+        print('ERROR, UNEXPECTED EXCEPTION')
+        print(str(e))
+        traceback.print_exc()
+        os._exit(1)
