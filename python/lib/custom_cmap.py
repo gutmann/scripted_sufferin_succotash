@@ -35,13 +35,15 @@ def make_colormap(seq):
             cdict['blue'].append([item, b1, b2])
     return mcolors.LinearSegmentedColormap('CustomMap', cdict)
 
-
-def subset(cmap=None,clim=(0,255),step=1):
+def subset(cmap=None,clim=(0,255),step=1, bottomvalue=None):
     """docstring for subset"""
     if type(cmap)==str:
         cmap=plt.cm.__getattribute__(cmap)
     
     newcmap=[]
+    if bottomvalue!=None:
+        newcmap.append(bottomvalue)
+        newcmap.append(0)
     for i in range(clim[0],clim[1]+step,step):
         newcmap.append(cmap(i))
         if (i<clim[1]):
@@ -49,6 +51,7 @@ def subset(cmap=None,clim=(0,255),step=1):
             
     return make_colormap(newcmap)
     
-    
-    
+def terrain():
+    """docstring for terrain"""
+    return subset(plt.cm.terrain,clim=(55,255),bottomvalue=(0.1,0.4,0.9))
     
