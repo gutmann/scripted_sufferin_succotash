@@ -15,8 +15,8 @@ def vis(data,geo=[25,52.7,-124.7,-67],title="",vmin=None,vmax=None,ylim=None,xli
     if not m:
         if geo=="subset":
             if proj=="lcc":
-                pass # we don't actually need geo for the lcc (WRF) subset
-                # geo=[25.125,52.875,-124.75,-67]
+                # pass # we don't actually need geo for the lcc (WRF) subset
+                geo=[25.125,52.875,-124.75,-67]
             else:
                 geo=[35,43,-113,-101]
         if geo=="conus":
