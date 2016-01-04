@@ -1,8 +1,7 @@
 import numpy as np
 # Note, this advection scheme is positive definite given stable courant conditions
-#  However, it is not terribly fast numerically, may need to look into 
-#  either "Marker based" or Adam's Bashforth for faster methods?
-#  Marker Based: http://www.msi.umn.edu/~lilli/taras-pepi.pdf
+#  However, it may be worth it to look into Adams Bashforth
+#  also Marker Based: http://www.msi.umn.edu/~lilli/taras-pepi.pdf
 
 
 def F(l,r,U):
@@ -166,7 +165,31 @@ def advectvertical(q,w,dx,dt,courant=False):
     #         - (F(q1[1:-1],q1[2:],Vr) - F(q1[1:-1],q1[:-2],Vl)))
     # return q
 
-def advect1d(q,u,dx,dt,S):
+def upwind1d(q,u,dx,dt,S):
+    """docstring for upwind"""
+    U=u*dt/dx
+    # if the courant stability condition is not met, decrease dt and try again
+    if np.max(np.abs(U))>0.95:
+        q1=upwind1d(q,u,dx,dt/2.0,S)
+        q2=upwind1d(q1,u,dx,dt/2.0,S)
+        return q2
+    
+    q[1:-1]=(q[1:-1]+S[1:-1]*dt/2 
+            - (F(q[1:-1],q[2:],(U[1:-1]+U[2:])/2.0) 
+            - F(q[:-2],q[1:-1],(U[1:-1]+U[:-2])/2.0)))
+    return q
+
+# def init():
+#   q=np.abs(5-np.arange(15,dtype='f'))
+#   q2=np.abs(5-np.arange(15,dtype='f'))
+#   q[0]=q[-2]
+#   q[-1]=q[1]
+#   q2[0]=q2[-2]
+#   q2[-1]=q2[1]
+#   return q,q2
+
+
+def advect1d(q,u,dx,dt,S,verbose=False):
     U=u*dt/dx
     # if the courant stability condition is not met, decrease dt and try again
     if np.max(np.abs(U))>0.95:
@@ -174,13 +197,29 @@ def advect1d(q,u,dx,dt,S):
         q2=advect1d(q1,u,dx,dt/2.0,S)
         return q2
     
+    # format string for printing verbose data at runtime
+    fmt='{0[0]:.2f} {0[1]:.2f} {0[2]:.2f} {0[3]:.2f} {0[4]:.2f}'
     q1=q.copy()
-    q1[1:-1]=(q[1:-1]+S[1:-1]*dt/2 
+    q1[1:-1]=(q[1:-1] #+S[1:-1]*dt/2 
             - (F(q[1:-1],q[2:],(U[1:-1]+U[2:])/2.0) 
             - F(q[:-2],q[1:-1],(U[1:-1]+U[:-2])/2.0)))
     U2=np.abs(U)-U**2
-    Vl=(U2[:-2]+U2[1:-1])/2*(q1[:-2]-q1[1:-1])/(q1[:-2]+q1[1:-1])
-    Vr=(U2[2:]+U2[1:-1])/2*(q1[2:]-q1[1:-1])/(q1[2:]+q1[1:-1])
-    q[1:-1]=(q1[1:-1]+S[1:-1]*dt/2
-            - (F(q1[1:-1],q1[2:],Vr) - F(q1[1:-1],q1[:-2],Vl)))
+    
+    # useful for debugging
+    if verbose:
+        print("qin = "+fmt.format(q[5:10]))
+        print("qup = "+fmt.format(q1[5:10]))
+        print("upf = "+fmt.format(-(F(q[1:-1],q[2:],(U[1:-1]+U[2:])/2.0)
+                            - F(q[:-2],q[1:-1],(U[1:-1]+U[:-2])/2.0))[4:9]))
+    
+    Vl=(U2[:-2]+U2[1:-1])/2 * (q1[:-2]- q1[1:-1]) / (q1[:-2]+ q1[1:-1])
+    Vr=(U2[2:]+U2[1:-1])/2  * (q1[2:] - q1[1:-1]) / (q1[2:] + q1[1:-1])
+    
+    q[1:-1]=(q1[1:-1] #+S[1:-1]*dt/2
+            - (F(q1[1:-1],q1[2:],Vr) - F(q1[:-2],q1[1:-1],Vl)))
+
+    if verbose:
+        print("mpf = "+fmt.format(-(F(q1[1:-1],q1[2:],Vr) - F(q1[:-2],q1[1:-1],Vl))[4:9]))
+        print("out = "+fmt.format(q[5:10]))
+    
     return q
