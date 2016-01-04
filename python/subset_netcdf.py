@@ -6,18 +6,20 @@ SYNOPSIS
     subset_netcdf.py [-h] [--verbose] [-v, --version] <filename>
 
 DESCRIPTION
-
-    TODO This describes how to use this script.
-    This docstring will be printed by the script if there is an error or
-    if the user requests help (-h or --help).
+    Attempt to subset a netcdf file based on the grid coordinates
+    Assumes the last coordinate is X and the second to last is Y
+    If a variable does not cover the x/y range specified it is output
+    without subsetting. 
+    
+    All variables and attributes are copied over. 
 
 EXAMPLES
 
-    TODO: Show some examples of how to use this script.
+    subset_netcdf.py high_res_wrf_output.nc -xmin 320 -xmax 430 -ymin 20 -ymax 150 -o baseline.nc --verbose
 
 EXIT STATUS
 
-    TODO: List exit codes
+    None
 
 AUTHOR
 
@@ -28,7 +30,7 @@ LICENSE
     This script is in the public domain.
 
 VERSION
-
+    1.0
     
 """
 
@@ -42,9 +44,15 @@ import numpy
 
 from bunch import Bunch
 
+EW_STAGGER_VARS=["U","XLAT_U","XLONG_U","MAPFAC_U","MAPFAC_UX","MAPFAC_UY"]
+NS_STAGGER_VARS=["V","XLAT_V","XLONG_V","MAPFAC_V","MAPFAC_VX","MAPFAC_VY","MF_VX_INV"]
+
 def subset_data(ncdata, xmin,xmax, ymin,ymax):
     """docstring for subset_data"""
     sz=ncdata.shape
+    if verbose:print("           ",ncdata.shape, xmin,xmax, ymin,ymax)
+    if len(sz)<2:return ncdata[:]
+    
     if (ymax!=None):
         if (sz[-2]<ymax):
             return ncdata[:]
@@ -73,18 +81,29 @@ def main (filename, xmin,xmax, ymin,ymax, outputfile, varnames):
         varnames=varnames.split(",")
     
     outputvariables=[]
+    if verbose:print("Reading data")
     for v in varnames:
-        print(v)
+        if verbose:print(v)
         ncdata=d.variables[v]
+        
+        if (xmax!=None) and (v in EW_STAGGER_VARS):
+            xmax+=1
+        if (ymax!=None) and (v in NS_STAGGER_VARS):
+            ymax+=1
+        
         data=subset_data(ncdata, xmin,xmax, ymin,ymax)
+
+        if (xmax!=None) and (v in EW_STAGGER_VARS):
+            xmax-=1
+        if (ymax!=None) and (v in NS_STAGGER_VARS):
+            ymax-=1
         
         atts=Bunch()
         attrlist=ncdata.ncattrs()
         for a in attrlist:
             atts[a]=ncdata.getncattr(a)
         
-        # e.data,e.name,e.dims,e.dtype,e.attributes
-        outputvariables.append(Bunch(data=data, name=v, attributes=atts, dims=ncdata.dimensions, dtype='f'))
+        outputvariables.append(Bunch(data=data, name=v, attributes=atts, dims=ncdata.dimensions, dtype=data.dtype))
     
     global_atts=Bunch()
     attrlist=d.ncattrs()
@@ -102,7 +121,8 @@ def main (filename, xmin,xmax, ymin,ymax, outputfile, varnames):
         outputvariables=outputvariables[1:]
     else:
         outputvariables=None
-        
+    
+    if verbose:print("Writing output")   
     mygis.write(outputfile,v.data, dtype=v.dtype, varname=v.name, dims=v.dims, attributes=v.attributes, 
                 extravars=outputvariables, global_attributes=global_atts)
 
@@ -125,6 +145,8 @@ if __name__ == '__main__':
                 default=False, help='verbose output', dest='verbose')
         args = parser.parse_args()
         
+        global verbose
+        verbose=args.verbose
         outputfile=args.ofile if args.ofile!=None else "subset_"+args.filename
         
         xmin=args.xmin
