@@ -29,13 +29,17 @@ LICENSE
 
 VERSION
 
-    
+
 """
+from __future__ import absolute_import, print_function, division
 
 import sys
 import os
 import traceback
 import argparse
+
+global verbose
+verbose=False
 
 def main (filename):
 
@@ -53,6 +57,8 @@ if __name__ == '__main__':
         parser.add_argument ('--verbose', action='store_true',
                 default=False, help='verbose output', dest='verbose')
         args = parser.parse_args()
+
+        verbose = args.verbose
 
         exit_code = main(args.filename)
         if exit_code is None:
