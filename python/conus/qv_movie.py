@@ -47,6 +47,9 @@ import numpy as np
 import custom_cmap
 from mpl_toolkits.basemap import Basemap
 
+global verbose
+verbose=False
+
 def map_vis(data,geo=[],title="",vmin=None,vmax=None,cmap=None,showcolorbar=True,
             latlabels=[1,0,0,0],lonlabels=[0,0,0,1],cbar_label=None,m=None,imgdata=None):
     """Plot a map of data using the bounds in geo=[lllat,urlat,lllon,urlon]
@@ -83,12 +86,12 @@ def plt_data(data, curdate, m, overlay, map_img=None, overimg=None,imgdata=None)
     offset=20
     max_range=0.005
     # max_mean=0.0095
-    max_mean=0.015
+    max_mean=0.025
     
     
     doy=curdate - datetime.datetime(2000,1,1,0,0,0)
     doy=(doy.days+doy.seconds/86400.0)%365.25
-    print(str(curdate))
+    if verbose:print(str(curdate))
     maxval=np.cos((doy-offset-period/2)/period*2*np.pi)*max_range+max_mean
     
     if map_img==None:
@@ -114,10 +117,11 @@ def plt_data(data, curdate, m, overlay, map_img=None, overimg=None,imgdata=None)
     
     return map_img,overimg
 
-def main (data_dir, year, month, day, hour):
+def main (data_dir, year, month, day, hour, timevar=None, time_step=1, file_search="wrf2d*00"):
     
     plt.figure(figsize=(13,10))
-    files=glob.glob(data_dir+"/wrf2d*00")
+    files=glob.glob(data_dir+"/"+file_search)
+
     files.sort()
     print(data_dir)
     print(files[0])
@@ -127,7 +131,7 @@ def main (data_dir, year, month, day, hour):
     test_data=mygis.read_nc(files[0],"Q2",returnNCvar=True)
     nx=test_data.data.shape[2]
     ny=test_data.data.shape[1]
-    nt=test_data.data.shape[0]
+    nt=max(test_data.data.shape[0],365*24)
     test_data.ncfile.close()
     
     m = Basemap(width=nx*dx,height=ny*dx,
@@ -135,9 +139,14 @@ def main (data_dir, year, month, day, hour):
                 resolution='l',area_thresh=10000.,projection='lcc',\
                 lat_1=28.,lat_2=50.,lat_0=39.7,lon_0=-98.0)
     
-    start_date=datetime.datetime(year,month,day,hour)
     ntimes=len(files)*nt
     times_per_day=24.0
+    if timevar==None:
+        start_date=datetime.datetime(year,month,day,hour)
+    else:
+        dummydate=datetime.datetime(2000,1,1,0,0,0)
+        # used for dummydate.strptime to create the curdate from a datestring in the file
+        
     # print("Loading water vapor data")
     # data=mygis.read_files(files,"Q2",axis=0)
     # print("Loading precip data")
@@ -153,33 +162,62 @@ def main (data_dir, year, month, day, hour):
     offset=20
     max_range=0.005
     # max_mean=0.0095
-    max_mean=0.015
+    max_mean=0.025
     
     savetime=0.0
     plottime=0.0
     readtime=0.0
     setuptime=0.0
     import time
-    print("Generating movie for date:")
+    if verbose:print("Generating movie for date:")
     curtimes=0
     nexttime=0
     imgdata=None
     overlay=None
+    lastprecip=0
     full_runt0=time.time()
-    for i in range(ntimes):
-        curdate=start_date + datetime.timedelta(i/times_per_day)
+    nextfile=0
+    for i in range(0,ntimes,time_step):
         if i>=nexttime:
+            if nextfile>=nfiles:
+                print("Finished:"+str(time.time()-full_runt0))
+                print("Reading:"+str(readtime))
+                print("Settup:"+str(setuptime))
+                print("Ploting:"+str(plottime)+" "+str(plot_init))
+                print("Saving:"+str(savetime))
+                return
+
             t0=time.time()
-            # print("Reading data")
-            fulldata=mygis.read_nc(files[i],"Q2").data
+            if verbose:print("Reading data")
+            fulldata=mygis.read_nc(files[nextfile],"Q2").data
             curtimes=fulldata.shape[0]
             
-            fullprecipdata=mygis.read_nc(files[i],"PREC_ACC_NC").data
+            try:
+                fullprecipdata=mygis.read_nc(files[nextfile],"PREC_ACC_NC").data
+            except:
+                fullprecipdata = mygis.read_nc(files[nextfile],"RAINNC").data
+                thislast_precip=np.copy(fullprecipdata[-1])
+                fullprecipdata[1:] = np.diff(fullprecipdata,axis=0)
+                fullprecipdata[0]-=lastprecip
+                # save this precip for the next loop
+                lastprecip=thislast_precip
+                fullprecipdata[fullprecipdata<0]+=100
+                fullprecipdata[fullprecipdata<0]+=100
+                
+            if timevar!=None:
+                file_times=mygis.read_nc(files[nextfile],timevar).data
+            
             readtime+=(time.time()-t0)
             lasttime=i
             nexttime=i+curtimes
+            nextfile+=1
             
-        
+        if timevar!=None:
+            datestring="".join(file_times[i-lasttime])
+            curdate=dummydate.strptime(datestring,"%Y-%m-%d_%H:%M:%S")
+        else:
+            curdate=start_date + datetime.timedelta(i/times_per_day)
+            
         doy=curdate - datetime.datetime(2000,1,1,0,0,0)
         doy=(doy.days+doy.seconds/86400.0)%365.25
         maxval=np.cos((doy-offset-period/2)/period*2*np.pi)*max_range+max_mean
@@ -206,9 +244,8 @@ def main (data_dir, year, month, day, hour):
         #     imgdata[:,:,rgb] = (overlay[:,:,rgb]*(1-alpha)) + (overlay[:,:,rgb] * alpha)
         setuptime+=time.time()-t0
         
-        
         t0=time.time()
-        # print("Plotting data")
+        if verbose:print("Plotting data:"+str(curdate))
         # map_img,overimg=None,None
         map_img,overimg = plt_data(data, curdate, m,overlay,map_img,overimg,imgdata=imgdata)
         # overimg.set_cmap(precip_cmap)
@@ -218,8 +255,8 @@ def main (data_dir, year, month, day, hour):
         else:
             plot_init=time.time()-t0
         t0=time.time()
-        # print("Saving image")
-        plt.savefig("movie/qv_movie_{}.png".format(i))#,dpi=50)
+        if verbose:print("Saving image")
+        plt.savefig("movie/qv_movie_{:05}.png".format(i))#,dpi=50)
         savetime+=(time.time()-t0)
     
     print("Finished:"+str(time.time()-full_runt0))
@@ -234,20 +271,26 @@ if __name__ == '__main__':
         parser= argparse.ArgumentParser(description='This is a template file for Python scripts. ',
                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument('data_dir',nargs="?", action='store', default="data")
-        parser.add_argument('-Y',  dest="year", action='store', default=2005,type=int, help="start date year")
-        parser.add_argument('-M',  dest="month",action='store', default=10,  type=int, help="start date month")
-        parser.add_argument('-D',  dest="day",  action='store', default=1,   type=int, help="start date day")
-        parser.add_argument('-hr', dest="hour", action='store', default=0,   type=int, help="start date hour")
+        parser.add_argument('-Y',  dest="year",   action='store', default=2005, type=int, help="start date year")
+        parser.add_argument('-M',  dest="month",  action='store', default=10,   type=int, help="start date month")
+        parser.add_argument('-D',  dest="day",    action='store', default=1,    type=int, help="start date day")
+        parser.add_argument('-hr', dest="hour",   action='store', default=0,    type=int, help="start date hour")
+        parser.add_argument('-f',  dest="files",  action='store', default="wrf2d*00", type=str, 
+                            help="glob string to use to search for files")
+        parser.add_argument('-s',  dest="step",   action='store', default=1,    type=int, 
+                            help="time steps to skip between visualizations")
+        parser.add_argument('-t',  dest="timevar",action='store', default=None, type=str, 
+                            help="attempt to read times from the named variable")
         parser.add_argument('-v', '--version',action='version',
                 version='qv_movie 1.0')
         parser.add_argument ('--verbose', action='store_true',
                 default=False, help='verbose output', dest='verbose')
         args = parser.parse_args()
         
-        global verbose
         verbose=args.verbose
         
-        exit_code = main(args.data_dir, args.year, args.month, args.day, args.hour)
+        exit_code = main(args.data_dir, args.year, args.month, args.day, args.hour, 
+                            timevar=args.timevar, time_step=args.step, file_search=args.files)
         if exit_code is None:
             exit_code = 0
         sys.exit(exit_code)

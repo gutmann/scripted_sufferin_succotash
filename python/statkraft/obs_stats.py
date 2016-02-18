@@ -45,11 +45,10 @@ import mygis
 from bunch import Bunch
 from statkraft import stats
 
-global verbose, rain_file_search, tmin_file_search, tmax_file_search, days_per_year
+global verbose, rain_file_search, temp_file_search, days_per_year
 verbose=False
-rain_file_search="icar_????_daily_rain.nc"
-tmin_file_search="icar_????_daily_tmin.nc"
-tmax_file_search="icar_????_daily_tmax.nc"
+rain_file_search="PREC_????.nc"
+temp_file_search="TEMP_????.nc"
 days_per_year=365
 
 global month_start, month_end, calendar, start_date
@@ -68,13 +67,15 @@ def compute_dates(ndays):
         dates=[start_date+dt.timedelta(i) for i in range(ndays)]
     return np.array(dates)
 
-def rain_stats(dir_name):
+def rain_stats(dir_name, fulldomain=False):
     if verbose:
         files=glob.glob(dir_name+rain_file_search)
         files.sort()
         print(files[0]+"  "+files[-1])
 
     data=mygis.read_files(dir_name+rain_file_search,"precipitation_amount",axis=0, verbose=verbose)
+    if not fulldomain:
+        data=data[:,1549:800:-1,:600]
 
     if verbose: print("Computing wet day fraction")
     mygis.write(dir_name+"annual_wetfrac.nc",stats.wetfrac(data))
@@ -106,16 +107,18 @@ def rain_stats(dir_name):
 
     return data
 
-def tmax_stats(dir_name):
+def temp_stats(dir_name, fulldomain=False):
     if verbose:
-        files=glob.glob(dir_name+tmax_file_search)
+        files=glob.glob(dir_name+temp_file_search)
         files.sort()
         print(files[0]+"  "+files[-1])
 
-    data=mygis.read_files(dir_name+tmax_file_search,"daily_maximum_temperature",axis=0, verbose=verbose)
+    data=mygis.read_files(dir_name+temp_file_search,"mean_temperature",axis=0, verbose=verbose)
+    if not fulldomain:
+        data=data[:,1549:800:-1,:600]
 
-    if verbose: print("mean annual tmax")
-    mygis.write(dir_name+"annual_mean_tmax.nc",stats.mean(data))
+    if verbose: print("mean annual temperature")
+    mygis.write(dir_name+"annual_mean_temp.nc",stats.mean(data))
 
     ndays=data.shape[0]
     dates=compute_dates(ndays)
@@ -127,110 +130,46 @@ def tmax_stats(dir_name):
 
         if verbose: print("month{:02}".format(month+1))
         if verbose: print("     mean")
-        mygis.write(dir_name+"month{:02}_mean_tmax.nc".format(month+1),stats.mean(data[curmonth,:,:]))
+        mygis.write(dir_name+"month{:02}_mean_temp.nc".format(month+1),stats.mean(data[curmonth,:,:]))
 
     return data
 
-def tmin_stats(dir_name):
-    if verbose:
-        files=glob.glob(dir_name+tmin_file_search)
-        files.sort()
-        print(files[0]+"  "+files[-1])
-
-    data=mygis.read_files(dir_name+tmin_file_search,"daily_minimum_temperature",axis=0, verbose=verbose)
-
-    if verbose: print("mean annual tmin")
-    mygis.write(dir_name+"annual_mean_tmin.nc",stats.mean(data))
-
-    ndays=data.shape[0]
-    dates=compute_dates(ndays)
-    curmonth=np.empty(ndays,dtype=bool)
-
-    for month in range(12):
-        for i in range(ndays):
-            curmonth[i] = (dates[i].month == (month+1))
-
-        if verbose: print("month{:02}".format(month+1))
-        if verbose: print("     mean")
-        mygis.write(dir_name+"month{:02}_mean_tmin.nc".format(month+1),stats.mean(data[curmonth,:,:]))
-
-    return data
-
-def dtr_stats(dir_name, tmax_data,tmin_data):
-    data=tmax_data-tmin_data
-
-    if verbose: print("mean annual diurnal temperature range")
-    mygis.write(dir_name+"annual_mean_dtr.nc",stats.mean(data))
-
-    ndays=data.shape[0]
-    dates=compute_dates(ndays)
-    curmonth=np.empty(ndays,dtype=bool)
-
-    for month in range(12):
-        for i in range(ndays):
-            curmonth[i] = (dates[i].month == (month+1))
-
-        if verbose: print("month{:02}".format(month+1))
-        if verbose: print("     mean")
-        mygis.write(dir_name+"month{:02}_mean_dtr.nc".format(month+1),stats.mean(data[curmonth,:,:]))
-
-
-
-
-def main (dir_name, run_rain=False, run_tmin=False, run_tmax=False):
+def main (dir_name, run_rain=False, run_temp=False, fulldomain=False):
 
     if dir_name[-1]!="/":dir_name+="/"
     if verbose: print('Working on: '+dir_name)
 
     if run_rain:
-        rain=rain_stats(dir_name)
+        rain=rain_stats(dir_name,fulldomain=fulldomain)
 
-    if run_tmin:
-        tmin=tmin_stats(dir_name)
-
-    if run_tmax:
-        tmax=tmax_stats(dir_name)
-
-    if run_tmax and run_tmin:
-        dtr=dtr_stats(dir_name, tmin, tmax)
+    if run_temp:
+        temp=temp_stats(dir_name,fulldomain=fulldomain)
 
 
 if __name__ == '__main__':
     try:
-        parser= argparse.ArgumentParser(description='Generate baseline statistics from icar2daily.py ouput data. ',
+        parser= argparse.ArgumentParser(description='Generate baseline statistics from met.no gridded obs. ',
                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-        parser.add_argument('dir_name',action='store', help="directory to search for data")
+        parser.add_argument('dir_name',action='store', default="directory to search for data")
         parser.add_argument('-v', '--version',action='version',
-                version='ICAR_stats 1.0')
+                version='obs_stats 1.0')
         parser.add_argument ('--verbose', action='store_true',
                 default=False, help='verbose output', dest='verbose')
         parser.add_argument ('--rain', action='store_true',
                 default=False, help='calculate precip stats', dest='rain')
-        parser.add_argument ('--tmax', action='store_true',
-                default=False, help='calculate tmax stats', dest='tmax')
-        parser.add_argument ('--tmin', action='store_true',
-                default=False, help='calculate tmin stats', dest='tmin')
-        parser.add_argument ('--noleap', action='store_true',
-                default=False, help='use a noleap calendar', dest='noleap')
-        parser.add_argument ('--gregorian', action='store_true',
-                default=False, help='use a gregorian calendar', dest='gregorian')
+        parser.add_argument ('--temp', action='store_true',
+                default=False, help='calculate temperature stats', dest='temp')
+        parser.add_argument ('--fulldomain', action='store_true',
+                default=False, help='generate stats for the full domain instead of the ICAR subset', dest='fulldomain')
 
         args = parser.parse_args()
 
-        if args.noleap:
-            calendar="noleap"
-        elif args.gregorian:
-            calendar="gregorian"
-        else:
-            if args.dir_name.split("_")[2][:3]=="era":
-                calendar="gregorian"
-            else:
-                calendar="noleap"
+        calendar="gregorian"
 
         verbose=args.verbose
         if verbose:print("Using a {} calendar".format(calendar))
 
-        exit_code = main(args.dir_name, run_rain=args.rain, run_tmin=args.tmin, run_tmax=args.tmax)
+        exit_code = main(args.dir_name, run_rain=args.rain, run_temp=args.temp, fulldomain=args.fulldomain)
         if exit_code is None:
             exit_code = 0
         sys.exit(exit_code)

@@ -46,9 +46,13 @@ import date_fun
 global verbose
 verbose=True
 
-prec_atts = Bunch(temporal_period="00-24Z", missing_value=-999.99, _FillValue=-999.99, description="Daily precipitation amount", units="mm")
-tmin_atts = Bunch(temporal_period="00-24Z", missing_value=-999.99, _FillValue=-999.99, description="Daily minimum temperature",  units="degrees C")
-tmax_atts = Bunch(temporal_period="00-24Z", missing_value=-999.99, _FillValue=-999.99, description="Daily maximum temperature",  units="degrees C")
+missing = -999.99
+mask_file = "geo_em.d02.nc"
+
+prec_atts = Bunch(temporal_period="00-24Z", missing_value=missing, _FillValue=missing, description="Daily precipitation amount", units="mm")
+tmin_atts = Bunch(temporal_period="00-24Z", missing_value=missing, _FillValue=missing, description="Daily minimum temperature",  units="degrees C")
+tmax_atts = Bunch(temporal_period="00-24Z", missing_value=missing, _FillValue=missing, description="Daily maximum temperature",  units="degrees C")
+tave_atts = Bunch(temporal_period="00-24Z", missing_value=missing, _FillValue=missing, description="Daily average temperature",  units="degrees C")
 
 lat_atts= Bunch(axis="Y",datum="WGS84", units="degrees_north", long_name="Latitude", standard_name="latitude_north")
 latvar  = Bunch(data=None, attributes=lat_atts, dims=("lat","lon"), dtype='f', name="lat")
@@ -65,8 +69,10 @@ space_time_vars = [latvar, lonvar, timevar]
 global_attributes=Bunch(institute = "National Center for Atmospheric Research", 
                         contact   = "Ethan Gutmann: gutmann@ucar.edu", 
                         source    = "The Intermediate Complexity Atmospheric Research (ICAR) model",
-                        references= "Gutmann et al. 2016: The Intermediate Complexity Atmospheric Research Model. J.Hydrometeorology, (accepted)",
-                        Conventions = "CF-1.6")
+                        references= "Gutmann et al. 2016: The Intermediate Complexity Atmospheric Research Model. J.Hydrometeor. doi:10.1175/JHM-D-15-0155.1, in press.",
+                        Conventions = "CF-1.6", 
+                        scenario  = "",
+                        forcing   = "")
 
 class ICAR_Reader(object):
     files=[]
@@ -88,6 +94,8 @@ class ICAR_Reader(object):
         self.tdata  = mygis.read_nc(self.files[self.curfile], self.t_var).data
         self.rrdata = mygis.read_nc(self.files[self.curfile],self.rr_var).data
         self.acdata = mygis.read_nc(self.files[self.curfile],self.ac_var).data
+        
+        self.mask = mygis.read_nc(mask_file,"LANDMASK").data[0]==0
         
         
     def update_data(self):
@@ -116,11 +124,11 @@ class ICAR_Reader(object):
                     next_rrdata[i]=next_acdata[i]-next_acdata[i-1]
                 if verbose:
                     if next_rrdata[i].max()>0:
-                        print("Found a restart step at step {} in file:{}".format(i,self.files[self.curfile]))
-                    
-        self.tdata  = next_tdata
-        self.acdata = next_acdata
-        self.rrdata = next_rrdata
+                        print("Found a restart step at step {} in file:{}".format(i,self.files[self.curfile]))            
+                        
+        self.tdata  = np.ma.array(next_tdata, mask=next_tdata>10000)
+        self.acdata = np.ma.array(next_acdata, mask=next_acdata>10000)
+        self.rrdata = np.ma.array(next_rrdata, mask=next_rrdata>10000)
         
         
     def next(self):
@@ -134,12 +142,22 @@ class ICAR_Reader(object):
             raise StopIteration
             
         rain = self.rrdata[self.curstep : self.curstep+self.steps_per_day].sum(axis=0)
-        tmin = self.tdata[ self.curstep : self.curstep+self.steps_per_day].min(axis=0)
-        tmax = self.tdata[ self.curstep : self.curstep+self.steps_per_day].max(axis=0)
+        tmin = self.tdata[ self.curstep : self.curstep+self.steps_per_day].min(axis=0)  - 273.15
+        tmax = self.tdata[ self.curstep : self.curstep+self.steps_per_day].max(axis=0)  - 273.15
+        tave = self.tdata[ self.curstep : self.curstep+self.steps_per_day].mean(axis=0) - 273.15
         
         self.curstep+=self.steps_per_day
         
-        return (rain, tmin, tmax)
+        tmin[self.mask]=missing
+        tmax[self.mask]=missing
+        tave[self.mask]=missing
+        
+        rain[rain>3000] = missing
+        tmin[tmin>100]  = missing
+        tmax[tmax>100]  = missing
+        tave[tave>100]  = missing
+        
+        return (rain, tmin, tmax, tave)
     
     def __iter__(self):
         """docstring for __iter__"""
@@ -166,11 +184,13 @@ def main (filename, outputfile):
     raindata=[]
     tmindata=[]
     tmaxdata=[]
+    tavedata=[]
     if verbose:print("Looping through data")
     for data in icar_data:
         raindata.append(data[0])
-        tmindata.append(data[1]-273.15)
-        tmaxdata.append(data[2]-273.15)
+        tmindata.append(data[1])
+        tmaxdata.append(data[2])
+        tavedata.append(data[3])
     
     latvar.data=mygis.read_nc(icar_data.files[0],"lat").data
     lonvar.data=mygis.read_nc(icar_data.files[0],"lon").data
@@ -190,21 +210,27 @@ def main (filename, outputfile):
     write_file(outputfile+"_rain.nc",raindata, varname="precipitation_amount",      varatts=prec_atts)
     write_file(outputfile+"_tmin.nc",tmindata, varname="daily_minimum_temperature", varatts=tmin_atts)
     write_file(outputfile+"_tmax.nc",tmaxdata, varname="daily_maximum_temperature", varatts=tmax_atts)
+    write_file(outputfile+"_tave.nc",tavedata, varname="daily_average_temperature", varatts=tave_atts)
     
     
     
 if __name__ == '__main__':
     try:
-        parser= argparse.ArgumentParser(description='This is a template file for Python scripts. ',
+        parser= argparse.ArgumentParser(description='Generate daily rain, tmin, tmax, and tave files from hourly ICAR output. ',
                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
         parser.add_argument('filename',action='store', help="glob file search for input files")
         parser.add_argument('-o', dest="outputfile", action='store', default="daily_", help="outputfile prefix")
+        parser.add_argument('-m', dest="model", action='store', default="", help="Model used to drive ICAR, e.g. icar_run_cesm_rcp45")
         parser.add_argument('-v', '--version',action='version',
-                version='icar2daily 1.0')
+                version='icar2daily 1.1')
         parser.add_argument ('--verbose', action='store_true',
                 default=False, help='verbose output', dest='verbose')
         args = parser.parse_args()
         verbose=args.verbose
+        
+        global_attributes.scenario = args.model.split("_")[3]
+        if global_attributes.scenario[0]!="r":global_attributes.scenario="Historical"
+        global_attributes.forcing  = args.model.split("_")[2]
         
         exit_code = main(args.filename,args.outputfile)
         if exit_code is None:

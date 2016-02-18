@@ -12,6 +12,6 @@ done
 for f in *.nc; do
 	echo $f
 	ncea -d lat,15.,90. -d lon,180.,300. $f subset/$f
-    rm $f
+    if [[ -e subset/$f ]]; then rm $f; fi
 done
 

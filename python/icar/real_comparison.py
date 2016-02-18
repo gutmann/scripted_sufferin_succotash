@@ -8,7 +8,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from bunch import Bunch
 
-# import swm.post as sw
 import mygis
 
 wrf_dir="/glade/u/home/gutmann/scratch/wrfoutput/4km/2007/"
@@ -55,7 +54,7 @@ class DataReader(object):
                              qi=np.sum,qr=np.sum,qs=np.sum,p=np.mean)
 
     _wrf_var_names=["QVAPOR",[op.add,"QCLOUD","QICE"],[op.add,"QRAIN","QSNOW"],"T2","U","V"]#[op.add,"T",290],"U","V"]
-    _swm_var_names=["qv",[op.add,"qc","qi"],[op.add,"qr","qs"],[exner,"th","p"],"u","v"]
+    _icar_var_names=["qv",[op.add,"qc","qi"],[op.add,"qr","qs"],[exner,"th","p"],"u","v"]
 
     
     x=slice(0,None) #by default take all data in the file in x,y, and z
@@ -65,7 +64,7 @@ class DataReader(object):
     # zslices=dict(qv=slice(0,10),qc=slice(0,10),t=slice(1),)
     # yslices=dict()
     # yslices.setdefault(y)
-    
+    llh
     def __init__(self, filenames,start_pos=0,datatype="WRF"):
         super(DataReader,self).__init__()
         self.files=filenames
@@ -80,8 +79,8 @@ class DataReader(object):
             self.DIM_2D_SHAPE=3
             self.DIM_3D_SHAPE=4
         
-        if datatype=="SWM":
-            self._var_names=self._swm_var_names
+        if datatype=="ICAR":
+            self._var_names=self._icar_var_names
             self.times_per_file=1
             self._rainvar="rain"
             tmp=self.y
@@ -281,23 +280,23 @@ def make_plots(data1,data2,date,fig=None):
     return fig
     
 
-def main(swm_dir="output/",output_dir="./"):
+def main(icar_dir="output/",output_dir="./"):
     output_filename=output_dir+"vis_{}.png"
     wrf_files=glob.glob(wrf_dir+"wrfout*")
     wrf_files.sort()
-    swm_files=glob.glob(swm_dir+"swim_out*")
-    swm_files.sort()
+    icar_files=glob.glob(icar_dir+"swim_out*")
+    icar_files.sort()
     
     wrf_data=DataReader(wrf_files,datatype="WRF")
-    swm_data=DataReader(swm_files,datatype="SWM")
+    icar_data=DataReader(icar_files,datatype="ICAR")
     fig=plt.figure(figsize=(24,14));
     for i in range(len(wrf_data)):
         wrf=wrf_data.next()
-        swm=swm_data.next()
-        print(str(wrf.date),str(swm.date))
+        icar=icar_data.next()
+        print(str(wrf.date),str(icar.date))
         sys.stdout.flush()
         
-        fig=make_plots(swm,wrf,wrf.date,fig=fig)
+        fig=make_plots(icar,wrf,wrf.date,fig=fig)
         fig.savefig(output_filename.format(str(wrf.date).replace(" ","_")))
     
 
@@ -306,18 +305,18 @@ if __name__ == '__main__':
 
     global wrf_dir
     out_dir="./"
-    swm_dir="output/"
+    icar_dir="output/"
 
     if len(sys.argv)>1:
         if sys.argv[1][:2]=="-h":
-            print("Usage: real_comparison.py [swm_output_directory] [vis_output_directory] [wrf_dir]")
+            print("Usage: real_comparison.py [icar_output_directory] [vis_output_directory] [wrf_dir]")
             sys.exit()
         
-        swm_dir=sys.argv[1]
+        icar_dir=sys.argv[1]
         if len(sys.argv)>2:
             out_dir=sys.argv[2]
         if len(sys.argv)>3:
             wrf_dir=sys.argv[3]
 
     
-    main(swm_dir,out_dir)
+    main(icar_dir,out_dir)
