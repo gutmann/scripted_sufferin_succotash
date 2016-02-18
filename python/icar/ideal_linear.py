@@ -18,12 +18,12 @@ import Nio                  # NCAR python io library
 #    tauf = average hydrometeor fall time (seconds) ~500s? for rain w/Hw=5000, 1500s? for snow w/Hw=3000
 #    tauc = average hydrometeor formation time (seconds) ~500s for rain, longer for snow, faster for warmer
 def setup_experiment(wind=2,experiment=1, verbose=False):
-    U     = [5.0,10.0,15.0,25.0][wind]       # % wind speed
+    U     = [5.0,10.0,15.0,25.0][wind]       #  wind speed
     # print("wind=",U,"  exp=",experiment)
-    # Ndsq  = 3.6e-5;                          # % dry BV freq sq. #original
-    # Ndsq  = 0.002**2    #4e-6                  # % dry BV freq sq.
-    # Ndsq  = 0.00011     #1e-4                  # % dry BV freq sq.
-    Ndsq  = 0.000011     #1e-4                  # % dry BV freq sq.
+    # Ndsq  = 3.6e-5;                          #  dry BV freq sq. #original
+    # Ndsq  = 0.002**2    #4e-6                  #  dry BV freq sq.
+    # Ndsq  = 0.00011     #1e-4                  #  dry BV freq sq.
+    Ndsq  = 0.000011     #1e-4                  #  dry BV freq sq.
 
 
     # experiment                        D1      D2      D3
@@ -32,41 +32,41 @@ def setup_experiment(wind=2,experiment=1, verbose=False):
     # z0        base of the hill      1700    2000    2200   [meters]
     # G         number of grids        420     250      52   [grid cells]
 
-    Nx    = [420.,250.,52.][experiment]*2            # % length of domain  (grid cells)
-    hm    = [1800.0,1400.0,1040.0][experiment]    # % mnt height (m)
-    xm    = Nx/2.0                                # % mountain location in domain (grid cell)
-    am    = [60.0,40.0,3.1][experiment]           # % mountain half-width (grid cells)
+    Nx    = [420.,250.,52.][experiment]*2            #  length of domain  (grid cells)
+    hm    = [1800.0,1400.0,1040.0][experiment]    #  mnt height (m)
+    xm    = Nx/2.0                                #  mountain location in domain (grid cell)
+    am    = [60.0,40.0,3.1][experiment]           #  mountain half-width (grid cells)
 
-    dx    = 2000.0                                # % grid spacing (m)
-    Lx    = Nx*dx                                 # % length of domain (m)
-    x     = np.linspace(0,Lx,Nx)                  # % distance array (m)
+    dx    = 2000.0                                #  grid spacing (m)
+    Lx    = Nx*dx                                 #  length of domain (m)
+    x     = np.linspace(0,Lx,Nx)                  #  distance array (m)
     zo    = [1700.0,2000.0,2200.0][experiment]    # mountain base height (m)  NOT REALLY USED CORRECTLY YET
     zo    = 0.0
     p0    = 101325 * (1 - 2.25577e-5*zo)**5.25588   # compute base pressure
     # p0    = 101325.0
     T2m   = 268.0# 270.56 #needs to be selected for each experiment...?
 
-    # hw    = 4000.0                                # % scale of water vapor (see formula in SB04,appendix)
+    # hw    = 4000.0                                #  scale of water vapor (see formula in SB04,appendix)
     base_mr=[0.00325,0.0032,0.003][experiment]    # mixing ratio at the base of the mountain
     base_mr = 0.003255
     base_mr = 0.0025687
     # hw=hw-zo
     # hw=3000.0
     # zo=0.0
-    # %----------------------------------------------------------------
-    # % Make the mountain (theoretical)
+    # ----------------------------------------------------------------
+    #  Make the mountain (theoretical)
     # 
-    #   zs=hm*exp(-(x-xm).^2/am^2);  % Gaussian
+    #   zs=hm*exp(-(x-xm).^2/am^2);   Gaussian
     zs=hm/(1.0+((x/dx-xm)/am)**2.)  # eqn from Trude
     zs=zs-zs[Nx/4] #sets the zero point to be 1/4 of the way in because we have doubled the size of the domain
     zs[zs<0]=0          #set anything below 0 to 0
     # zs+=zo
-    # %-----------------------------------------------------------------
-    # % put zs in Fourier space
+    # -----------------------------------------------------------------
+    #  put zs in Fourier space
     Fzs  = np.fft.fftshift(np.fft.fft(zs))/Nx
 
-    # % linear model paramters (see calculations in SB'04):
-    # % -------------------------------------------------------------------------------
+    #  linear model paramters (see calculations in SB'04):
+    #  -------------------------------------------------------------------------------
     t0 = 273.16
     # p0 = 100000
     # p0 =  82000.0 (now calculated above from z0)
@@ -85,7 +85,7 @@ def setup_experiment(wind=2,experiment=1, verbose=False):
     #     cw below calculated from Trude's profile, Ndsq=0.00011, T2m=271K, p0=820mb,  dth/dz=0.004K/m dt/dz=-0.0054
     # could calculate Ndsq as = (env_gamma-cap_gamma)*g/T2m
     Ndsq=(-0.0054-cap_gamma)*g/T2m
-    # % -------------------------------------------------------------------------------
+    #  -------------------------------------------------------------------------------
     # cw  = 1.9                # sensitivity (commonly set to 1.1, see paper SB04) = cap_gamma / env_gamma
     cw  = cap_gamma/env_gamma
     # using base_mr from profile, but maybe it should be qs0 above?
@@ -106,36 +106,36 @@ def setup_experiment(wind=2,experiment=1, verbose=False):
         print("   tauc=",tauc)
         print("   tauf=",tauf)
         print("   cwqv=",cwqv)
-    # %---------------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------------
     params=Bunch(cw=cw,cwqv=cwqv,z0=z0,tauf=tauf,tauc=tauc,hw=hw,Ndsq=Ndsq)
     return (x,zs,Fzs,U,dx,params)
 
 def get_params(T2m,U,Ndsq,zs,env_gamma,verbose=False):
     """docstring for get_params"""
-    Nx    = len(zs)            # % length of domain  (grid cells)
-    # hm    = [1800.0,1400.0,1040.0][experiment]    # % mnt height (m)
-    # xm    = Nx/2.0                                # % mountain location in domain (grid cell)
-    # am    = [60.0,40.0,3.1][experiment]           # % mountain half-width (grid cells)
+    Nx    = len(zs)            #  length of domain  (grid cells)
+    # hm    = [1800.0,1400.0,1040.0][experiment]    #  mnt height (m)
+    # xm    = Nx/2.0                                #  mountain location in domain (grid cell)
+    # am    = [60.0,40.0,3.1][experiment]           #  mountain half-width (grid cells)
 
-    # dx    = 2000.0                                # % grid spacing (m)
-    # Lx    = Nx*dx                                 # % length of domain (m)
-    # x     = np.linspace(0,Lx,Nx)                  # % distance array (m)
+    # dx    = 2000.0                                #  grid spacing (m)
+    # Lx    = Nx*dx                                 #  length of domain (m)
+    # x     = np.linspace(0,Lx,Nx)                  #  distance array (m)
     # zo    = [1700.0,2000.0,2200.0][experiment]    # mountain base height (m)  NOT REALLY USED CORRECTLY YET
     zo    = 0.0
     p0    = 101325 * (1 - 2.25577e-5*zo)**5.25588   # compute base pressure
     # p0    = 101325.0
     # T2m   = 268.0# 270.56 #needs to be selected for each experiment...?
 
-    # hw    = 4000.0                                # % scale of water vapor (see formula in SB04,appendix)
+    # hw    = 4000.0                                #  scale of water vapor (see formula in SB04,appendix)
     # base_mr=[0.00325,0.0032,0.003][experiment]    # mixing ratio at the base of the mountain
     # base_mr = 0.003255
     # base_mr = 0.0025687
-    # %-----------------------------------------------------------------
-    # % put zs in Fourier space
+    # -----------------------------------------------------------------
+    #  put zs in Fourier space
     Fzs  = np.fft.fftshift(np.fft.fft(zs))/Nx
 
-    # % linear model paramters (see calculations in SB'04):
-    # % -------------------------------------------------------------------------------
+    #  linear model paramters (see calculations in SB'04):
+    #  -------------------------------------------------------------------------------
     t0 = 273.16
     # p0 = 100000
     # p0 =  82000.0 (now calculated above from z0)
@@ -156,7 +156,7 @@ def get_params(T2m,U,Ndsq,zs,env_gamma,verbose=False):
     #     cw below calculated from Trude's profile, Ndsq=0.00011, T2m=271K, p0=820mb,  dth/dz=0.004K/m dt/dz=-0.0054
     # could calculate Ndsq as = (env_gamma-cap_gamma)*g/T2m
     # Ndsq=(-0.0054-cap_gamma)*g/T2m
-    # % -------------------------------------------------------------------------------
+    #  -------------------------------------------------------------------------------
     # cw  = 1.9                # sensitivity (commonly set to 1.1, see paper SB04) = cap_gamma / env_gamma
     cw  = cap_gamma/env_gamma
     if verbose:
@@ -179,14 +179,14 @@ def get_params(T2m,U,Ndsq,zs,env_gamma,verbose=False):
         print("   tauc=",tauc)
         print("   tauf=",tauf)
         print("   cwqv=",cwqv)
-    # %---------------------------------------------------------------------------------
+    # ---------------------------------------------------------------------------------
     params=Bunch(cw=cw,cwqv=cwqv,z0=z0,tauf=tauf,tauc=tauc,hw=hw,Ndsq=Ndsq)
     return (Fzs,params)
     
 
-# %
-# %    This is a 2-D precipitation solution for the linear model. 
-# %
+# 
+#     This is a 2-D precipitation solution for the linear model. 
+# 
 def solve(Fzs,U,dx,params, zlevels=None):
     cw  = params.cw   #1.1    #efficiency factor
     cwqv= params.cwqv
@@ -208,24 +208,24 @@ def solve(Fzs,U,dx,params, zlevels=None):
     denom = sig**2 # -cori**2 # don't bother with coriollis force in 2D case
     # discrim=Ndsq/U**2-k**2
     # for ik in np.arange(Nx):
-    # % nonhydrostatic version, needed for smaller-scale mountains(?)
-    # %  if (discrim(ik) > 0)
-    # %    m(ik) = sign(sig(ik))*sqrt(discrim(ik));
-    # %  else
-    # %    m(ik) = sqrt(discrim(ik));                      % Check before use
-    # %  end
+    #  nonhydrostatic version, needed for smaller-scale mountains(?)
+    #   if (discrim(ik) > 0)
+    #     m(ik) = sign(sig(ik))*sqrt(discrim(ik));
+    #   else
+    #     m(ik) = sqrt(discrim(ik));                       Check before use
+    #   end
     # nonhydrostatic version needed for smaller-scale mountains(?). 
-    msq = (Ndsq/denom * (k**2)).astype('complex')          # % vertical wave number, hydrostatic
+    msq = (Ndsq/denom * (k**2)).astype('complex')          #  vertical wave number, hydrostatic
     mimag=np.zeros(Nx).astype('complex')
     mimag.imag=(np.sqrt(-msq)).real
     m=np.where(msq>=0, (np.sign(sig)*np.sqrt(msq)).astype('complex'), mimag)
-    # m = np.sign(sig)*np.abs(np.sqrt(Ndsq)/U)          # % vertical wave number, hydrostatic (eqn 14 in SB'04 (?))
+    # m = np.sign(sig)*np.abs(np.sqrt(Ndsq)/U)          #  vertical wave number, hydrostatic (eqn 14 in SB'04 (?))
 
-    # FSraw  = i*cwqv*Fzs*sig*np.exp(-z0/hw)                            # % the raw upslope (~Smith'79)
-    # FSterm = (i*cwqv*Fzs*sig/(1-i*m*hw))                                # % simple, hydrostatic solution (eqn 16 in SB'04)
-    FSterm = (i*cwqv*Fzs*np.exp(i*m*z0)*sig*np.exp(-z0*(1-i*m*hw)/hw)/  # % simple, hydrostatic solution (eqn 16 in SB'04)
+    # FSraw  = i*cwqv*Fzs*sig*np.exp(-z0/hw)                            #  the raw upslope (~Smith'79)
+    # FSterm = (i*cwqv*Fzs*sig/(1-i*m*hw))                                #  simple, hydrostatic solution (eqn 16 in SB'04)
+    FSterm = (i*cwqv*Fzs*np.exp(i*m*z0)*sig*np.exp(-z0*(1-i*m*hw)/hw)/  #  simple, hydrostatic solution (eqn 16 in SB'04)
                  (1-i*m*hw))                                            # see BS'11 for z0 component
-    FPterm = FSterm/((1+i*sig*tauc)*(1+i*sig*tauf))                     # % this also include time delays and dynamics (eqn 5 in SB'04)
+    FPterm = FSterm/((1+i*sig*tauc)*(1+i*sig*tauf))                     #  this also include time delays and dynamics (eqn 5 in SB'04)
 
     # calculate "3D" wind field for Nz levels ranging from 0m to Hw*5 m AGL
     if zlevels!=None:
@@ -252,7 +252,7 @@ def solve(Fzs,U,dx,params, zlevels=None):
         # Fu[curz,:]=(-m*(sig*k-i*l*f)*i*neta)/kl
         Fu[curz,:]=(-m*(sig*k)*i*neta)/k2
 
-    # % bring all back from Fourier space:
+    #  bring all back from Fourier space:
     # S      = Nx*np.fft.ifft(np.fft.ifftshift(FSterm))
     # Sraw   = Nx*np.fft.ifft(np.fft.ifftshift(FSraw))
     Pt     = np.real(Nx*np.fft.ifft(np.fft.ifftshift(FPterm)))
@@ -262,7 +262,7 @@ def solve(Fzs,U,dx,params, zlevels=None):
         w[curz,:]=Nx*np.real(np.fft.ifft(np.fft.ifftshift(Fw[curz,:])))
         u_hat[curz,:]=Nx*np.real(np.fft.ifft(np.fft.ifftshift(Fu[curz,:])))
 
-    # % trucate negative values as unphysical:
+    #  trucate negative values as unphysical:
     Pt[np.where(Pt<=0)]=0
     return (Pt,w,U+u_hat,z3d)
     
@@ -375,7 +375,7 @@ def plot_arrows(x,z,U,w):
             plt.plot([xi/1000.0,(xi+ui*dx/maxu*0.9)/1000.0],[zi,zi+wi*dz/maxw*0.9],color="black")
     
 def plot_output(x,zs,Pt,z3d,w,U,title,fname):
-    # % P-term:
+    #  P-term:
     plt.clf()
     f=plt.gcf()
     # plot precipitation
@@ -519,7 +519,7 @@ def main():
 if __name__ == '__main__':
     main()
 
-# % Some Linear Model papers :
-# %         SB'04  :: Smith and Barstad (2004); JAS
-# %         BGS'07 :: Barstad et al. 2007; J Hydrol.
-# %         BS'11  :: Barstad and Schuller (2011) Nov, JAS
+# Some Linear Model papers :
+#         SB'04  :: Smith and Barstad (2004); JAS
+#         BGS'07 :: Barstad et al. 2007; J Hydrol.
+#         BS'11  :: Barstad and Schuller (2011) Nov, JAS

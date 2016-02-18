@@ -4,7 +4,7 @@ import datetime
 import matplotlib.pyplot as plt
 import numpy as np
 import process
-import mygis as swim_io
+import mygis
 
 # Smoothing window=870, (=290 when decimation=3000)
 # r=0.9918143173048467,
@@ -27,9 +27,10 @@ temperature_poly=np.array([ -1.84051175e-29,   3.89058030e-26,  -3.72543698e-23,
 decimation_factor=3000 # convert 10Hz to 5min data)
 # start_point=4400*10000l # using full data set
 # end_point=None
-start_point=1200000 # for a subset of data
-master_end_point=0.7 #3600000
+# start_point=1200000 # for a subset of data for the May data
+master_end_point=0.99999 #3600000
 # start_point=11000*10000l #!Feb 1
+start_point=38880000
 master_smooth_min=1 #200 for freezing?
 master_smooth_max=400
 master_smooth_step=10
@@ -94,7 +95,7 @@ def correct_temperature(data=None,v=None,vo=None,vv=None,r=None,tcol=8,vcol=-1):
 def optimal_t_fit(data=None,inputT=None,inputCompression=None,dates=None,smin=None,smax=None,sstep=None):
     
     if data==None:
-        data=swim_io.read_nc("full_interception.nc").data
+        data=mygis.read_nc("full_interception.nc").data
     if smin!=None:
         smooth_min=smin
     else:
@@ -153,14 +154,14 @@ def main():
         
     """docstring for main"""
     print("Loading data")
-    data=swim_io.read_nc("full_interception.nc").data
+    data=mygis.read_nc("full_interception.nc").data
     if master_end_point==None:
         end_point=data.shape[0]
     elif type(master_end_point)==float:
-        if master_end_point<1:
+        if master_end_point<=1:
             end_point=int(data.shape[0]*master_end_point)
         else:
-            end_point=master_end_point
+            end_point=int(master_end_point)
     else:
         end_point=master_end_point
     print("Fitting T")
@@ -183,27 +184,27 @@ def main():
     print("Calculating dates")
     startdate=datetime.datetime(2013,10,3,10,0)
     enddate=datetime.datetime(2014,3,5,13,0,0)
-    startdate=datetime.datetime(2014,4,28,11,20,0)
-    enddate=datetime.datetime(2014,5,16,12,27,0)
+    # startdate=datetime.datetime(2014,4,28,11,20,0)
+    # enddate=datetime.datetime(2014,5,16,12,27,0)
     dt=(enddate-startdate)/len(rawt)
     dates=[startdate+dt*i for i in range(len(rawt))]
     subdates=dates[start_point/decimation_factor:end_point/decimation_factor][stats[0]:-1]
     
     print("Plotting...")
-    plt.figure(figsize=(14,6),dpi=100);
+    fig=plt.figure(figsize=(14,6),dpi=100);
     plt.plot(dates,rawcompression,label="Compression")
     plt.plot(dates,full_fitt,label="Fitted Temp.")
-    plt.plot(dates,rawcompression-full_fitt+rawcompression[len(rawcompression)/2],label="T.Corr. Comp.")
+    # plt.plot(dates,rawcompression-full_fitt+rawcompression[len(rawcompression)/2],label="T.Corr. Comp.")
     plt.plot([dates[0],dates[1]],[-100,-100],label="Temperature",color="grey")
     plt.ylabel("Compression")
     if tree==1:
-        plt.ylim(25000,27000)
+        plt.ylim(24000,29000)
     if tree==2:
-        plt.ylim(27000,35000)
+        plt.ylim(27000,36000)
     if tree==3:
-        plt.ylim(27000,30000)
+        plt.ylim(26000,33000)
     # plt.ylim(20000,30000)
-    plt.legend()
+    plt.legend(loc=2)
     plt.title("Tree:{}  Potentiometers:{} & {}  Temp.fit:r={}".format(tree,pot1,pot2,r))
     # plotting temperature on a second axis
     temp_axis=plt.twinx()
@@ -211,15 +212,55 @@ def main():
     temp_axis.set_ylim(10,-50)
     temp_axis.set_ylabel("Temperature [C]")
     date_index=start_point/decimation_factor
+    print(date_index, dates[date_index])
     temp_axis.plot([dates[date_index],dates[date_index]],[10,-50],"--",color="black")
     date_index=end_point/decimation_factor
+    print(date_index)
     if date_index>=len(dates):date_index=-1
+    print(date_index, dates[date_index])
     temp_axis.plot([dates[date_index],dates[date_index]],[10,-50],"--",color="black")
-    temp_axis.plot([dates[0],dates[-1]],[0,0],color="red")
+    temp_axis.plot([dates[0],dates[-1]],[0,0],'--',color="red")
     
-    plt.xlim(dates[int(len(dates)*0.05)],dates[int(len(dates)*0.95)])
+    # plt.xlim(dates[int(len(dates)*0.05)],dates[int(len(dates)*0.95)])
+    plt.xlim(dates[0],dates[-1])
+    fig.autofmt_xdate()
+    
     plt.savefig("temp-v-compression_tree{}.png".format(tree))
+    
+    return date_index, dates, rawt, rawcompression, compression, full_smootht, tsmooth, stats
+
+
+def write_dates(fname,dates):
+    """docstring for write_dates"""
+    with open(fname,'w') as f:
+        for d in dates:
+            f.write(str(d)+"\n")
+            
+    
+def batch_output():
+    """docstring for batch_output"""
+    global tree
+    global pot1
+    global pot2
+    
+    for i in range(1,4):
+        tree=i
+        if tree==1:
+            pot1=3
+            pot2=4
+        if tree==2:
+            pot1=5
+            pot2=6
+        if tree==3:
+            pot1=12
+            pot2=13
+        
+        data=main()
+        write_dates("dates_tree_{}.nc".format(tree), data[1])
+        mygis.write("raw_t_tree_{}.nc".format(tree), data[2])
+        mygis.write("compression_tree_{}.nc".format(tree), data[3])
+        mygis.write("smooth_t_tree_{}.nc".format(tree), data[5])
 
 if __name__ == '__main__':
     
-    main()
+    batch_output()

@@ -1,3 +1,4 @@
 #!/bin/bash
-~/src/profiling/gprof2dot.py -f axe gprof_output | dot -Tpng -o output.png
+gprof ~/bin/icar | ~/src/profiling/gprof2dot.py --skew=0.1 -n 0.1 -z MAIN__ | dot -Tpng -o output.png
+# ~/src/profiling/gprof2dot.py -f axe gprof_output | dot -Tpng -o output.png
 # ~/src/profiling/gprof2dot.py -f axe $1 | dot -Tpng -o output.png
