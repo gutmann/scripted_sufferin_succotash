@@ -29,40 +29,48 @@ LICENSE
 
 VERSION
 
-
+    
 """
-from __future__ import absolute_import, print_function, division
 
 import sys
 import os
 import traceback
 import argparse
 
-global verbose
-verbose=False
+import mygis
+import matplotlib.pyplot as plt
 
-def main (filename):
+def main (filename, varname, d0, d2, outputfile, vmin,vmax):
 
-    # TODO: Do something more interesting here...
-    print('You want me to work on the file: '+filename)
+    data=mygis.read_nc(filename,varname).data
+    if d2!=None:
+        data=data[:,:,int(d2)]
+    if d0!=None:
+        data=data[int(d0)]
+
+    plt.imshow(data,vmin=vmin,vmax=vmax)
+    plt.colorbar()
+        
+    plt.savefig(outputfile)
 
 if __name__ == '__main__':
     try:
         parser= argparse.ArgumentParser(description='This is a template file for Python scripts. ',
                                         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-        parser.add_argument('filename',nargs="?", action='store', default="some_file_name")
-        parser.add_argument('-f2', dest="file_two", action='store', default="a_Second_filename")
+        parser.add_argument('filename', action='store', default="some_file_name")
+        parser.add_argument('varname',  action='store', default="data")
+        parser.add_argument('-d0',nargs="?", action='store', default=None)
+        parser.add_argument('-d2',nargs="?", action='store', default=None)
+        parser.add_argument('-vmin',nargs="?", action='store', default=None,type=int)
+        parser.add_argument('-vmax',nargs="?", action='store', default=None,type=int)
+        parser.add_argument('-o', nargs="?", action='store', default="output.png")
         parser.add_argument('-v', '--version',action='version',
                 version='Template Parser 1.0')
         parser.add_argument ('--verbose', action='store_true',
                 default=False, help='verbose output', dest='verbose')
         args = parser.parse_args()
-        
-        verbose=args.verbose
 
-        verbose = args.verbose
-
-        exit_code = main(args.filename)
+        exit_code = main(args.filename, args.varname,args.d0, args.d2, args.o, args.vmin, args.vmax)
         if exit_code is None:
             exit_code = 0
         sys.exit(exit_code)

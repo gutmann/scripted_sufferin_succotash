@@ -1,4 +1,4 @@
 #!/bin/bash
-for ((i=1;i<8;i++)) do
+for ((i=1;i<9;i++)) do
   echo node$i `ssh node$i uptime`
 done
