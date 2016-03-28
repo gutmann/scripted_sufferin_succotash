@@ -37,6 +37,8 @@ import os
 import traceback
 import argparse
 
+global verbose
+
 def main (filename):
 
     # TODO: Do something more interesting here...
@@ -53,6 +55,8 @@ if __name__ == '__main__':
         parser.add_argument ('--verbose', action='store_true',
                 default=False, help='verbose output', dest='verbose')
         args = parser.parse_args()
+        
+        verbose=args.verbose
 
         exit_code = main(args.filename)
         if exit_code is None:

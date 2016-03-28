@@ -19,7 +19,7 @@ def load_shapes(filename):
 
 def load_geo(filename,latvar=None,lonvar=None):
     """Load Geographic (lat/lon coords) from a netCDF file
-    
+
     Output will be a (lat,lon) tuple of 2d grids with lon=[-180 - 180]
     """
     lat,lon=None,None
@@ -30,7 +30,7 @@ def load_geo(filename,latvar=None,lonvar=None):
             lon=io.read_nc(filename,lonvar).data
         except exception as e:
             print(e)
-    # otherwise you have to search a list of 
+    # otherwise you have to search a list of
     # variable names to test
     latnames=["lat","latitude","XLAT"]
     lonnames=["lon","longitude","XLONG"]
@@ -51,7 +51,7 @@ def load_geo(filename,latvar=None,lonvar=None):
     # if grids are 1D make them 2D
     if len(lat.shape)==1:
         lon,lat=np.meshgrid(lon,lat)
-    
+
     return lat,lon
 
 
@@ -92,7 +92,7 @@ def main(geo_file,poly_file,outputfilename,hucdivider=1):
     shapes=load_shapes(poly_file)
     print("Loading Geographic data")
     lat,lon=load_geo(geo_file)
-    
+
     # variable to hold the outputdata
     outputdata=np.zeros(lat.shape,dtype=np.long)
     code_position=11
@@ -105,10 +105,10 @@ def main(geo_file,poly_file,outputfilename,hucdivider=1):
         mark_poly(outputdata,shapes[i],lat,lon,code_position,hucdivider)
     print("\nFinished")
     write_file(outputfilename,outputdata,lat,lon)
-    
+
 if __name__ == '__main__':
     # stupidly simple commandline processing,
-    # use argparse if we need more options in the future. 
+    # use argparse if we need more options in the future.
     try:
         if len(sys.argv)==4:
             main(sys.argv[1],sys.argv[2],sys.argv[3])
@@ -125,7 +125,7 @@ if __name__ == '__main__':
         print(e)
         print("USAGE:")
         print("""  hucmask.py <rasterfilename.nc> <shapefilename.shp> <outputfilename> [divisor]
-        
+
         rasterfile must have lat/lon, latitude/longitude, or XLAT/XLONG variables
         shapefile needs an associated dbf file in the same directory
         """)
