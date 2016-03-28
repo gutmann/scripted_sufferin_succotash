@@ -49,10 +49,13 @@ verbose=True
 missing = -999.99
 mask_file = "geo_em.d02.nc"
 
-prec_atts = Bunch(temporal_period="00-24Z", missing_value=missing, _FillValue=missing, description="Daily precipitation amount", units="mm")
-tmin_atts = Bunch(temporal_period="00-24Z", missing_value=missing, _FillValue=missing, description="Daily minimum temperature",  units="degrees C")
-tmax_atts = Bunch(temporal_period="00-24Z", missing_value=missing, _FillValue=missing, description="Daily maximum temperature",  units="degrees C")
-tave_atts = Bunch(temporal_period="00-24Z", missing_value=missing, _FillValue=missing, description="Daily average temperature",  units="degrees C")
+prec_atts = Bunch(missing_value=missing, _FillValue=missing, description="Hourly precipitation amount", units="mm")
+snow_atts = Bunch(missing_value=missing, _FillValue=missing, description="Hourly snowfall amount", units="mm", note="May deviate from precip by 0.1mm")
+tave_atts = Bunch(missing_value=missing, _FillValue=missing, description="Air temperature at 2m",  units="degrees C")
+huss_atts = Bunch(missing_value=missing, _FillValue=missing, description="Specific humidity at 2m",  units="kg/kg")
+sw_atts   = Bunch(missing_value=missing, _FillValue=missing, description="Downwards shortwave radiation at surface", units="W/m^2")
+lw_atts   = Bunch(missing_value=missing, _FillValue=missing, description="Downwards longwave radiation at surface", units="W/m^2")
+wind_atts = Bunch(missing_value=missing, _FillValue=missing, description="Wind speed at 10m", units="m/s")
 
 lat_atts= Bunch(axis="Y",datum="WGS84", units="degrees_north", long_name="Latitude", standard_name="latitude_north")
 latvar  = Bunch(data=None, attributes=lat_atts, dims=("lat","lon"), dtype='f', name="lat")
@@ -79,21 +82,40 @@ class ICAR_Reader(object):
     curstep=0
     curfile=0
     rr_var="rain_rate"
+    snow_var="snow"
     ac_var="rain"
     t_var="ta2m"
+    u_var="u10m"
+    v_var="v10m"
+    hus_var="hus2m"
+    sw_var="rsds"
+    lw_var="rlds"
     
-    def __init__(self, filesearch, steps_per_day=24):
+    def __init__(self, filesearch):
         """docstring for init"""
         self.files=glob.glob(filesearch)
         self.files.sort()
-        self.steps_per_day=steps_per_day
         
         if len(self.files)==0:
             raise ValueError("\nERROR: no files match search string:"+filesearch+"\n")
         if verbose: print("Reading:{}".format(self.files[self.curfile]))
-        self.tdata  = mygis.read_nc(self.files[self.curfile], self.t_var).data
+        self.tdata  = mygis.read_nc(self.files[self.curfile], self.t_var).data-273.15
         self.rrdata = mygis.read_nc(self.files[self.curfile],self.rr_var).data
         self.acdata = mygis.read_nc(self.files[self.curfile],self.ac_var).data
+        self.winddata = mygis.read_nc(self.files[self.curfile],self.u_var).data**2
+        self.winddata+= mygis.read_nc(self.files[self.curfile],self.v_var).data**2
+        self.winddata=np.sqrt(self.winddata)
+        self.husdata = mygis.read_nc(self.files[self.curfile],self.hus_var).data
+        self.swdata = mygis.read_nc(self.files[self.curfile],self.sw_var).data
+        self.lwdata = mygis.read_nc(self.files[self.curfile],self.lw_var).data
+        self.acsnowdata = mygis.read_nc(self.files[self.curfile],self.snow_var).data
+        self.snowdata=np.zeros(self.acsnowdata.shape)
+        self.snowdata[0]=self.acsnowdata[0]
+        self.snowdata[1:]=np.diff(self.acsnowdata,axis=0)
+        for i in range(self.snowdata.shape[0]):
+            if self.snowdata[i].min()<0:
+                self.snowdata[i]=self.acsnowdata[i]
+        self.lastsnow=self.acsnowdata[-1]
         
         self.mask = mygis.read_nc(mask_file,"LANDMASK").data[0]==0
         
@@ -108,9 +130,24 @@ class ICAR_Reader(object):
             raise StopIteration
             
         if verbose: print("Reading:{}".format(self.files[self.curfile]))
-        next_tdata  = mygis.read_nc(self.files[self.curfile], self.t_var).data
+        self.tdata  = mygis.read_nc(self.files[self.curfile], self.t_var).data-273.15
         next_rrdata = mygis.read_nc(self.files[self.curfile],self.rr_var).data
         next_acdata = mygis.read_nc(self.files[self.curfile],self.ac_var).data
+        self.winddata = mygis.read_nc(self.files[self.curfile],self.u_var).data**2
+        self.winddata+= mygis.read_nc(self.files[self.curfile],self.v_var).data**2
+        self.winddata=np.sqrt(self.winddata)
+        self.husdata = mygis.read_nc(self.files[self.curfile],self.hus_var).data
+        self.swdata = mygis.read_nc(self.files[self.curfile],self.sw_var).data
+        self.lwdata = mygis.read_nc(self.files[self.curfile],self.lw_var).data
+        self.acsnowdata = mygis.read_nc(self.files[self.curfile],self.snow_var).data
+        self.snowdata=np.zeros(self.acsnowdata.shape)
+        self.snowdata[0]=self.acsnowdata[0]-self.lastsnow
+        self.snowdata[1:]=np.diff(self.acsnowdata,axis=0)
+        for i in range(self.snowdata.shape[0]):
+            if self.snowdata[i].min()<0:
+                self.snowdata[i]=self.acsnowdata[i]
+        self.lastsnow=self.acsnowdata[-1]
+        
         # check that the next file has at least one day's worth of data in it
         if next_rrdata.shape[0]<24:
             raise StopIteration
@@ -126,7 +163,7 @@ class ICAR_Reader(object):
                     if next_rrdata[i].max()>0:
                         print("Found a restart step at step {} in file:{}".format(i,self.files[self.curfile]))            
                         
-        self.tdata  = np.ma.array(next_tdata, mask=next_tdata>10000)
+        self.tdata  = np.ma.array(self.tdata, mask=next_tdata>10000)
         self.acdata = np.ma.array(next_acdata, mask=next_acdata>10000)
         self.rrdata = np.ma.array(next_rrdata, mask=next_rrdata>10000)
         
@@ -136,28 +173,28 @@ class ICAR_Reader(object):
         if self.curstep==self.tdata.shape[0]:
             self.update_data()
         
-        if self.curstep+self.steps_per_day > self.tdata.shape[0]:
-            print("Ran out of files to process at step {} in file:{}".format(self.curstep,self.files[self.curfile]))
-            print("If isn't the last file ({}), may need to edit to permit fractional days / file".format(self.files[-1]))
-            raise StopIteration
-            
-        rain = self.rrdata[self.curstep : self.curstep+self.steps_per_day].sum(axis=0)
-        tmin = self.tdata[ self.curstep : self.curstep+self.steps_per_day].min(axis=0)  - 273.15
-        tmax = self.tdata[ self.curstep : self.curstep+self.steps_per_day].max(axis=0)  - 273.15
-        tave = self.tdata[ self.curstep : self.curstep+self.steps_per_day].mean(axis=0) - 273.15
+        # if self.curstep+1 > self.tdata.shape[0]:
+        #     print("Ran out of files to process at step {} in file:{}".format(self.curstep,self.files[self.curfile]))
+        #     print("If isn't the last file ({}), may need to edit to permit fractional days / file".format(self.files[-1]))
+        #     raise StopIteration
         
-        self.curstep+=self.steps_per_day
+        rain = self.rrdata[self.curstep]
+        snow = self.snowdata[self.curstep]
+        tave = self.tdata[ self.curstep] - 273.15
+        hus  = self.husdata[self.curstep]
+        sw   = self.swdata[self.curstep]
+        lw   = self.lwdata[self.curstep]
+        wind = self.winddata[self.curstep]
         
-        tmin[self.mask]=missing
-        tmax[self.mask]=missing
-        tave[self.mask]=missing
+        self.curstep+=1
+        
+        tave[self.mask] = missing
+        hus[ self.mask] = missing
         
         rain[rain>3000] = missing
-        tmin[tmin>100]  = missing
-        tmax[tmax>100]  = missing
         tave[tave>100]  = missing
         
-        return (rain, tmin, tmax, tave)
+        return (rain, snow, tave, hus, sw, lw, wind)
     
     def __iter__(self):
         """docstring for __iter__"""
@@ -181,16 +218,25 @@ def main (filename, outputfile):
     icar_data=ICAR_Reader(filename)
     if verbose:print(icar_data.files[0],icar_data.files[-1])
     
-    raindata=[]
-    tmindata=[]
-    tmaxdata=[]
-    tavedata=[]
+
+    raindata = []
+    snowdata = []
+    tavedata = []
+    husdata  = []
+    swdata   = []
+    lwdata   = []
+    winddata = []
+
     if verbose:print("Looping through data")
     for data in icar_data:
         raindata.append(data[0])
-        tmindata.append(data[1])
-        tmaxdata.append(data[2])
-        tavedata.append(data[3])
+        snowdata.append(data[1])
+        tavedata.append(data[2])
+        husdata.append( data[3])
+        swdata.append(  data[4])
+        lwdata.append(  data[5])
+        winddata.append(data[6])
+
     
     latvar.data=mygis.read_nc(icar_data.files[0],"lat").data
     lonvar.data=mygis.read_nc(icar_data.files[0],"lon").data
@@ -203,15 +249,17 @@ def main (filename, outputfile):
         start_date = date_fun.date2mjd(year,01,01,00,00)
     else:
         start_date = (year-1800) * 365
-    timevar.data = np.arange(start_date,start_date+len(raindata))
+    timevar.data = np.arange(start_date,start_date+len(raindata)/24.0)
     if verbose:print(year, timevar.data[0], len(raindata))
     
     if verbose:print("Writing data")
-    write_file(outputfile+"_rain.nc",raindata, varname="precipitation_amount",      varatts=prec_atts)
-    write_file(outputfile+"_tmin.nc",tmindata, varname="daily_minimum_temperature", varatts=tmin_atts)
-    write_file(outputfile+"_tmax.nc",tmaxdata, varname="daily_maximum_temperature", varatts=tmax_atts)
-    write_file(outputfile+"_tave.nc",tavedata, varname="daily_average_temperature", varatts=tave_atts)
-    
+    write_file(outputfile+"_prec.nc", raindata, varname="precipitation_amount",  varatts=prec_atts)
+    write_file(outputfile+"_snow.nc", snowdata, varname="snowfall_amount",       varatts=snow_atts)
+    write_file(outputfile+"_ta2m.nc", tavedata, varname="air_temperature",       varatts=tave_atts)
+    write_file(outputfile+"_hus2m.nc",husdata,  varname="specific_humidity",     varatts=huss_atts)
+    write_file(outputfile+"_sw.nc",   swdata,   varname="shortwave",             varatts=sw_atts)
+    write_file(outputfile+"_lw.nc",   lwdata,   varname="longwave",              varatts=lw_atts)
+    write_file(outputfile+"_wind.nc", winddata, varname="wind_speed",            varatts=wind_atts)
     
     
 if __name__ == '__main__':
