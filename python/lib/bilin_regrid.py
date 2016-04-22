@@ -172,6 +172,8 @@ def regrid(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,ymin=0,xmin=
         
     # set up the output dataset 
     # WARNING: this could be HUGE, you may want to process the data in chunks so it will fit in memory
+    if len(data.shape)==2:
+        data=data.reshape((1,data.shape[0],data.shape[1]))
     outputdata=np.zeros((data.shape[0],geoLUT.shape[0],geoLUT.shape[1]),dtype=np.float32)
     # each of these four iterations corresponds to one of the four surrounding points
     # take that point, multiply by its weight and sum for bilinear interpolation
