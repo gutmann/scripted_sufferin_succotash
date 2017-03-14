@@ -24,17 +24,19 @@ def main(f1=None,f2=None,output_dir="./",inputvar="tos",outputvar="sst"):
     print("Reading geo data")
     geo1=mygis.read_geo(files[0])
     geo2=mygis.read_geo(reference)
-    geo2.lon=geo2.lon[20:60,20:60]
-    geo2.lat=geo2.lat[20:60,20:60]
+    # geo2.lon=geo2.lon[20:60,20:60]
+    # geo2.lat=geo2.lat[20:60,20:60]
     print(geo1.lon.min(),geo1.lon.max())
     print(geo2.lon.min(),geo2.lon.max())
+    print(geo1.lat.shape, geo2.lat.shape, geo1.lon.min(),geo2.lon.min(),geo1.lon.max(), geo2.lon.max())
     
     latatts=Bunch(standard_name="latitude",long_name="latitude coordinate",units="degrees_north")
     lonatts=Bunch(standard_name="longitude",long_name="longitude coordinate",units="degrees_east")
     timeatts=None
+    dummy_time_var=Bunch(data=None,name="time",dims=("time",),dtype="d",attributes=timeatts)
     extra_vars=[Bunch(data=geo2.lat,name="lat",dims=("lat","lon"),dtype="f",attributes=latatts),
                 Bunch(data=geo2.lon,name="lon",dims=("lat","lon"),dtype="f",attributes=lonatts),
-                Bunch(data=None,name="time",dims=("time",),dtype="d",attributes=timeatts)
+                dummy_time_var
                 ]
     
     missing_value=0
@@ -47,17 +49,26 @@ def main(f1=None,f2=None,output_dir="./",inputvar="tos",outputvar="sst"):
         data=mygis.read_nc(f,inputvar).data
         data_atts=mygis.read_atts(f,inputvar)
         global_atts=mygis.read_atts(f,global_atts=True)
-        time_atts=mygis.read_atts(f,"time")
+        try:
+            time_atts=mygis.read_atts(f,"time")
+        except:
+            time_atts=None
         
         print("Regridding")
         output=regrid(data,geoLUT=geoLUT,missing=0)
     
         print("Writing data")
-        extra_vars[-1].data=mygis.read_nc(f,"time").data
-        extra_vars[-1].attributes=time_atts
+        if time_atts:
+            extra_vars[-1].data=mygis.read_nc(f,"time").data
+            extra_vars[-1].attributes=time_atts
+        else:
+            extra_vars.pop(-1)
         
         mygis.write(output_dir+f.replace(inputvar,outputvar),output,dims=("time","lat","lon"),varname=outputvar,attributes=data_atts,
                     global_attributes=global_atts,extravars=extra_vars)
+        
+        if time_atts==None:
+            extra_vars.append(dummy_time_var)
     
 if __name__ == '__main__':
     
