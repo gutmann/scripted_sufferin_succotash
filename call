@@ -9,7 +9,7 @@
 # See the Perl documentation for Term::ANSIColor.  For example:
 # print "\e[1m\e[34mThis text is in bold blue.\e[0m\e[0m\n";
 
-$master = "/home/gutmann/usr/local/lib/phonedir";
+$master = "/home/gutmann/.usr/local/lib/phonedir";
 @private = split(' ', $ENV{'PHONEDIR'}) if $ENV{'PHONEDIR'};
 
 foreach $dir (@private, $master) {

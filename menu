@@ -1,7 +1,7 @@
 #!/bin/bash
 if [ ! -e menu ]; then
     wget http://www2.ucar.edu/for-staff/daily/menu &>/dev/null
-    grep -e "views-field" -e Pizza -e Sandwich -e Entr -e Chef -e Soup -e Grill -e Salad menu \
+    grep -e "views-field" -e "<strong>ML:" -e "<strong>FL:" -e "<strong>CG:" -e Pizza -e Sandwich -e Entr -e Chef -e Soup -e Grill -e Salad menu \
         | sed -e 's/<[^>]*>//g;s/&[^;]*;//g; s/          //g;s/      //g'
     rm menu
 else
