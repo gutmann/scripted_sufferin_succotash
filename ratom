@@ -187,7 +187,7 @@ function handle_connection {
 exec 3<> /dev/tcp/$host/$port
 
 if [ $? -gt 0 ]; then
-	echo "Unable to connect to TextMate on $host:$port"
+	echo "Unable to connect to Atom on $host:$port"
 	exit 1
 fi
 
