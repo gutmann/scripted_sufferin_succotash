@@ -372,13 +372,13 @@ def read_geo(filesearch,outputdim=2):
         try:
             latdat=read_nc(filename,lat).data
             londat=read_nc(filename,lon).data
-
             try:
                 latatts = read_atts(filename,lat)
                 lonatts = read_atts(filename,lon)
             except:
                 latatts=None
                 lonatts=None
+
         except Exception as e:
             pass
 
@@ -555,6 +555,22 @@ def _write_one_var(NCfile,data,varname="data",units=None,dtype='f',dims=('t','z'
             if k!="_FillValue":
                 NCfile.variables[varname].__setattr__(k,attributes[k])
 
+def _nio_addvar(NCfile,data,varname,dims,dtype='f',attributes=None):
+    for i,d in enumerate(dims):
+        if not(d in NCfile.dimensions):
+            NCfile.create_dimension(d,data.shape[i])
+
+    try:
+        fill_value=attributes["_FillValue"]
+    except:
+        fill_value=None
+    NCfile.create_variable(varname,dtype,dims)
+    NCfile.variables[varname][:]=data.astype(dtype)
+    if attributes:
+        for k in attributes.keys():
+            if k!="_FillValue":
+                NCfile.variables[varname].__setattr__(k,attributes[k])
+
 
 def addvar(NCfile,data,varname,dims,dtype='f',attributes=None, record_dim=None):
     for i,d in enumerate(dims):
@@ -663,6 +679,11 @@ def _write_nio(filename,data,dtype,varname,dims,units,attributes,lat,lon,extrava
         NCfile.create_dimension(dim, n)
     NCfile.create_variable(varname,dtype,dims)
     NCfile.variables[varname][:]=data.astype(dtype)
+
+    if attributes:
+        for k in attributes.keys():
+            if k!="_FillValue":
+                NCfile.variables[varname].__setattr__(k,attributes[k])
 
     if extravars:
         for e in extravars:

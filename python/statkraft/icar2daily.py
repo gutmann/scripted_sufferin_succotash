@@ -92,10 +92,10 @@ class ICAR_Reader(object):
             raise ValueError("\nERROR: no files match search string:"+filesearch+"\n")
         if verbose: print("Reading:{}".format(self.files[self.curfile]))
         self.tdata  = mygis.read_nc(self.files[self.curfile], self.t_var).data
-        self.rrdata = mygis.read_nc(self.files[self.curfile],self.rr_var).data
-        self.acdata = mygis.read_nc(self.files[self.curfile],self.ac_var).data
+        # self.rrdata = mygis.read_nc(self.files[self.curfile],self.rr_var).data
+        # self.acdata = mygis.read_nc(self.files[self.curfile],self.ac_var).data
         
-        self.mask = mygis.read_nc(mask_file,"LANDMASK").data[0]==0
+        # self.mask = mygis.read_nc(mask_file,"LANDMASK").data[0]==0
         
         
     def update_data(self):
@@ -109,26 +109,26 @@ class ICAR_Reader(object):
             
         if verbose: print("Reading:{}".format(self.files[self.curfile]))
         next_tdata  = mygis.read_nc(self.files[self.curfile], self.t_var).data
-        next_rrdata = mygis.read_nc(self.files[self.curfile],self.rr_var).data
-        next_acdata = mygis.read_nc(self.files[self.curfile],self.ac_var).data
+        # next_rrdata = mygis.read_nc(self.files[self.curfile],self.rr_var).data
+        # next_acdata = mygis.read_nc(self.files[self.curfile],self.ac_var).data
         # check that the next file has at least one day's worth of data in it
-        if next_rrdata.shape[0]<24:
-            raise StopIteration
+        # if next_rrdata.shape[0]<24:
+        #     raise StopIteration
             
         # fill in any missing dates in the rain_rate data (happens with restarts)
-        for i in range(next_rrdata.shape[0]):
-            if next_rrdata[i].max()==0:
-                if i==0:
-                    next_rrdata[i]=next_acdata[i]-self.acdata[-1]
-                else:
-                    next_rrdata[i]=next_acdata[i]-next_acdata[i-1]
-                if verbose:
-                    if next_rrdata[i].max()>0:
-                        print("Found a restart step at step {} in file:{}".format(i,self.files[self.curfile]))            
+        # for i in range(next_rrdata.shape[0]):
+        #     if next_rrdata[i].max()==0:
+        #         if i==0:
+        #             next_rrdata[i]=next_acdata[i]-self.acdata[-1]
+        #         else:
+        #             next_rrdata[i]=next_acdata[i]-next_acdata[i-1]
+        #         if verbose:
+        #             if next_rrdata[i].max()>0:
+        #                 print("Found a restart step at step {} in file:{}".format(i,self.files[self.curfile]))            
                         
         self.tdata  = np.ma.array(next_tdata, mask=next_tdata>10000)
-        self.acdata = np.ma.array(next_acdata, mask=next_acdata>10000)
-        self.rrdata = np.ma.array(next_rrdata, mask=next_rrdata>10000)
+        # self.acdata = np.ma.array(next_acdata, mask=next_acdata>10000)
+        # self.rrdata = np.ma.array(next_rrdata, mask=next_rrdata>10000)
         
         
     def next(self):
@@ -140,21 +140,24 @@ class ICAR_Reader(object):
             print("Ran out of files to process at step {} in file:{}".format(self.curstep,self.files[self.curfile]))
             print("If isn't the last file ({}), may need to edit to permit fractional days / file".format(self.files[-1]))
             raise StopIteration
-            
-        rain = self.rrdata[self.curstep : self.curstep+self.steps_per_day].sum(axis=0)
-        tmin = self.tdata[ self.curstep : self.curstep+self.steps_per_day].min(axis=0)  - 273.15
-        tmax = self.tdata[ self.curstep : self.curstep+self.steps_per_day].max(axis=0)  - 273.15
-        tave = self.tdata[ self.curstep : self.curstep+self.steps_per_day].mean(axis=0) - 273.15
+
+        rain=[]
+        tmin=[]
+        tmax=[]
+        # rain = self.rrdata[self.curstep : self.curstep+self.steps_per_day].sum(axis=0)
+        # tmin = self.tdata[ self.curstep : self.curstep+self.steps_per_day].min(axis=0)  - 273.15
+        # tmax = self.tdata[ self.curstep : self.curstep+self.steps_per_day].max(axis=0)  - 273.15
+        tave = self.tdata[ self.curstep : self.curstep+self.steps_per_day].mean(axis=0) #- 273.15
         
         self.curstep+=self.steps_per_day
         
-        tmin[self.mask]=missing
-        tmax[self.mask]=missing
-        tave[self.mask]=missing
+        # tmin[self.mask]=missing
+        # tmax[self.mask]=missing
+        # tave[self.mask]=missing
         
-        rain[rain>3000] = missing
-        tmin[tmin>100]  = missing
-        tmax[tmax>100]  = missing
+        # rain[rain>3000] = missing
+        # tmin[tmin>100]  = missing
+        # tmax[tmax>100]  = missing
         tave[tave>100]  = missing
         
         return (rain, tmin, tmax, tave)
@@ -195,7 +198,7 @@ def main (filename, outputfile):
     latvar.data=mygis.read_nc(icar_data.files[0],"lat").data
     lonvar.data=mygis.read_nc(icar_data.files[0],"lon").data
     
-    dates_are_mjd = (icar_data.files[0].split("/")[1].split("_")[2] == "era")
+    dates_are_mjd = (icar_data.files[0].split("/")[1] == "erai")
     if verbose:print("using modified julian day dates="+str(dates_are_mjd))
     year = int(icar_data.files[0].split("/")[-1].split("_")[1])
     if dates_are_mjd:
@@ -207,10 +210,10 @@ def main (filename, outputfile):
     if verbose:print(year, timevar.data[0], len(raindata))
     
     if verbose:print("Writing data")
-    write_file(outputfile+"_rain.nc",raindata, varname="precipitation_amount",      varatts=prec_atts)
-    write_file(outputfile+"_tmin.nc",tmindata, varname="daily_minimum_temperature", varatts=tmin_atts)
-    write_file(outputfile+"_tmax.nc",tmaxdata, varname="daily_maximum_temperature", varatts=tmax_atts)
-    write_file(outputfile+"_tave.nc",tavedata, varname="daily_average_temperature", varatts=tave_atts)
+    # write_file(outputfile+"_rain.nc",raindata, varname="precipitation_amount",      varatts=prec_atts)
+    # write_file(outputfile+"_tmin.nc",tmindata, varname="daily_minimum_temperature", varatts=tmin_atts)
+    # write_file(outputfile+"_tmax.nc",tmaxdata, varname="daily_maximum_temperature", varatts=tmax_atts)
+    write_file(outputfile+"_tave",tavedata, varname="daily_average_temperature", varatts=tave_atts)
     
     
     
@@ -229,7 +232,12 @@ if __name__ == '__main__':
         verbose=args.verbose
         
         print(args.model)
-        global_attributes.scenario = args.model.split("_")[3]
+        try:
+            global_attributes.scenario = args.model.split("_")[3]
+        except:
+            #era data
+            global_attributes.scenario="Historical"
+        
         if global_attributes.scenario[0]!="r":global_attributes.scenario="Historical"
         global_attributes.forcing  = args.model.split("_")[2]
         

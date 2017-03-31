@@ -57,11 +57,15 @@ def main(f1=None, f2=None, zvar=None, zbasevar=None,skip_z0=False,
     else:
         lonatts=geo1.lonatts
 
-    master_vars=[Bunch(data=geo2.lat,name="lat",dims=("lat","lon"),dtype="f",attributes=latatts),
-                 Bunch(data=geo2.lon,name="lon",dims=("lat","lon"),dtype="f",attributes=lonatts)]
     if timevar:
         timeatts=Bunch(standard_name="time")
         master_vars.append(Bunch(data=None,name=timevar,dims=("time",),dtype="d",attributes=timeatts))
+
+    dummy_time_var=Bunch(data=None,name="time",dims=("time",),dtype="d",attributes=timeatts)
+    extra_vars=[Bunch(data=geo2.lat,name="lat",dims=("lat","lon"),dtype="f",attributes=latatts),
+                Bunch(data=geo2.lon,name="lon",dims=("lat","lon"),dtype="f",attributes=lonatts),
+                dummy_time_var
+                ]
 
     missing_value=0
     # find the variable names that we need to regrid
@@ -95,6 +99,7 @@ def main(f1=None, f2=None, zvar=None, zbasevar=None,skip_z0=False,
             zout+=mygis.read_nc(reference,zrefbasevar).data
 
     for f in files:
+
         regridded_z=None
         if zvar:
             zin=mygis.read_nc(f,zvar).data
@@ -155,21 +160,14 @@ def main(f1=None, f2=None, zvar=None, zbasevar=None,skip_z0=False,
                         for t in range(output.shape[0]):
                             output[t,:nz] = vinterp(output[t],inputz=regridded_z[t],outputz=zout[t*4+2])
                         output=output[:,:nz,:,:]
-            print(data.shape)
-            print(output.shape)
 
             if v!=varlist[-1]:
                 extra_vars.append(Bunch(data=output,name=v,dims=dims,dtype="f",attributes=data_atts))
             else:
                 print("Writing data")
                 outputfile=f.split("/")[-1]
-                print(outputfile)
-                print(output_dir)
-                print(v)
-                print(outputvar[i])
-                outputfile=output_dir+"regrid_"+outputfile.replace(v,outputvar[i])
-                print(outputfile)
-                print(output.shape)
+                outputfile=output_dir+"regrid_"+outputfile#.replace(v,outputvar[i])
+                print(outputvar[i], dims, data_atts)
                 for e in extra_vars:
                     print(e.name, e.dims, e.data.shape)
                 if outputfile[2:]!=inputfile:
