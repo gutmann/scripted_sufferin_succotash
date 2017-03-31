@@ -172,13 +172,30 @@ def regrid(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,ymin=0,xmin=
         
     # set up the output dataset 
     # WARNING: this could be HUGE, you may want to process the data in chunks so it will fit in memory
-    outputdata=np.zeros((data.shape[0],geoLUT.shape[0],geoLUT.shape[1]),dtype=np.float32)
+    if len(data.shape)==2:
+        data=data.reshape((1,data.shape[0],data.shape[1]))
+        has_time=False
+    else:
+        has_time=True
+    if len(data.shape)==3:
+        data=data.reshape((1,data.shape[0],data.shape[1],data.shape[2]))
+        has_z=False
+    else:
+        has_z=True
+    
+    outputdata=np.zeros((data.shape[0],data.shape[1],geoLUT.shape[0],geoLUT.shape[1]),dtype=np.float32)
     # each of these four iterations corresponds to one of the four surrounding points
     # take that point, multiply by its weight and sum for bilinear interpolation
     for i in range(4):
-        y=geoLUT[:,:,i,0].astype('i')-ymin
-        x=geoLUT[:,:,i,1].astype('i')-xmin
-        outputdata+=np.float32(data[:,y,x]*geoLUT[np.newaxis,:,:,i,2])
+        y = geoLUT[:,:,i,0].astype('i')-ymin
+        x = geoLUT[:,:,i,1].astype('i')-xmin
+        outputdata += np.float32(data[:,:,y,x] * geoLUT[np.newaxis,np.newaxis,:,:,i,2])
+    
+    # remove extra dimensions if they existed. 
+    if not has_time:
+        outputdata=outputdata[0]
+    if not has_z:
+        outputdata=outputdata[0]
     
     if output_geoLUT:
         return outputdata,geoLUT

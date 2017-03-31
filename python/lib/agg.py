@@ -1,6 +1,5 @@
 import numpy as np
 from bunch import Bunch
-import swim_io
 
 def dataXn(data,nsamples):
     """aggregate an NxM data array into an nsamples x nsamples array
@@ -30,6 +29,51 @@ def dataXn(data,nsamples):
             xstart+=xstep
         ystart+=ystep
     return outputdata
+
+def find_point(x,y,xmap,ymap,guess=None):
+    if guess==None:
+        xout,yout = np.unravel_index(np.argmin(dists),dists.shape)
+        
+    else:
+        window = 3
+        nx = xmap.shape[1]
+        xs = max(0,guess[0]-window)
+        xe = min(nx-1,guess[0]+window)
+        ny = xmap.shape[0]
+        ys = max(0,guess[1]-window)
+        ye = min(ny-1,guess[1]+window)
+        
+        dists = (xmap[ys:ye,xs:xe]-x)**2 + (ymap[ys:ye,xs:xe]-y)**2
+        xout,yout = np.unravel_index(np.argmin(dists),dists.shape)
+        xout+=xs
+        yout+=ys
+    
+    guess=(yout,xout)
+    
+    max_delta = np.sqrt((xmap[0,0]-xmap[1,1])**2 + (ymap[0,0]-ymap[1,1])**2)/2
+    curdist = np.sqrt((xmap[yout,xout]-x)**2 + (ymap[yout,xout]-y)**2)
+    if (curdist > max_delta):
+        xout=-1
+        yout=-1
+    
+    return, xout, yout, guess
+        
+
+def geoLUT(geoin, geoout):
+    nx = geoin.lat.shape[1]
+    ny = geoin.lat.shape[0]
+    outputlut=np.zeros((ny,nx,3))
+    
+    guess = None
+    for i in range(ny):
+        for j in range(nx):
+            x,y,guess = find_point(geoin.lon[i,j], geoin.lat[i,j], geoout.lon, geoout.lat, guess=guess)
+            outputlut[i,j,0] = x
+            outputlut[i,j,1] = y
+            outputlut[i,j,2]+= 1
+    
+    return outputlut
+    
     
 def data2huc(data,hucmask,huc,minvalue=-100,maxvalue=1E5):
     """Compute mean of data where hucmask==huc

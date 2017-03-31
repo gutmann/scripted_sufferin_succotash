@@ -1,0 +1,2 @@
+#!/bin/bash
+qsub -I -A P48500028 -q regular -l walltime=12:00:00 -l select=1:ncpus=36:ompthreads=36

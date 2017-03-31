@@ -3,7 +3,7 @@
 """
 mygis.py
 
-Series of routines for reading / writing various GIS formats 
+Series of routines for reading / writing various GIS formats
     (added as I need them)
 
 Requires GDAL and netCDF4 (both the libraries and the Python bindings)
@@ -14,6 +14,7 @@ Copyright (c) 2011 National Center for Atmospheric Research. All rights reserved
 """
 import time
 import os, glob
+import datetime
 
 try:
     from osgeo import gdal,osr
@@ -37,19 +38,19 @@ import numpy as np
 
 def ll2utm(lon,lat,zone=None,north=None):
     '''Convert a given longitude and latitude into a UTM coordinate
-    
+
     (UTMx,UTMy,UTMz)=ll2utm(lon,lat,[zone=],[north=])
     If not specified the UTM zone is calculated from the longitude.
     If not specified north/south is calculated from the latitude.
-    
-    Either zone or hemisphere can be forced via zone=n or 
+
+    Either zone or hemisphere can be forced via zone=n or
     north=1/0 (1=northern hemisphere, 0=southern hemisphere)
-    
+
     Assumes a WGS84 datum/spheroid for both projections
     '''
     if not gdalloaded:
         raise ImportError("OSR not available")
-    
+
     if zone==None:
         zone=np.int(np.ceil((lon+180)/6))
         if zone==0: zone=1
@@ -60,11 +61,11 @@ def ll2utm(lon,lat,zone=None,north=None):
     # utm_proj.ImportFromEPSG(32613)
     utm_proj.SetUTM(zone,north)
     utm_proj.SetWellKnownGeogCS( 'WGS84' )
-    
+
     # create a geographic reference in WGS84
     geog_ref=osr.SpatialReference()
     geog_ref.ImportFromEPSG(4326)
-    
+
     # create a transfomration object between the two reference systems
     transform=osr.CoordinateTransformation(geog_ref,utm_proj)
     # transform the input coordinates to lat lon
@@ -73,24 +74,24 @@ def ll2utm(lon,lat,zone=None,north=None):
 
 
 def proj2ll(x=None,y=None,points=None,proj=None):
-    '''Convert an arbitrary projection point to latitude and longitude. 
-    
+    '''Convert an arbitrary projection point to latitude and longitude.
+
     (lon,lat)=proj2ll(x,y,proj)
-    
-    where proj is either: 
+
+    where proj is either:
         <osgeo.osr.SpatialReference> object
         Well Known Text (WKT)
         Proj4
         EPSG
-    
+
     Assumes a WGS84 datum/spheroid for both
     '''
     if not gdalloaded:
         raise ImportError("OSR not available")
-    
+
     if proj==None:
         raise TypeError("Must specify a projection")
-    
+
     if type(proj)==str:
         projWKT=proj
         proj=osr.SpatialReference()
@@ -98,16 +99,16 @@ def proj2ll(x=None,y=None,points=None,proj=None):
             proj.ImportFromWkt(projWKT)
         except:
             proj.ImportFromProj4(projWKT)
-            
+
     if type(proj)==int:
         projEPSG=proj
         proj=osr.SpatialReference()
         proj.ImportFromEPSG(projEPSG)
-    
+
     # create a geographic reference in WGS84
     geog_ref=osr.SpatialReference()
     geog_ref.ImportFromEPSG(4326)
-    
+
     # create a transfomration object between the two reference systems
     transform=osr.CoordinateTransformation(proj,geog_ref)
     # transform the input coordinates to lat lon
@@ -117,29 +118,29 @@ def proj2ll(x=None,y=None,points=None,proj=None):
         lat=data[:,1]
     else:
         lon,lat,z=transform.TransformPoint(x,y)
-        
+
     return lat,lon
 
 
 def ll2proj(lon=None,lat=None,points=None,proj=None):
-    '''Convert latitude and longitude to an arbitrary projection point. 
-    
+    '''Convert latitude and longitude to an arbitrary projection point.
+
     (x,y)=ll2proj(lon,lat,proj)
-    
-    where proj is either: 
+
+    where proj is either:
         <osgeo.osr.SpatialReference> object
         Well Known Text (WKT)
         Proj4
         EPSG
-    
+
     Assumes a WGS84 datum/spheroid for both
     '''
     if not gdalloaded:
         raise ImportError("OSR not available")
-    
+
     if proj==None:
         raise TypeError("Must specify a projection")
-    
+
     if type(proj)==str:
         projWKT=proj
         proj=osr.SpatialReference()
@@ -147,16 +148,16 @@ def ll2proj(lon=None,lat=None,points=None,proj=None):
             proj.ImportFromWkt(projWKT)
         except:
             proj.ImportFromProj4(projWKT)
-            
+
     if type(proj)==int:
         projEPSG=proj
         proj=osr.SpatialReference()
         proj.ImportFromEPSG(projEPSG)
-    
+
     # create a geographic reference in WGS84
     geog_ref=osr.SpatialReference()
     geog_ref.ImportFromEPSG(4326)
-    
+
     # create a transfomration object between the two reference systems
     transform=osr.CoordinateTransformation(geog_ref,proj)
     # transform the input coordinates to lat lon
@@ -166,18 +167,18 @@ def ll2proj(lon=None,lat=None,points=None,proj=None):
         y=data[:,1]
     else:
         x,y,z=transform.TransformPoint(lon,lat)
-        
+
     return x,y
 
 
 
 def utm2ll(utmx,utmy,zone=13,north=1):
-    '''Convert a given UTM point to latitude and longitude. 
-    
+    '''Convert a given UTM point to latitude and longitude.
+
     (lon,lat,elev)=utm2ll(utmx,utmy,[zone=],[north=])
-    
+
     Defaults to Zone 13 Northern hemisphere, but either can be set.
-    
+
     Assumes a WGS84 datum/spheroid for both
     '''
     if not gdalloaded:
@@ -187,11 +188,11 @@ def utm2ll(utmx,utmy,zone=13,north=1):
     # utm_proj.ImportFromEPSG(32613)
     utm_proj.SetUTM(zone,north)
     utm_proj.SetWellKnownGeogCS( 'WGS84' )
-    
+
     # create a geographic reference in WGS84
     geog_ref=osr.SpatialReference()
     geog_ref.ImportFromEPSG(4326)
-    
+
     # create a transfomration object between the two reference systems
     transform=osr.CoordinateTransformation(utm_proj,geog_ref)
     # transform the input coordinates to lat lon
@@ -207,7 +208,7 @@ def read_img(filename):
 
 def read_tiff(filename,xmin=0,xmax=None,ymin=0,ymax=None,bounds=None):
     '''read a GeoTIFF and return the data and geographic information
-    
+
     output is a structure :
         data:tiff data as an array
         geo: geographic transform data (top-left-X,dx,rot,top-left-y,rot,dy)
@@ -243,7 +244,7 @@ def read_tiff(filename,xmin=0,xmax=None,ymin=0,ymax=None,bounds=None):
 
 def write_tiff(filename,data,res=None,origin=None,zone=None):
     '''write a geotiff:WARNING not well tested and likely to break!
-    
+
     write_tiff(filename,data,res=,origin=,zone=)
         for now all inputs are required
         filename= name of outputfile (string)
@@ -258,14 +259,14 @@ def write_tiff(filename,data,res=None,origin=None,zone=None):
         print("Error: must set origin (in UTM projection)")
     if zone==None:
         print("Error: For now, UTM Only, and you must set the zone")
-    
+
     format = "GTiff"
     if not gdalloaded:
         raise ImportError("GDAL not available")
-        
+
     driver = gdal.GetDriverByName( format )
     metadata = driver.GetMetadata()
-    
+
     if data.dtype==np.int8:
         datatype=gdal.GDT_Byte
     elif data.dtype==np.int16:
@@ -282,19 +283,81 @@ def write_tiff(filename,data,res=None,origin=None,zone=None):
         datatype=gdal.GDT_Float64
     else:
         print("UNKNOWN Datatype:"+str(data.dtype)+" Please add it to the code")
-    
+
     xs=data.shape[1]
     ys=data.shape[0]
     dst_ds = driver.Create( filename, xs, ys, 1, datatype )
     dst_ds.SetGeoTransform( [ origin[0], res, 0, origin[1], 0, -1*res ] )
-    
+
     srs = osr.SpatialReference()
     srs.SetUTM( zone, 1 )
     srs.SetWellKnownGeogCS( 'WGS84' )
     dst_ds.SetProjection( srs.ExportToWkt() )
-    
+
     dst_ds.GetRasterBand(1).WriteArray(data)
     dst_ds=None
+
+def sec_dt(delta):
+    return datetime.timedelta(seconds=long(delta))
+
+def min_dt(delta):
+    return datetime.timedelta(minutes=long(delta))
+
+def hour_dt(delta):
+    return datetime.timedelta(hours=long(delta))
+
+def day_dt(delta):
+    return datetime.timedelta(float(delta))
+
+
+unit_deltas = {"seconds":sec_dt, "minutes":min_dt, "hours":hour_dt, "days":day_dt}
+
+def read_times(filesearch, tvar=None, round_inputs=False):
+    """ Read a netcdf variable searching for a time variable and converting to a list of datetimes"""
+    files = glob.glob(filesearch)
+    if not files:
+        raise EnvironmentError("File Not Found "+filesearch)
+
+    if tvar == None:
+        timenames=["time","times","Time","Times","XTIME"]
+        for t in timenames:
+            try:
+                test = read_nc(files[0],t,returnNCvar=True)
+                tvar = t
+                test.ncfile.close()
+            except:
+                pass
+
+    times = []
+    files.sort()
+    for filename in files:
+        timeatts = read_atts(filename,tvar)
+        time_data = read_nc(filename,tvar).data
+        if round_inputs: time_data = np.round(time_data)
+
+        # pull out the first date from the units attribute
+        #  assumes that the units attribut exists and follows the format "days/hours/seconds... since year-mo-da hr:mn:ss..."
+        time_unit_pieces = timeatts.units.split()
+        d0string = " ".join(time_unit_pieces[2:4])[:len("1970-01-01 00:00:00")]
+        if len(time_unit_pieces)>4:
+            tzoffset = time_unit_pieces[4].split(":")
+            if len(tzoffset)>1:
+                tzoffset = datetime.timedelta(hours=int(tzoffset[0]), minutes=int(tzoffset[1]))
+            else:
+                tzoffset = datetime.timedelta(hours=int(tzoffset[0]))
+
+        else:
+            tzoffset = datetime.timedelta(hours=0, minutes=0)
+        # time_zone = datetime.timezone(offset)
+        t0 = datetime.datetime.strptime(d0string, '%Y-%m-%d %H:%M:%S') + tzoffset
+
+        # get the conversion for, e.g., seconds since as 1/86400 to convert to days for datetime
+        time_conversion = unit_deltas[timeatts.units.split()[0].lower()]
+        for t in time_data:
+            times.append(t0 + time_conversion(t))
+
+    return times
+
 
 
 def read_geo(filesearch,outputdim=2):
@@ -302,29 +365,41 @@ def read_geo(filesearch,outputdim=2):
     lonnames=["lon","longitude","XLONG","XLONG_M"]
     latdat=None
     londat=None
-    
+
     filename=glob.glob(filesearch)[0]
-    
+
     for lat,lon in zip(latnames,lonnames):
         try:
             latdat=read_nc(filename,lat).data
             londat=read_nc(filename,lon).data
+
+            try:
+                latatts = read_atts(filename,lat)
+                lonatts = read_atts(filename,lon)
+            except:
+                latatts=None
+                lonatts=None
         except Exception as e:
             pass
-    
+
     if latdat==None:
         # we probably weren't looking at a netcdf file...
         raise IOError("Unable to read latitude or longitude data from file:"+filename)
-    
+
     if londat.max()>180:
         londat[londat>180]=londat[londat>180]-360
     if (len(londat.shape)==1) and (outputdim>1):
         londat,latdat=np.meshgrid(londat,latdat)
+
+    if (len(londat.shape)==3) and (outputdim==2):
+        londat = londat[0]
+        latdat = latdat[0]
+
     if outputdim==3:
         londat=londat[np.newaxis,...]
         latdat=latdat[np.newaxis,...]
-    
-    return Bunch(lat=latdat,lon=londat)
+
+    return Bunch(lat=latdat,lon=londat, latatts=latatts, lonatts=lonatts)
 
 
 def read_files(pattern,var="data",returnNCvar=False,axis=None,catch_exceptions=False,adddim=False,verbose=False):
@@ -349,7 +424,27 @@ def read_files(pattern,var="data",returnNCvar=False,axis=None,catch_exceptions=F
     if axis!=None:
         d=np.concatenate(d,axis=axis)
     return d
-    
+
+def read_dims(filename,varname=None):
+    """docstring for read_attr"""
+    if nclib==NETCDF4:
+        ncfile=Dataset(filename)
+        if varname==None:
+            dims=[str(d) for d in ncfile.dimensions]
+        else:
+            dims=[str(d) for d in ncfile.variables[varname].dimensions]
+
+    # elif nclib==NIO:
+    #     ncfile=Nio.open_file(filename,format="nc")
+        # if varname==None:
+        #     dims=[str(d) for d in ncfile.dimensions]
+        # else:
+        #     dims=[str(d) for d in ncfile.variables[varname].dimensions]
+
+    ncfile.close()
+    return dims
+
+
 def read_attr(filename,attribute_name,varname=None):
     """docstring for read_attr"""
     if nclib==NETCDF4:
@@ -358,14 +453,14 @@ def read_attr(filename,attribute_name,varname=None):
             att_val=ncfile.getncattr(attribute_name)
         else:
             att_val=ncfile.variables[varname].getncattr(attribute_name)
-        
+
     elif nclib==NIO:
         ncfile=Nio.open_file(filename,format="nc")
         if varname==None:
             att_val=ncfile.__dict__[attribute_name]
         else:
             att_val=ncfile.variables[varname].__dict__[attribute_name]
-            
+
     ncfile.close()
     return att_val
 
@@ -373,42 +468,42 @@ def read_atts(filename,varname=None,global_atts=False):
     if varname==None and not global_atts:
         print("WARNING: no variable name or global attributes requested")
         return Bunch()
-    
+
     atts=Bunch()
     if nclib==NETCDF4:
         ncfile=Dataset(filename)
     elif nclib==NIO:
         ncfile=Nio.open_file(filename,format="nc")
-        
+
     if varname!=None:
         data=ncfile.variables[varname]
     if global_atts:
         data=ncfile
-    
-    
+
+
     for k in data.__dict__.keys():
         atts[k]=data.__dict__[k]
-    
+
     ncfile.close()
     return atts
-    
 
-def read_nc(filesearch,var="data",proj=None,returnNCvar=False):
+
+def read_nc(filesearch,var="data",proj=None,returnNCvar=False, format="NETCDF4"):
     '''read a netCDF file and return the specified variable
 
     output is a structure :
         data:raw data as an array
         proj:string representation of the projection information
         atts:data attribute dictionary (if any)
-    if (returnNCvar==True) then the netCDF file is not closed and the netCDF4 
-        representation of the variable is returned instead of being read into 
-        memory immediately.  
+    if (returnNCvar==True) then the netCDF file is not closed and the netCDF4
+        representation of the variable is returned instead of being read into
+        memory immediately.
     '''
     filename=glob.glob(filesearch)[0]
-    if not filename: 
+    if not filename:
         print(filesearch)
     if nclib==NETCDF4:
-        d=Dataset(filename, mode='r',format="NETCDF4")
+        d=Dataset(filename, mode='r',format=format)
     else:
         d=Nio.open_file(filename,format="nc")
     outputdata=None
@@ -429,17 +524,21 @@ def read_nc(filesearch,var="data",proj=None,returnNCvar=False):
     if proj!=None:
         projection=d.variables[proj]
         outputproj=str(projection)
-    
-    
+
+
     if returnNCvar:
         return Bunch(data=outputdata,proj=outputproj,ncfile=d,atts=attributes)
     d.close()
     return Bunch(data=outputdata,proj=outputproj,atts=attributes)
 
 
-def _write_one_var(NCfile,data,varname="data",units=None,dtype='f',dims=('t','z','y','x'),attributes=None):
+def _write_one_var(NCfile,data,varname="data",units=None,dtype='f',dims=('t','z','y','x'),attributes=None, record_dim=None):
     dimlen=list(data.shape)
-    if dims[0]=="time":dimlen[0]=0
+    if record_dim==None:
+        for i in range(len(dimlen)):
+            if dims[i]=="time":dimlen[i]=None
+    else:
+        dimlen[record_dim]=None
     dimlen=tuple(dimlen)
     for n,dim in zip(dimlen,dims):
         NCfile.createDimension(dim, n)
@@ -457,11 +556,14 @@ def _write_one_var(NCfile,data,varname="data",units=None,dtype='f',dims=('t','z'
                 NCfile.variables[varname].__setattr__(k,attributes[k])
 
 
-def addvar(NCfile,data,varname,dims,dtype='f',attributes=None):
+def addvar(NCfile,data,varname,dims,dtype='f',attributes=None, record_dim=None):
     for i,d in enumerate(dims):
         if not(d in NCfile.dimensions):
-            NCfile.createDimension(d,data.shape[i])
-    
+            if (record_dim!=None) and (i==record_dim):
+                NCfile.createDimension(d,None)
+            else:
+                NCfile.createDimension(d,data.shape[i])
+
     try:
         fill_value=attributes["_FillValue"]
     except:
@@ -473,17 +575,17 @@ def addvar(NCfile,data,varname,dims,dtype='f',attributes=None):
             if k!="_FillValue":
                 NCfile.variables[varname].__setattr__(k,attributes[k])
 
-def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes=None,
-          lat=None,lon=None,extravars=None,history="",global_attributes=None):
-    """write a netcdf file 
-    
+def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes=None, record_dim=None,
+          lat=None,lon=None,extravars=None,history="",global_attributes=None, format="NETCDF4"):
+    """write a netcdf file
+
     filename = name of output netcdf file (.nc will be appended automatically)
     data = data to write to file
     dtype = data type of data (see below)
     varname = name of variable to create in the netcdf file
     units = units for the data
     lat = a latitude variable to add (here for legacy reasons, use extravars)
-    lon = ditto    
+    lon = ditto
     attribues: bunch/dictionary with key/values pairs to be added as attributes
     extravars is a list of variables to add
         each variable is a bunch or other class with attribues:
@@ -501,8 +603,8 @@ def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes
             attribues: bunch/dictionary with key/values pairs to be added as attributes
     """
     history = 'Created : ' + time.ctime() +'\nusing simple io.write by:'+os.environ['USER']+"  "+history
-    
-    
+
+
     if dims==None:
         if len(data.shape)==1:
             dims=('x',)
@@ -517,9 +619,9 @@ def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes
     if nclib==NIO:
         return _write_nio(filename,data,dtype,varname,dims,units,attributes,lat,lon,extravars,history,global_attributes)
     else:
-        NCfile=Dataset(filename,mode="w",format="NETCDF4")
-        _write_one_var(NCfile,data,varname=varname,units=units,dtype=dtype,dims=dims,attributes=attributes)
-    
+        NCfile=Dataset(filename,mode="w",format=format)
+        _write_one_var(NCfile,data,varname=varname,units=units,dtype=dtype,dims=dims,attributes=attributes,record_dim=record_dim)
+
     if lat!=None:
         print("WARNING: explicitly passing lat is deprecated, use extravars")
         if len(lat.shape)>1:
@@ -534,10 +636,14 @@ def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes
         else:
             NCfile.createVariable("lon",'f',(dims[-1],))
         NCfile.variables["lon"][:]=lon.astype('f')
-    
+
     if extravars:
         for e in extravars:
-            addvar(NCfile,e.data,e.name,e.dims,e.dtype,e.attributes)
+            if 'record_dim' in e.keys():
+                this_record_dim=e.record_dim
+            else:
+                this_record_dim=None
+            addvar(NCfile,e.data,e.name,e.dims,e.dtype,e.attributes, this_record_dim)
 
     if global_attributes!=None:
         for k in global_attributes.keys():
@@ -549,15 +655,15 @@ def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes
         NCfile.history=history
     NCfile.close()
 
-    
+
 def _write_nio(filename,data,dtype,varname,dims,units,attributes,lat,lon,extravars,history,global_attributes):
     NCfile=Nio.open_file(filename,mode="w",format="nc",history=history)
-    
+
     for n,dim in zip(data.shape,dims):
         NCfile.create_dimension(dim, n)
     NCfile.create_variable(varname,dtype,dims)
     NCfile.variables[varname][:]=data.astype(dtype)
-    
+
     if extravars:
         for e in extravars:
             _nio_addvar(NCfile,e.data,e.name,e.dims,e.dtype,e.attributes)
@@ -565,8 +671,8 @@ def _write_nio(filename,data,dtype,varname,dims,units,attributes,lat,lon,extrava
     if global_attributes!=None:
         for k in global_attributes.keys():
             NCfile.__setattr__(k,global_attributes[k])
-    
-    
+
+
     NCfile.close()
 
 
@@ -589,8 +695,8 @@ class NC_writer(object):
             self.nz=nz
         self.NCfile.createVariable('time','l',('time',))
         if var: self.addVar(var,dtype=dtype)
-            
-    
+
+
     def addVar(self,varname,dtype='f'):
         if self.NCfile:
             if self.nz:
@@ -598,7 +704,7 @@ class NC_writer(object):
             else:
                 self.NCfile.createVariable(varname,dtype,('time','lat','lon'))
             self.curVar=varname
-    
+
     def appendToVar(self,data,varname=None,date=None,pos=None,dtype='f'):
         if varname==None:varname=self.curVar
         var=self.NCfile.variables[varname]
@@ -613,16 +719,15 @@ class NC_writer(object):
         else:
             var[n,:,:]=data.astype(dtype)
         if date:self.NCfile.variables['time'][n]=long(date)
-    
+
     def close(self):
         if self.NCfile:
             self.NCfile.close()
             self.NCfile=None
-            
+
     def __del__(self):
         self.close()
         # if self.NCfile:
         #     self.NCfile.close()
         #     self.NCfile=None
         # super(NC_writer,self).__del__()
-            

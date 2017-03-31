@@ -55,3 +55,43 @@ def terrain():
     """docstring for terrain"""
     return subset(plt.cm.terrain,clim=(55,255),bottomvalue=(0.1,0.4,0.9))
     
+def flatten_short_axis(data):
+    if data.shape[0]>data.shape[1]:
+        return data.mean(axis=1)
+    else:
+        return data.mean(axis=0)
+    
+def med_filter(data, filtersize):
+    sz=5
+    if type(filtersize)==int:
+        sz = filtersize
+    
+    tmp = np.zeros(data.shape)
+    
+    for i in range(len(data)):
+        top = min(len(data), i+sz)
+        bottom = max(0, i-sz)
+        tmp[i] = np.median(data[bottom:top,:],axis=0)
+    
+    return tmp
+        
+    
+def from_image(filename, reverse=False, startpt=0, endpt=None, median_filter=None):
+    data = plt.imread(filename)
+    
+    data = flatten_short_axis(data)
+    if median_filter != None:
+        data = med_filter(data, median_filter)
+    
+    data = data[startpt:endpt]
+    size = data.shape[0]
+    if reverse:
+        data = data[::-1]
+    colors = [tuple(data[0])]
+    
+    for i in range(1,size):
+        colors.extend([float(i)/size, tuple(data[i])])
+    
+    
+    return make_colormap(colors)
+    
