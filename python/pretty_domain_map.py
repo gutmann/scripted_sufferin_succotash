@@ -103,7 +103,7 @@ dlat=calc_grid_lines(height)
 dlon=calc_grid_lines(width)
 # dlat=0.25
 # dlon=0.25
-dx=2000.0
+dx=1000.0
 
 # setup Lambert Conformal basemap.
 print("Setting up map projection")
@@ -210,7 +210,7 @@ plt.title(titlename,fontsize=title_font_size)
 
 xpt,ypt = m(center_lon,center_lat)
 # if not large:
-    # m.plot(xpt,ypt,'ro')  # plot a red dot at the center point
+m.plot(xpt,ypt,'ro')  # plot a red dot at the center point
 # put some text next to the dot, offset a little bit
 # (the offset is in map projection coordinates)
 # plt.text(xpt+100000,ypt+100000,'Boulder (%5.1fW,%3.1fN)' % (lonpt,latpt))

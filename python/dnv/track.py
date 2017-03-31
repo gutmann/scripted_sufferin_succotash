@@ -3,17 +3,15 @@
 """
 SYNOPSIS
 
-    template_argparse.py [-h] [--verbose] [-v, --version] <filename>
+    track.py [-h] [--verbose] [-v, --version] <filename>
 
 DESCRIPTION
 
-    TODO This describes how to use this script.
-    This docstring will be printed by the script if there is an error or
-    if the user requests help (-h or --help).
+    Track tropical cyclones in the 4km-CONUS WRF output
 
 EXAMPLES
 
-    TODO: Show some examples of how to use this script.
+    track.py 2010/wrf_2010.nc -o track_2010.txt
 
 EXIT STATUS
 
@@ -50,13 +48,14 @@ verbose=False
 TC_p_threshold =  -2700 # Pa (below max time series p)
 land_threshold =    000 # Pa initially set to 101000, but no reason not to track over land too...
 wind_threshold =     25 # m/s
+hurricane_wind_threshold = 32.9 # m/s
 dx = 4.0 # km
 
 # permit tracks to move by up to 100 grid cells between tracks
 window=100
 ntracks=0
 
-def update_tracks(tracks, pd, wind, time):
+def update_tracks(tracks, pd, p, wind, precip, time):
     # pd is the pressure depression from the timeseries pmax
     newtracks=[]
     
@@ -76,9 +75,11 @@ def update_tracks(tracks, pd, wind, time):
         newy+=ymin
         newx+=xmin
         pmin=pd[newy,newx]
+        realp=p[newy,newx]
+
         # if verbose:print(pmin, TC_p_threshold, wmax, wind_threshold)
         if ((pmin<(TC_p_threshold+1000)) and (wmax>(wind_threshold-10))):
-            newtracks.append(get_track_stats(newx,newy, pmin, wmax, wind_window, t.ID, time, xmin, ymin))
+            newtracks.append(get_track_stats(newx,newy, pmin,realp, wmax, wind_window, t.ID, time, xmin, ymin, precip))
             if verbose:print(newtracks[-1])
             if verbose:print("UPDATED!!!", t.ID)
             ymin=max(t.y-window*1.5,0)
@@ -91,7 +92,7 @@ def update_tracks(tracks, pd, wind, time):
     
 
 
-def get_track_stats(x,y,pmin,wmax,wind, trackID, time, xmin, ymin):
+def get_track_stats(x,y,pmin,realp,wmax,wind, trackID, time, xmin, ymin, precip):
     
     # find the average radius of winds > wind_threshold
     ny=wind.shape[0]
@@ -99,7 +100,7 @@ def get_track_stats(x,y,pmin,wmax,wind, trackID, time, xmin, ymin):
     # for each row,
     for i in range(ny):
         # find the first and last x and y locations that exceed the threshold
-        tmp=np.where(wind[i]>=wind_threshold)
+        tmp=np.where(wind[i]>=hurricane_wind_threshold)
         if len(tmp[0])>1:
             npoints[i,0,0]=i
             npoints[i,0,1]=tmp[0][0]
@@ -111,22 +112,22 @@ def get_track_stats(x,y,pmin,wmax,wind, trackID, time, xmin, ymin):
     ym=npoints[:,:,0].mean()
     xm=npoints[:,:,1].mean()
     # then compute the distance to each point on the perimeter
-    dists=np.sqrt((npoints[:,:,1]-xm)**2+(npoints[:,:,0]-ym)**2)
+    dists=np.sqrt((npoints[:,:,1]-(x-xmin))**2.0+(npoints[:,:,0]-(y-ymin))**2.0)
     # the radius is the mean of those distances
     radius = dists.mean()
     
     # find all points that exceed the threshold so we can compute the area and the mean winds
     high_winds=np.where(wind>wind_threshold)
     
-    return Bunch(x=x,y=y, pmin=pmin, wmax=wmax, 
+    return Bunch(x=x,y=y, pmin=pmin, realp=realp, wmax=wmax, 
                  radius=radius*dx,
                  area=len(high_winds[0])*(dx**2),
                  wmean=wind[high_winds].mean(), 
                  w3mean=(wind[high_winds]**3).mean(), 
                  ID=trackID, timestep=time,
-                 center_x=xm+xmin, center_y=ym+ymin)
+                 center_x=xm+xmin, center_y=ym+ymin, precip=precip.max())
     
-def find_new_tracks(tracks, pd, wind, time):
+def find_new_tracks(tracks, pd, p, wind, precip, time):
     pmin=pd.min()
     if pmin>TC_p_threshold:return # there are no tracks to find
     
@@ -142,11 +143,12 @@ def find_new_tracks(tracks, pd, wind, time):
         xmin=max(x-window/2,0)
         xmax=min(x+window/2,nx)
         
+        realp=p[y,x]
         wmax=wind[ymin:ymax,xmin:xmax].max()
         
         if wmax > wind_threshold:
             if verbose:print("Found new track:{}, {}".format(x,y))
-            newtracks.append( get_track_stats(x,y,pmin,wmax,wind[ymin:ymax,xmin:xmax], ntracks, time, xmin, ymin) )
+            newtracks.append( get_track_stats(x,y,pmin,realp,wmax,wind[ymin:ymax,xmin:xmax], ntracks, time, xmin, ymin, precip[ymin:ymax,xmin:xmax]) )
             if verbose:print(newtracks[-1])
             ntracks+=1
             if verbose:print(ntracks)
@@ -207,7 +209,7 @@ def visualize(tracks, pressure, wind, time_step, filename):
     plt.savefig(filename+"{:05}.png".format(time_step))
     
 
-def main (filename, outputfilename, p=None, wspd=None, vis_data=False, img_name=""):
+def main (filename, outputfilename, p=None, wspd=None, pr=None, vis_data=False, img_name=""):
 
     start=0
     end=None
@@ -219,13 +221,29 @@ def main (filename, outputfilename, p=None, wspd=None, vis_data=False, img_name=
 
     if p==None:
         if verbose: print("Reading PSFC")
-        p = mygis.read_nc(filename,"PSFC", returnNCvar=True).data[start:end]
-        
+        if (start != 0) and (end != None):
+            p = mygis.read_nc(filename,"PSFC", returnNCvar=True).data[start:end]
+        else:
+            p = mygis.read_nc(filename,"PSFC").data
+
+    if pr==None:
+        if verbose: print("Reading Precip")
+        if (start != 0) and (end != None):
+            pr = mygis.read_nc(filename,"PREC_ACC_NC", returnNCvar=True).data[start:end]
+        else:
+            pr = mygis.read_nc(filename,"PREC_ACC_NC").data
+            
     if wspd==None:
         if verbose: print("Reading U10")
-        u = mygis.read_nc(filename,"U10", returnNCvar=True).data[start:end]
-        if verbose: print("Reading V10")
-        v = mygis.read_nc(filename,"V10", returnNCvar=True).data[start:end]
+        if (start != 0) and (end != None):
+            u = mygis.read_nc(filename,"U10", returnNCvar=True).data[start:end]
+            if verbose: print("Reading V10")
+            v = mygis.read_nc(filename,"V10", returnNCvar=True).data[start:end]
+        else:
+            u = mygis.read_nc(filename,"U10").data
+            if verbose: print("Reading V10")
+            v = mygis.read_nc(filename,"V10").data
+            
         if verbose:print("Loading wind")
         wspd=np.sqrt(u[:,:600,600:]**2 + v[:,:600,600:]**2)
         del u
@@ -237,6 +255,7 @@ def main (filename, outputfilename, p=None, wspd=None, vis_data=False, img_name=
     # wspd = wspd[:,:600,600:]
     if verbose:print("Loading pressure")
     p=p[:,:600,600:]
+    pr=pr[:,:600,600:]
     
     if verbose:print("Computing initial values")
     pmax = p.max(axis=0)
@@ -246,21 +265,26 @@ def main (filename, outputfilename, p=None, wspd=None, vis_data=False, img_name=
     tracks=[]
     ntimes=p.shape[0]
     
+    if verbose: print("Ntimes = "+str(ntimes))
     for i in range(ntimes):
         if verbose:print("TIME = "+str(i))
         curp = np.ma.array(p[i]-pmax,mask=land)
-        if vis_data:
-            visp=np.copy(curp)
+        
+        if vis_data: visp=np.copy(curp)
+
+        curpr = pr[i]
+        
         curw = np.ma.array(wspd[i],mask=land)
         if i>0:
-            update_tracks(tracks, curp, curw, i)
+            update_tracks(tracks, curp, p[i], curw, curpr, i)
         else:
             tracks.append([])
         
-        find_new_tracks(tracks, curp, curw, i)
+        find_new_tracks(tracks, curp, p[i], curw, curpr, i)
         if verbose:print("")
         if vis_data:visualize(tracks[-1], visp, curw, i, img_name)
     
+    if verbose:print("Writing: "+outputfilename)
     write_tracks(tracks, outputfilename)
         
 
@@ -280,7 +304,7 @@ if __name__ == '__main__':
         args = parser.parse_args()
 
         verbose = args.verbose
-
+        print(args.output)
         exit_code = main(args.filename, args.output, vis_data=args.plot_data, img_name=args.img_file)
         if exit_code is None:
             exit_code = 0

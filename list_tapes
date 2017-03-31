@@ -1,16 +1,26 @@
 #!/bin/bash
 
 if [[ $1 ]]; then
-	export TARGET_DIR=$1
+    export TARGET_DIR=$1
+    # echo $TARGET_DIR 1>&2
+    
+    # save intermediate results in a text file because one might want to do additional filtering on it later
+    hsi -P ls -PR $TARGET_DIR >temp_file
+    <temp_file awk  'BEGIN { FS = "\t"};{ if($1 == "FILE") print $6, $2}' | sort | awk '{print "cget", $2}'
+    # rm temp_file
 else
-	export TARGET_DIR=/CHLIU/HW_2010/4KM_1OCT06-1OCT07/
-	# other examples
-	# export TARGET_DIR=/KYOKO/wrf/snowpack/HW2010/CTRL/hydro_study/NARR_WRFOUT_T2_04km*.gz
-	# export TARGET_DIR=/KYOKO/wrf/snowpack/HW2010/PGW/hydro_study/PGW_WRFOUT_T2_04km*.gz
-	# export TARGET_DIR=/KYOKO/CESM_LE/wrf361_noah/Ens030_v0/wrfout/*
+    echo 'USAGE: list_tapes <hpss_directory_path>'
+    echo '  hpss_directory_path = a glob-able path for hpss files to be listed'
+    echo 'EXAMPLES:'
+    echo '  list_tapes /CHLIU/HW_2010/4KM_1OCT06-1OCT07/'
+    echo "  list_tapes '/KYOKO/wrf/snowpack/HW2010/CTRL/hydro_study/NARR_WRFOUT_T2_04km*.gz'"
 fi
-echo $TARGET_DIR 1>&2
-#export ticketname=`klist | head -1 | sed -e"s/:/ /g" | awk '{print $4 }'`
-#echo $ticketname 1>&2
-#hsi -P -c $ticketname  ls -PR $TARGET_DIR |  awk  'BEGIN { FS = "\t"};{ if($1 == "FILE") print $6, $2}' | sort | awk '{print "cget", $2}'
-hsi -P ls -PR $TARGET_DIR |  awk  'BEGIN { FS = "\t"};{ if($1 == "FILE") print $6, $2}' | sort | awk '{print "cget", $2}'
+
+
+# /KYOKO/CESM_LE/wrf361_noah/Ens030_v0/wrfout/*
+#
+# if for some reason you need to use kerberos tickets to access hpss:
+#
+# export ticketname=`klist | head -1 | sed -e"s/:/ /g" | awk '{print $4 }'`
+# echo $ticketname 1>&2
+# hsi -P -c $ticketname  ls -PR $TARGET_DIR |  awk  'BEGIN { FS = "\t"};{ if($1 == "FILE") print $6, $2}' | sort | awk '{print "cget", $2}'

@@ -7,7 +7,7 @@ def calc_quantiles_and_sorted_data(data):
     outputdata = np.zeros((data.shape[0], 2))
     outputdata[:,0] = np.sort(data)
     outputdata[:,1] = np.arange(len(data))/float(len(data))
-    
+
     return outputdata
 
 
@@ -26,7 +26,7 @@ def lookup_data(data, quantile_data, datacol=0, weightcol=1):
     step=float(i/2)
     done=False
     count=0
-    
+
     # perform a log(N) binary search
     while not done:
         if step<1:
@@ -45,7 +45,7 @@ def lookup_data(data, quantile_data, datacol=0, weightcol=1):
         count = count+1
         if (count>n):
             raise ValueError("We are taking too long to converge, what is wrong?!?")
-    
+
     # check a small region around the "found" point to avoid edge cases
     i=max(0,i-2)
     done=False
@@ -54,21 +54,23 @@ def lookup_data(data, quantile_data, datacol=0, weightcol=1):
             done=True
         else:
             i+=1
-        
+
         if (i==n):
             done=True
             i=n-1
-    
+
     # if the data point is past the bounds of the data, just return the extreme value
-    if (i==0) or (quantile_data[i,weightcol]<=data):
+    if (i==0):
         return quantile_data[0,datacol]
+    if (quantile_data[i,weightcol]<=data):
+        return quantile_data[-1,datacol]
+
     # otherwise, linearly interpolate between the two nearest values
-    else:
-        return linterp(quantile_data[i-1:i+1,:], data, weightcol=weightcol, datacol=datacol)
+    return linterp(quantile_data[i-1:i+1,:], data, weightcol=weightcol, datacol=datacol)
 
 # perform a quantile mapping of data from the input_quantiles to the output_quantiles
 # assumes inputdata is a 1D array and quantile data were calculated from 1D arrays by calc_quantiles_and_sorted_data
-def map_data(inputdata, input_quantile_data, output_quantile_data):
+def map_data_with_quantiles(inputdata, input_quantile_data, output_quantile_data):
     """perform quantile mapping of data from input_quantiles to output_quantiles"""
     outputdata=np.zeros(inputdata.shape)
     for i in range(len(inputdata)):
@@ -77,22 +79,31 @@ def map_data(inputdata, input_quantile_data, output_quantile_data):
         # find the corresponding data in output_quantile_data
         qm_data  = lookup_data(quantile,     output_quantile_data, weightcol=1, datacol=0)
         outputdata[i] = qm_data
-    
+
     return outputdata
-    
+
+def map_data(input_data, data_to_match):
+    # just develop the training data from the first half of the input_data
+    input_quantile_data  = calc_quantiles_and_sorted_data(input_data)
+    output_quantile_data = calc_quantiles_and_sorted_data(data_to_match)
+
+    output_data = map_data_with_quantiles(input_data, input_quantile_data, output_quantile_data)
+
+    return output_data
+
 if __name__ == '__main__':
     # simple example test case
     n=1000
-    
+
     input_data    = np.random.randn(n*2) * 10+2
     data_to_match = np.random.randn(n)   * 100-50
-    
+
     # just develop the training data from the first half of the input_data
     input_quantile_data  = calc_quantiles_and_sorted_data(input_data[:n])
     output_quantile_data = calc_quantiles_and_sorted_data(data_to_match)
-    
-    output_data = map_data(input_data, input_quantile_data, output_quantile_data)
-    
+
+    output_data = map_data_with_quantiles(input_data, input_quantile_data, output_quantile_data)
+
     if n<=10:
         print("Here are the random input values")
         print(input_data)
@@ -119,5 +130,3 @@ if __name__ == '__main__':
             print(data_to_match[:10])
             print("Here are some of the quantile mapped input values")
             print(output_data[:10])
-            
-        

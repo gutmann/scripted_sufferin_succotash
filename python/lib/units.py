@@ -7,14 +7,14 @@ converts between various formulations of atmospheric humidity
     specific humidity (sh)
     relative humidity (rh)
     dewpoint (dp)
-    
+
     calculate saturated vapor pressure from a temperature
-    
+
     xy2a = convert x,y point (or u/v vector) to the corresponding angle (0,0) to (x,y)
-    
+
     Various utilities to calculate elevation as a function of pressure, temperature, humidity, and sea level pressure
-    
-    for atmospheric purposes can compute lifting condensation level (LCL) 
+
+    for atmospheric purposes can compute lifting condensation level (LCL)
     and the temperature at the LCL
 
     could also explicitly add
@@ -27,7 +27,7 @@ import numpy as np
 
 def rtod(angle):
     return angle*360.0/(2*np.pi)
-    
+
 def dtor(angle):
     return angle/360.0*(2*np.pi)
 
@@ -38,17 +38,17 @@ def moist_BV_frequency_squared(t,z,p,ql):
     # L = 2260.0*1000 # J/kg
     # L = 2.5e6 # J/kg
     L = (2500.8 - 2.36*(t-273.15) + 0.0016*(t-273.15)**2 - 0.00006*(t-273.15)**3)*1000 # J/kg
-    
+
     qs = rh2mr(t,p,1.0)
     gamma_moist = sat_lapse_rate(t,mr=qs)
     print("Gmoist=",gamma_moist[0])
     print("qsat=  ",qs[0])
-    
+
     dtdz = np.zeros(t.shape)
     dtdz[:-1] = (t[1:]-t[:-1]) / (z[1:]-z[:-1])
     dtdz[-1]=dtdz[-2]
     print("dtdz=  ",dtdz[0])
-    
+
     qw=qs+ql
     dqwdz = np.zeros(qw.shape)
     dqwdz[:-1] = (qw[1:]-qw[:-1]) / (z[1:]-z[:-1])
@@ -61,19 +61,19 @@ def moist_BV_frequency_squared(t,z,p,ql):
 
 def dry_BV_frequency_squared(theta,z,bottom=0,top=None,t=None,p=None):
     g=9.81
-    
+
     if (theta==None):
         if t!=None and p!=None:
             theta=t/exner(p)
         else:
             raise ValueError("Needs either potential temperature[K] or real T[K] and P[Pa]")
-    
+
     lntheta=np.log(theta)
     if top==None:
         bv=g * (lntheta[bottom+1:top]-lntheta[bottom:-1]) / (z[bottom+1:top] - z[bottom:-1])
     else:
         bv=g * (lntheta[bottom+1:top]-lntheta[bottom:top-1]) / (z[bottom+1:top] - z[bottom:top-1])
-    
+
     return bv
 
 def exner(p):
@@ -89,7 +89,7 @@ def exner(p):
     except:
         if p>1200:
             p0*=100.0
-            
+
     return (p/p0)**(Rd/cp)
 
 # def p2z(p,t,p0=101325.0):
@@ -117,32 +117,32 @@ def sat_lapse_rate(T,mr=None, p=None):
     Rw = 461.5  # J /kg /K
     ratio=Rd/Rw # []
     cp = 1005.0 # J /kg /K
-    
+
     # T [=] K
     # mr[=] kg/kg
-    
+
     if mr==None:
         mr = rh2mr(T,p,100.0)
-    
+
     return g* ((1 + ((L*mr) / (Rd*T)) )
             / (cp + (((L**2)*mr*ratio) / (Rd*(T**2))) ))
 
 
 def calc_tv(t,mr=None,e=None,p=None):
     '''calculate the virtual temperature
-    
+
     Uses a real temperature and mixing ratio or (vapor pressure and barometric pressure)
-    
+
     t [=] K
     mr[=] kg/kg
     e [=] any (same as p) e.g. Pa, hPa
-    p [=] any (same as e) 
+    p [=] any (same as e)
     '''
     # from http://en.wikipedia.org/wiki/Virtual_temperature
     RoR = 0.622 # Rdry / Rvapor
-    
+
     # if mixing ratio was specified:
-    if mr!=None: 
+    if mr!=None:
         return t*(mr+RoR)/(RoR*(1+mr))
     # if vapor pressure and barometric pressure were given:
     if (e!=None) and (p!=None):
@@ -159,7 +159,7 @@ def calc_z(slp,p,t,mr):
     mr  = 3D mixing ratio       [kg/kg]
 
     returns z = 3D geopotential height field [m]
-    
+
     based off WMO CIMO guide: http://www.wmo.int/pages/prog/www/IMOP/CIMO-Guide.html
                     Part I Chapter 3
     """
@@ -188,13 +188,13 @@ def zt2p(z,p0=101325.0,t0=288.15,dtdz= -0.0065,zaxis=1,use_z_axis=None):
     g=9.807
     M=0.029
     R=8.314
-    if (type(t0)!=np.ndarray) and (type(t0)!=np.ma.core.ndarray):
+    if (not isinstance(t0,np.ndarray):
         p= p0*(t0/(t0+dtdz*z))**((g*M)/(R*dtdz))
         return p
-        
+
     if use_z_axis==None:
         use_z_axis=len(t0.shape)>3
-        
+
     if use_z_axis:
         p=np.zeros(t0.shape)
         for i in range(t0.shape[zaxis]):
@@ -208,16 +208,16 @@ def zt2p(z,p0=101325.0,t0=288.15,dtdz= -0.0065,zaxis=1,use_z_axis=None):
                 p[:,:,i]=p0*(t0.take(i,axis=zaxis)/(t0.take(i,axis=zaxis)+dtdz*z.take(i,axis=zaxis)))**((g*M)/(R*dtdz))
             else:
                 raise ValueError("not setup to process higher axes")
-                
-                
-                
+
+
+
             # p.take(i,axis=zaxis)=p0*(t0.take(i,axis=zaxis)/(t0.take(i,axis=zaxis)+dtdz*z.take(i,axis=zaxis)))**((g*M)/(R*dtdz))
     else:
         p= p0*(t0/(t0+dtdz*z))**((g*M)/(R*dtdz))
             # p[:,i,...]=p0*(t0[:,i,...]/(t0[:,i,...]+dtdz*z[:,i,...]))**((g*M)/(R*dtdz))
-    
+
     return p
-    
+
 # def calc_z(slp,p,t,hus):
 #     """Calculate geopotential height [m] from a 3D atm field and sea level pressure
 #     the 3D fields must include pressure, temperature, and humidity.
@@ -253,19 +253,19 @@ def zt2p(z,p0=101325.0,t0=288.15,dtdz= -0.0065,zaxis=1,use_z_axis=None):
 #         z[i] = K * (1+alpha*(t[i]+t[i-1])/2) * 1.0/(1-0.378*(e[i-1]+e[i])/2/b) * asphericity * np.log10(p[i-1]/p[i])+z[i-1]
 #
 #     return z,z0,e,dtdz
-        
-    
-    
+
+
+
 
 def calc_slp(ps,z,ts=288.15,dtdz= -0.0065,mr=None,e=None,sh=None,latitude=None,method=1):
     """ Calculate sea level pressure from as much information as available
-    
+
     based off the WMO handbook:
     http://www.wmo.int/pages/prog/www/IMOP/meetings/SI/ET-Stand-1/Doc-10_Pressure-red.pdf
     excerpt from CIMO Guide, Part I, Chapter 3 (Edition 2008, Updated in 2010)
     equation 3.2
     see also: http://www.meteormetrics.com/correctiontosealevel.htm
-    
+
     ps   = station pressure [Pa or hPa, output slp will have the same units]
     z    = station elevation [m]
     ts   = station temperature [K or C]   OPTIONAL
@@ -281,13 +281,13 @@ def calc_slp(ps,z,ts=288.15,dtdz= -0.0065,mr=None,e=None,sh=None,latitude=None,m
     g=9.80665
     M=0.029
     R=287.05
-    
+
     #############################################
     #
     # This section is for converting units
     #
     p_inhPa=False
-    if type(ps)==np.ndarray:
+    if isinstance(ps,np.ndarray):
         if ps.max()<1200:
             ps*=100
             p_inhPa=True
@@ -295,7 +295,7 @@ def calc_slp(ps,z,ts=288.15,dtdz= -0.0065,mr=None,e=None,sh=None,latitude=None,m
         if ps<1200: # assume ps is in Pa, not hPa
             ps*=100
             p_inhPa=True
-    
+
     if sh!=None:
         mr=sh/(1-sh)
     if mr!=None:
@@ -305,9 +305,9 @@ def calc_slp(ps,z,ts=288.15,dtdz= -0.0065,mr=None,e=None,sh=None,latitude=None,m
     if e==None:
         mr=0.01
         e=mr*ps/(0.62197+mr)
-    
+
     T_inC=False
-    if type(ts)==np.ndarray:
+    if isinstance(ts,np.ndarray):
         if ts.min()<100:
             ts+=273.15
             T_inC=True
@@ -319,23 +319,23 @@ def calc_slp(ps,z,ts=288.15,dtdz= -0.0065,mr=None,e=None,sh=None,latitude=None,m
     # End of unit convertions
     #
     #############################################
-    
+
     Ch = 0.0012 # K/Pa
-    
+
     Hp=z # geopotential height
     a= dtdz # K/gpm
-    
+
     # if latitude != None:
     #     # N.B. this may not be correct... removing for now
     #     k=0.0026 # earth shape factor
     #     lat_factor=1/(1-k*np.cos(2*dtor(latitude)))
     # else:
     #     lat_factor=1
-    
+
     # convert p back to hPa
     if p_inhPa:
         ps/=100
-    
+
     # these both come from CIMO Guide, and one would think they would be identical...
     if method==1:
         slp= ps*np.exp(((g/R)*Hp) / (ts - a*Hp/2.0 + e*Ch))
@@ -347,19 +347,19 @@ def calc_slp(ps,z,ts=288.15,dtdz= -0.0065,mr=None,e=None,sh=None,latitude=None,m
         elif e!=None:
             tv=calc_tv(ts,e=e,p=ps)
         slp= ps*10**(Kp*Hp/tv)
-    
+
     # convert t back into degrees C
     if T_inC:
         t-=273.15
-        
+
     return slp
-    
+
 
 def xy2a(x,y):
     '''
     convert an x,y coordinate to the angle to that coordinate (0-360)
     '''
-    
+
     angle=rtod(np.arctan(np.cast['f'](x)/y))
     if np.array(x).size==1:
         if x>0:
@@ -372,7 +372,7 @@ def xy2a(x,y):
                 angle=360+angle
             else:
                 angle=180+angle
-                
+
     else:
         for i in range(len(x)):
             if x[i]>0:
@@ -385,8 +385,8 @@ def xy2a(x,y):
                     angle[i]=360+angle[i]
                 else:
                     angle[i]=180+angle[i]
-            
-            
+
+
     return angle
 
 
@@ -399,8 +399,8 @@ def t2vp(t):
         t+=273.15
         tIsInK=False
     freezing=273.15
-    
-    if type(t)==np.ndarray:
+
+    if isinstance(t,np.ndarray):
         a=np.zeros(t.shape)+17.2693882
         b=np.zeros(t.shape)+35.86
         a[np.where(t<freezing)]=21.8745584
@@ -412,7 +412,7 @@ def t2vp(t):
         else:
             a=17.2693882
             b=35.86
-    
+
     vp = 6.1078* np.exp(a*(t-273.16)/(t-b)) #(hPa)
     # vp=6.112*np.exp(17.67*t/(t+243.5)) #*10**((7.5*t)/(237.7+t))
     if not tIsInK:
@@ -432,7 +432,7 @@ def rh2sh(t,p,rh):
 def sh2dp(t,p,sh):
     '''T(deg.C or K), p(mb), SH(kg/kg)'''
     return rh2dp(t,sh2rh(t,p,sh))
-    
+
 def mr2rh(t,p,mr):
     '''T(deg.C or K), p(mb), MR(kg/kg)'''
     # e=mr*p/(621.97+mr)
@@ -446,10 +446,10 @@ def rh2mr(t,p,rh):
         multiplier=1/100.0
     else:
         multiplier=1.0
-        
+
     e=t2vp(t)*rh*multiplier
     mr=0.62197*e/(p-e)
-    
+
     return mr
 
 def dp2mr(t,p,dp):
@@ -479,7 +479,7 @@ def rh2dp(t,rh):
         tIsInK=False
     e=t2vp(t) * rh
     dp=243.5*np.log(e/6.112)/(17.67-np.log(e/6.112))
-    if tIsInK: 
+    if tIsInK:
         t+=273.15
         dp+=273.15
     return dp
@@ -492,12 +492,12 @@ def dp2rh(t,dp):
 
 def find_lcl(p,t,dp):
     '''Find the lifting condensation level (m) p=[Pa,hPa],t[C,K],dp[C,K]
-    
-    Units are permitted to vary, 
+
+    Units are permitted to vary,
         p can be hPa, or Pa
         t and dp can be C or K
             but both t and dp must be the same (C or K)
-    
+
     Main code from Greg Thompson's FORTRAN77 (meteo_funcs.f) based on Bolton (1980)?
     '''
     if np.array(t).max()<150:
@@ -511,26 +511,26 @@ def find_lcl(p,t,dp):
         p*=100.0
     else:
         pIsInHPa=False
-    
+
     rcp=287.04/1004.0
     cpr=1.0/rcp
-    
+
     tlcl=t_lcl(t,dp)
     theta=t*(100000.0/p)**rcp
     plcl = 100000.0 * (tlcl/theta)**cpr
     lcl=(1-((plcl/101325.0)**(1.0/5.25588)))/2.25577E-5
-    
+
     if pIsInHPa:
         p/=100
     if tIsInC:
         t-=273.15
         dp-=273.15
     return lcl
-    
+
 
 def t_lcl(t,dp):
     '''Convert T and dew point to T at lifting condensation level
-    
+
     Units can be in C or K, if T<150 assumes C and returns C
     if T>=150 assumes K and returns K
     Code from Greg Thompson FORTRAN77 (meteo_funcs.f) based on Bolton (1980) eqn #15
