@@ -2,8 +2,24 @@
 import numpy as np
 from bunch import Bunch
 
+global printed_error
+printed_error=False
+
 def bilin_weights(yi,y,xi,x,mask=None,xj=None,yj=None,case=None):
     '''Compute the bilinear weights for points surrounding xi,yi'''
+    global printed_error
+
+    if ((x[1]-x[0])==0) or ((x[3]-x[2])==0):
+        if (printed_error):
+            print("At least two cells are the same, extrapolating out of bounds? try increasing window size?")
+            printed_error=True
+
+        nn = np.argmin((yi-y)**2 + (xi-x)**2)
+        weights = np.zeros(4)
+        weights[nn] = 1
+        return weights
+
+
     x0=np.abs((xi-x[0])/(x[1]-x[0]))
     x1=1-x0 # equivalent to np.abs((xi-x[1])/(x[1]-x[0]))
     x2=np.abs((xi-x[2])/(x[3]-x[2]))
@@ -11,18 +27,18 @@ def bilin_weights(yi,y,xi,x,mask=None,xj=None,yj=None,case=None):
     y5=y[0]*x1+y[1]*x0
     y6=y[2]*x3+y[3]*x2
     if (y6-y5)==0:
-        raise ValueError("Divide by zero, increase window size")
-        # print(y)
-        # print(x1,x0,x3,x2)
-        # print(x)
-        # print(yi,xi)
-        # print(xj,yj)
-        # print(case)
-        # print("-"*20)
+        if (printed_error):
+            print("Divide by zero, increase window size")
+            printed_error=True
+
+        nn = np.argmin((yi-y)**2 + (xi-x)**2)
+        weights = np.zeros(4)
+        weights[nn] = 1
+        return weights
 
     f1=(yi-y5)/(y6-y5)
     f2=1-f1# equivalent to (y6-yi)/(y6-y5)
-    if mask==None:
+    if mask is None:
         return np.array([x1*f2,x0*f2,x3*f1,x2*f1])
     else:
         weights=np.array([x1*f2,x0*f2,x3*f1,x2*f1])
@@ -131,7 +147,7 @@ def load_geoLUT(lat1,lon1,lat2,lon2,subset=None,mask=None,winhalfsize=5):
                     y[3]=max(min(newy-dyinc,winsz[0]-1),0)
                     case=3
             # finally compute the weights for each of the four surrounding points for a bilinear interpolation
-            if mask!=None:
+            if not (mask is None):
                 weights=bilin_weights(lat2[j,i],latwin[y,x],lon2[j,i],lonwin[y,x],mask=mask[y+y0,x+x0],xj=x,yj=y,case=case)
             else:
                 weights=bilin_weights(lat2[j,i],latwin[y,x],lon2[j,i],lonwin[y,x])
@@ -156,13 +172,13 @@ def regrid(data,lat1=None,lon1=None,lat2=None,lon2=None,geoLUT=None,ymin=0,xmin=
         if the output grid is too short, process it in N time slices.
         Calculate geoLUT first and pass it on each iteration to save time
     '''
-    if missing!=None:
+    if not (missing is None):
         mask=data[0,...]==missing
     else:
         mask=None
 
     # if we weren't given a Geographic Look up table, create it now
-    if geoLUT==None:
+    if geoLUT is None:
         # if lat lon are linear instead of gridded, make them into grids
         if len(lat1.shape)==1:
             (lon1,lat1)=np.meshgrid(lon1,lat1)
@@ -215,9 +231,9 @@ def vLUT_1d_to_1d(inputz,outputz,geom_in=None,geom_out=None):
 
     outputLUT=np.zeros((outputz.shape[0],3)) # 3 elements are point 1, point2, weight for point1 (w2=1-w1)
 
-    if geom_in==None:
+    if geom_in is None:
         geom_in=get_geometry(inputz)
-    if geom_out==None:
+    if geom_out is None:
         geom_out=get_geometry(outputz)
 
     for i in range(geom_out.bottom,geom_out.top+geom_out.step,geom_out.step):
@@ -283,7 +299,7 @@ def load_vLUT(inputz,outputz):
 
 def vinterp(data,inputz=None,outputz=None,vLUT=None):
     """docstring for vinterp(era_on_gcm_grid,vLUT=pLUT)"""
-    if vLUT==None:
+    if vLUT is None:
         vLUT=load_vLUT(inputz,outputz)
 
     if len(vLUT.shape)==4:

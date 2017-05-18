@@ -57,15 +57,17 @@ def main(f1=None, f2=None, zvar=None, zbasevar=None,skip_z0=False,
     else:
         lonatts=geo1.lonatts
 
+    extra_vars=[Bunch(data=geo2.lat,name="lat",dims=("lat","lon"),dtype="f",attributes=latatts),
+                Bunch(data=geo2.lon,name="lon",dims=("lat","lon"),dtype="f",attributes=lonatts)]
+
     if timevar:
         timeatts=Bunch(standard_name="time")
-        master_vars.append(Bunch(data=None,name=timevar,dims=("time",),dtype="d",attributes=timeatts))
+        dummy_time_var=Bunch(data=None,name="time",dims=("time",),dtype="d",attributes=timeatts)
+        extra_vars.append(dummy_time_var)
+    else:
+        timeatts=None
 
-    dummy_time_var=Bunch(data=None,name="time",dims=("time",),dtype="d",attributes=timeatts)
-    extra_vars=[Bunch(data=geo2.lat,name="lat",dims=("lat","lon"),dtype="f",attributes=latatts),
-                Bunch(data=geo2.lon,name="lon",dims=("lat","lon"),dtype="f",attributes=lonatts),
-                dummy_time_var
-                ]
+
 
     missing_value=0
     # find the variable names that we need to regrid
@@ -89,9 +91,11 @@ def main(f1=None, f2=None, zvar=None, zbasevar=None,skip_z0=False,
     if timevar:print(timeatts)
     # ncdata=mygis.read_nc(files[0],inputvar,returnNCvar=True)
     if regrid_horizontal:
+        print(geo1.lat.shape, geo2.lat.shape)
+        print(geo1.lon.shape, geo2.lon.shape)
         geoLUT = load_geoLUT(lat1=geo1.lat,lon1=geo1.lon,lat2=geo2.lat,lon2=geo2.lon, winhalfsize=5)#,
                         # mask=(ncdata.data[0,...]==missing_value),winhalfsize=7)
-        print(geoLUT.shape)
+        print("geolut shape", geoLUT.shape)
     # ncdata.ncfile.close()
     if zrefvar:
         zout=mygis.read_nc(reference,zrefvar).data
@@ -110,7 +114,7 @@ def main(f1=None, f2=None, zvar=None, zbasevar=None,skip_z0=False,
             if skip_z0:
                 zin=zin[:,1:]
 
-        extra_vars = copy.deepcopy(master_vars)
+        # extra_vars = copy.deepcopy(master_vars)
         global_atts= mygis.read_atts(f,global_atts=True)
 
         if timevar:
@@ -145,6 +149,7 @@ def main(f1=None, f2=None, zvar=None, zbasevar=None,skip_z0=False,
             if (regrid_horizontal and (len(data.shape)>1)):
                 print(data.shape)
                 output=regrid(data,geoLUT=geoLUT)
+                print(output.shape)
             else:
                 output=data
 
@@ -169,7 +174,9 @@ def main(f1=None, f2=None, zvar=None, zbasevar=None,skip_z0=False,
                 outputfile=output_dir+"regrid_"+outputfile#.replace(v,outputvar[i])
                 print(outputvar[i], dims, data_atts)
                 for e in extra_vars:
-                    print(e.name, e.dims, e.data.shape)
+                    print(e.name)
+                    if not (e.data is None):
+                        print(e.dims, e.data.shape)
                 if outputfile[2:]!=inputfile:
                     mygis.write(outputfile,output,dims=dims,varname=outputvar[i],attributes=data_atts,
                                 global_attributes=global_atts,extravars=extra_vars)#, format="NETCDF4")

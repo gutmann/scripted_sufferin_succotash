@@ -51,10 +51,10 @@ def ll2utm(lon,lat,zone=None,north=None):
     if not gdalloaded:
         raise ImportError("OSR not available")
 
-    if zone==None:
+    if zone is None:
         zone=np.int(np.ceil((lon+180)/6))
         if zone==0: zone=1
-    if north==None:
+    if north is None:
         north=np.int(lat>=0)
     # create a UTM zone X projectiong reference
     utm_proj=osr.SpatialReference()
@@ -89,7 +89,7 @@ def proj2ll(x=None,y=None,points=None,proj=None):
     if not gdalloaded:
         raise ImportError("OSR not available")
 
-    if proj==None:
+    if proj is None:
         raise TypeError("Must specify a projection")
 
     if type(proj)==str:
@@ -112,7 +112,7 @@ def proj2ll(x=None,y=None,points=None,proj=None):
     # create a transfomration object between the two reference systems
     transform=osr.CoordinateTransformation(proj,geog_ref)
     # transform the input coordinates to lat lon
-    if points!=None:
+    if not (points is None):
         data=np.array(transform.TransformPoints(points))
         lon=data[:,0]
         lat=data[:,1]
@@ -138,7 +138,7 @@ def ll2proj(lon=None,lat=None,points=None,proj=None):
     if not gdalloaded:
         raise ImportError("OSR not available")
 
-    if proj==None:
+    if proj is None:
         raise TypeError("Must specify a projection")
 
     if type(proj)==str:
@@ -161,7 +161,7 @@ def ll2proj(lon=None,lat=None,points=None,proj=None):
     # create a transfomration object between the two reference systems
     transform=osr.CoordinateTransformation(geog_ref,proj)
     # transform the input coordinates to lat lon
-    if points!=None:
+    if not (points is None):
         data=np.array(transform.TransformPoints(points))
         x=data[:,0]
         y=data[:,1]
@@ -253,11 +253,11 @@ def write_tiff(filename,data,res=None,origin=None,zone=None):
         origin=UTM coordinate of top left [NE] gridcell (number,number)
         zone=UTM zone (number)
     '''
-    if res==None:
+    if res is None:
         print("Error: must set output resolution")
-    if origin==None:
+    if origin is None:
         print("Error: must set origin (in UTM projection)")
-    if zone==None:
+    if zone is None:
         print("Error: For now, UTM Only, and you must set the zone")
 
     format = "GTiff"
@@ -382,7 +382,7 @@ def read_geo(filesearch,outputdim=2):
         except Exception as e:
             pass
 
-    if latdat==None:
+    if latdat is None:
         # we probably weren't looking at a netcdf file...
         raise IOError("Unable to read latitude or longitude data from file:"+filename)
 
@@ -421,7 +421,7 @@ def read_files(pattern,var="data",returnNCvar=False,axis=None,catch_exceptions=F
                 raise e
             else:
                 pass
-    if axis!=None:
+    if not (axis is None):
         d=np.concatenate(d,axis=axis)
     return d
 
@@ -429,14 +429,14 @@ def read_dims(filename,varname=None):
     """docstring for read_attr"""
     if nclib==NETCDF4:
         ncfile=Dataset(filename)
-        if varname==None:
+        if varname is None:
             dims=[str(d) for d in ncfile.dimensions]
         else:
             dims=[str(d) for d in ncfile.variables[varname].dimensions]
 
     # elif nclib==NIO:
     #     ncfile=Nio.open_file(filename,format="nc")
-        # if varname==None:
+        # if varname is None:
         #     dims=[str(d) for d in ncfile.dimensions]
         # else:
         #     dims=[str(d) for d in ncfile.variables[varname].dimensions]
@@ -449,14 +449,14 @@ def read_attr(filename,attribute_name,varname=None):
     """docstring for read_attr"""
     if nclib==NETCDF4:
         ncfile=Dataset(filename)
-        if varname==None:
+        if varname is None:
             att_val=ncfile.getncattr(attribute_name)
         else:
             att_val=ncfile.variables[varname].getncattr(attribute_name)
 
     elif nclib==NIO:
         ncfile=Nio.open_file(filename,format="nc")
-        if varname==None:
+        if varname is None:
             att_val=ncfile.__dict__[attribute_name]
         else:
             att_val=ncfile.variables[varname].__dict__[attribute_name]
@@ -465,7 +465,7 @@ def read_attr(filename,attribute_name,varname=None):
     return att_val
 
 def read_atts(filename,varname=None,global_atts=False):
-    if varname==None and not global_atts:
+    if varname is None and not global_atts:
         print("WARNING: no variable name or global attributes requested")
         return Bunch()
 
@@ -475,7 +475,7 @@ def read_atts(filename,varname=None,global_atts=False):
     elif nclib==NIO:
         ncfile=Nio.open_file(filename,format="nc")
 
-    if varname!=None:
+    if not (varname is None):
         data=ncfile.variables[varname]
     if global_atts:
         data=ncfile
@@ -521,7 +521,7 @@ def read_nc(filesearch,var="data",proj=None,returnNCvar=False, format="NETCDF4")
             else:
                 outputdata=data[:]
     outputproj=None
-    if proj!=None:
+    if not (proj is None):
         projection=d.variables[proj]
         outputproj=str(projection)
 
@@ -534,7 +534,7 @@ def read_nc(filesearch,var="data",proj=None,returnNCvar=False, format="NETCDF4")
 
 def _write_one_var(NCfile,data,varname="data",units=None,dtype='f',dims=('t','z','y','x'),attributes=None, record_dim=None):
     dimlen=list(data.shape)
-    if record_dim==None:
+    if record_dim is None:
         for i in range(len(dimlen)):
             if dims[i]=="time":dimlen[i]=None
     else:
@@ -548,7 +548,7 @@ def _write_one_var(NCfile,data,varname="data",units=None,dtype='f',dims=('t','z'
         fill_value=None
     NCfile.createVariable(varname,dtype,dims,fill_value=fill_value)
     NCfile.variables[varname][:]=data.astype(dtype)
-    if units!=None:
+    if not (units is None):
         NCfile.variables[varname].units=units
     if attributes:
         for k in attributes.keys():
@@ -575,7 +575,7 @@ def _nio_addvar(NCfile,data,varname,dims,dtype='f',attributes=None):
 def addvar(NCfile,data,varname,dims,dtype='f',attributes=None, record_dim=None):
     for i,d in enumerate(dims):
         if not(d in NCfile.dimensions):
-            if (record_dim!=None) and (i==record_dim):
+            if (not (record_dim is None)) and (i==record_dim):
                 NCfile.createDimension(d,None)
             else:
                 NCfile.createDimension(d,data.shape[i])
@@ -621,7 +621,7 @@ def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes
     history = 'Created : ' + time.ctime() +'\nusing simple io.write by:'+os.environ['USER']+"  "+history
 
 
-    if dims==None:
+    if dims is None:
         if len(data.shape)==1:
             dims=('x',)
         if len(data.shape)==2:
@@ -638,14 +638,14 @@ def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes
         NCfile=Dataset(filename,mode="w",format=format)
         _write_one_var(NCfile,data,varname=varname,units=units,dtype=dtype,dims=dims,attributes=attributes,record_dim=record_dim)
 
-    if lat!=None:
+    if not (lat is None):
         print("WARNING: explicitly passing lat is deprecated, use extravars")
         if len(lat.shape)>1:
             NCfile.createVariable("lat",'f',(dims[-2],dims[-1]))
         else:
             NCfile.createVariable("lat",'f',(dims[-2],))
         NCfile.variables["lat"][:]=lat.astype('f')
-    if lon!=None:
+    if not (lon is None):
         print("WARNING: explicitly passing lon is deprecated, use extravars")
         if len(lon.shape)>1:
             NCfile.createVariable("lon",'f',(dims[-2],dims[-1]))
@@ -661,7 +661,7 @@ def write(filename,data,dtype='f',varname="data",dims=None,units=None,attributes
                 this_record_dim=None
             addvar(NCfile,e.data,e.name,e.dims,e.dtype,e.attributes, this_record_dim)
 
-    if global_attributes!=None:
+    if not (global_attributes is None):
         for k in global_attributes.keys():
             if k=="history":
                 NCfile.__setattr__(k,history+global_attributes[k])
@@ -689,7 +689,7 @@ def _write_nio(filename,data,dtype,varname,dims,units,attributes,lat,lon,extrava
         for e in extravars:
             _nio_addvar(NCfile,e.data,e.name,e.dims,e.dtype,e.attributes)
 
-    if global_attributes!=None:
+    if not (global_attributes is None):
         for k in global_attributes.keys():
             NCfile.__setattr__(k,global_attributes[k])
 
@@ -727,13 +727,13 @@ class NC_writer(object):
             self.curVar=varname
 
     def appendToVar(self,data,varname=None,date=None,pos=None,dtype='f'):
-        if varname==None:varname=self.curVar
+        if varname is None:varname=self.curVar
         var=self.NCfile.variables[varname]
         if pos:
             n=pos
         else:
             n=self.NCfile.dimensions['time']
-            if n==None:
+            if n is None:
                 n=0
         if self.nz:
             var[n,:,:,:]=data.astype(dtype)

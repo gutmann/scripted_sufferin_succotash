@@ -49,7 +49,7 @@ geo_var_list=["lat","lon",'level']
 def main (filename, outputfile):
 
     d = mygis.Dataset(filename)
-    output = mygis.Dataset(outputfile,'w')
+    output = mygis.Dataset(outputfile,'w',format="NETCDF3_CLASSIC")
 
     for dim in d.dimensions:
         if dim=="time":
@@ -71,13 +71,23 @@ def main (filename, outputfile):
 
             elif v.name == "lon":
                 ov = output.createVariable("lon",v.dtype,(v.dimensions[1],))
+                print("creating lon")
+                print(v.dtype)
+                print(v.dimensions[1])
+                print(v[0,:])
+                print(ov.shape)
+                print(v.shape)
+                print(ov)
                 ov[:] = v[0,:]
             elif v.name == "level":
                 ov = output.createVariable("z",v.dtype,v.dimensions)
                 ov[:] = v[:]
 
         for a in v.ncattrs():
-            ov.setncattr(a,v.getncattr(a))
+            try:
+                ov.setncattr(a,v.getncattr(a))
+            except Exception as e:
+                print(e, a)
 
     for a in d.ncattrs():
         output.setncattr(a,d.getncattr(a))

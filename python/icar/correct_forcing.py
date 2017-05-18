@@ -48,19 +48,21 @@ global verbose
 verbose=False
 
 vars_to_correct = ["qv"]#, "th", "p", "u", "v"]
+vars_to_correct = ["qv","u","v","theta","p","swdown","lwdown","tskin"]
 z_var_name = "z"
 
 def z_interp(inputdata, outputdata, lut):
-    print(outputdata.shape)
-    print(inputdata.shape)
-    print(lut[0].min(), lut[0].max())
-    for i in range(outputdata.shape[2]):
-        print(i)
-        for j in range(outputdata.shape[3]):
-            print(j)
-            print(lut[:,:,i,j])
-            outputdata[:,:,i,j] = ( (inputdata[:,lut[0,:,i,j].astype('i'), i,j]      * lut[np.newaxis, 1,:,i,j])
-                                  + (inputdata[:,lut[0,:,i,j].astype('i'), i,j] + 1) * (1 - lut[np.newaxis, 1,:,i,j]))
+
+    if (len(outputdata.shape)==4):
+        for i in range(outputdata.shape[2]):
+            for j in range(outputdata.shape[3]):
+                outputdata[:,:,i,j] = ( (inputdata[:,lut[0,:,i,j].astype('i'), i,j]      * lut[np.newaxis, 1,:,i,j])
+                                      + (inputdata[:,lut[0,:,i,j].astype('i')+1, i,j]) * (1 - lut[np.newaxis, 1,:,i,j]))
+    elif (len(outputdata.shape)==3):
+        for i in range(outputdata.shape[1]):
+            for j in range(outputdata.shape[2]):
+                outputdata[:,i,j] = ( (inputdata[lut[0,:,i,j].astype('i'), i,j]    * lut[1,:,i,j])
+                                    + (inputdata[lut[0,:,i,j].astype('i')+1, i,j]) * (1 - lut[1,:,i,j]))
 
 def compute_column_vlut(zin, zout):
     vlut=np.zeros((2,zout.shape[0]))
@@ -115,35 +117,34 @@ def z_interp_all_vars(base_data, output_data, zin, zout, varlist):
         z_interp(base_data[v], output_data[v], vlut)
 
 
-def main (era_filesearch, cesm_base_filesearch, cesm_output_filesearch):
+
+def main (era_filesearch, cesm_base_filesearch, bias_output):
 
     print("opening data")
     era_data         = xr.open_mfdataset(era_filesearch,         concat_dim='time')
+    base_cesm_data   = xr.open_mfdataset(cesm_base_filesearch,   concat_dim='time')
+
     print("loading data")
     era_data.load()
-
-    base_cesm_data   = xr.open_mfdataset(cesm_base_filesearch,   concat_dim='time')
-    # output_cesm_data = xr.open_mfdataset(cesm_output_filesearch, concat_dim='time')
     base_cesm_data.load()
 
-    print("compute mean z")
-    ezmean = era_data["z"].mean(dim="time")
-    czmean = base_cesm_data["z"].mean(dim="time")
+    print("compute means")
+    emean = era_data.std(dim="time")
+    cmean = base_cesm_data.std(dim="time")
 
     print("creating data")
-    interpolated_era = xr.zeros_like(base_cesm_data)
+    interpolated_era = xr.zeros_like(cmean)
     print("loading data")
     interpolated_era.load()
 
-    z_interp_all_vars(era_data, interpolated_era, ezmean, czmean, vars_to_correct)
+    z_interp_all_vars(emean, interpolated_era, era_data["z"].mean(dim="time"), base_cesm_data["z"].mean(dim="time"), vars_to_correct)
+    interpolated_era.to_netcdf("era_interpolated_std.nc")
+
+    print("Computing Bias")
+    bias = interpolated_era - cmean
 
     print("writing")
-    interpolated_era.to_netcdf("test_file.nc")
-    # base_cesm_data = geo_interp(base_cesm_data, era_data)
-    # z_interp_all_vars(base_cesm_data, zmean, vars_to_correct)
-    #
-    # output_cesm_data = geo_interp(output_cesm_data, era_data)
-    # z_interp_all_vars(output_cesm_data, zmean, vars_to_correct)
+    bias.to_netcdf(bias_output)
 
 
 if __name__ == '__main__':
@@ -153,7 +154,7 @@ if __name__ == '__main__':
         # parser.add_argument('filename',nargs="?", action='store', default="some_file_name")
         parser.add_argument('-f1', dest="f1", action='store', default="")
         parser.add_argument('-f2', dest="f2", action='store', default="")
-        parser.add_argument('-f3', dest="f3", action='store', default="")
+        parser.add_argument('-o',  dest="output", action='store', default="")
         parser.add_argument('-v', '--version',action='version',
                 version='Template Parser 1.0')
         parser.add_argument ('--verbose', action='store_true',
@@ -164,7 +165,7 @@ if __name__ == '__main__':
 
         verbose = args.verbose
 
-        exit_code = main(args.f1, args.f2, args.f3)
+        exit_code = main(args.f1, args.f2, args.output)
         if exit_code is None:
             exit_code = 0
         sys.exit(exit_code)

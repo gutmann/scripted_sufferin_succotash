@@ -56,7 +56,7 @@ def load_data(filename):
                 for d in l.split(","):
                     key=d.split(":")[0].replace("'","").strip().replace("{","")
                     keys.append(key)
-            
+
             data=l.split(",")
             values=[]
             for d in data:
@@ -66,12 +66,12 @@ def load_data(filename):
                 except:
                     value=-999
                 values.append(value)
-                    
+
             output.append(np.array(values))
     return np.array(keys), np.array(output)
-                
+
 def plot_track(d, keys):
-    
+
     ID  = np.where(keys=="ID")[0]
     lat = np.where(keys=="y")[0]
     lon = np.where(keys=="x")[0]
@@ -81,7 +81,7 @@ def plot_track(d, keys):
 
     if verbose:print(keys)
     if verbose:print(ID, lat, lon, time, wind)
-        
+
     for track in np.unique(d[:,ID]):
         curtrack=np.where(d[:,ID]==track)
         print(track)
@@ -89,7 +89,7 @@ def plot_track(d, keys):
             if verbose:print("plotting ID: "+str(track))
             plt.plot(d[curtrack[0],lon],d[curtrack[0],lat],color="black")
             plt.text(d[curtrack[0],lon][0],d[curtrack[0][0],lat],str(d[curtrack[0][0],time][0]))
-            
+
             colors=d[curtrack[0],wind]
             print(colors.min(), colors.max())
             colors=(colors-25)/30
@@ -106,7 +106,7 @@ def plot_track(d, keys):
     #             plt.plot(d[i,lon],d[i,lat],'o',color=plt.cm.jet(c))
     plt.xlim(0,800)
     plt.ylim(0,600)
-                 
+
 
 def main (filename):
 
@@ -116,7 +116,7 @@ def main (filename):
     plot_track(data, keys)
     plt.title(filename)
     plt.savefig(filename+".png")
-    
+
 if __name__ == '__main__':
     try:
         parser= argparse.ArgumentParser(description='This is a template file for Python scripts. ',
@@ -135,11 +135,11 @@ if __name__ == '__main__':
         if exit_code is None:
             exit_code = 0
         sys.exit(exit_code)
-    except KeyboardInterrupt, e: # Ctrl-C
+    except KeyboardInterrupt as e: # Ctrl-C
         raise e
-    except SystemExit, e: # sys.exit()
+    except SystemExit as e: # sys.exit()
         raise e
-    except Exception, e:
+    except Exception as e:
         print('ERROR, UNEXPECTED EXCEPTION')
         print(str(e))
         traceback.print_exc()
