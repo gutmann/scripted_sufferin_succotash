@@ -1,0 +1,31 @@
+#!/bin/bash
+
+WORKDIR=`pwd -P`
+logdir=/home/gutmann/logs
+
+now=`date --rfc-3339=seconds | tr " " "T"  | awk -F "-" '{print $1 $2 $3}' | tr -d ":"`
+logdir=$WORKDIR/.jupyter-notebook
+logfile=$logdir/log.$now
+mkdir -p $logdir
+
+echo "Logging this session in $logfile"
+echo
+HOST=`hostname`
+echo "hostname: " $HOST
+port=$(shuf -i 8000-9000 -n 1)
+echo "port:" $port
+jupyter notebook $@ --no-browser --port=$port > $logfile 2>&1 &
+
+echo
+echo -n  "Starting jupyter server, please wait... "
+seconds=0
+
+echo -en "\r"
+
+# echo "Run the following command on your local machine:"
+# echo "ssh -L $port:localhost:$port $USER@$YELLOWSTONE ssh -L $port:localhost:$port $HYDROC1 ssh -L $port:localhost:$port $HOST"
+# echo
+# echo "Log in with your token (there will be no prompt). Then"
+# echo "open a browser and go to http://localhost:$port"
+
+while true; do sleep 10; done
