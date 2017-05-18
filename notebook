@@ -1,31 +1,85 @@
 #!/bin/bash
+set -e
 
-WORKDIR=`pwd -P`
-logdir=/home/gutmann/logs
+#control_c() {
+#    echo "Ctrl-C trapped"
+#    echo "Would do kill $ipythonpid"
+#    exit 1
+#}
+
+# Enabling monitor mode, essential to fg the program at the end of this script
+#set -o monitor
+#ipythonpid=-1
+#trap control_c SIGINT
+
+PASSWORD_FILE=~/.notebook.password
+
+if [ ! -f $PASSWORD_FILE ]; then
+    python -c 'from __future__ import print_function; from IPython.lib import passwd; print(passwd())' | tail -1 > $PASSWORD_FILE
+fi
+PASSWORD=$(cat $PASSWORD_FILE)
 
 now=`date --rfc-3339=seconds | tr " " "T"  | awk -F "-" '{print $1 $2 $3}' | tr -d ":"`
-logdir=$WORKDIR/.jupyter-notebook
+logdir=/glade/scratch/$USER/.jupyter-notebook
 logfile=$logdir/log.$now
 mkdir -p $logdir
 
 echo "Logging this session in $logfile"
 echo
-HOST=`hostname`
-echo "hostname: " $HOST
-port=$(shuf -i 8000-9000 -n 1)
-echo "port:" $port
-jupyter notebook $@ --no-browser --port=$port > $logfile 2>&1 &
+HOST=`hostname`-ib
+MASTER=yellowstone
+
+if [[ $HOST == yslogin* ]]; then
+
+    echo 'See "Use of login nodes" here before running Jupyter-Notebook on this'
+    echo "node: https://www2.cisl.ucar.edu/resources/yellowstone/using_resources."
+    echo
+    echo "Consider running on Geyser instead by using execgy to start a session. (Run execgy -help.)"
+fi
+
+if [[ $HOST == cheyenne* ]]; then
+
+    HOST=`hostname`
+    MASTER=cheyenne
+    echo 'See "Use of login nodes" here before running Jupyter-Notebook on this node.'
+    echo
+    echo "Consider running on Geyser instead by using execgy to start a session. (Run execgy -help.)"
+fi
+
+if [[ $HOST == r* ]]; then
+    HOST=`hostname`
+    MASTER=cheyenne
+fi
+
+
+echo "jupyter notebook $@ --no-browser --ip=${HOST} --NotebookApp.password=$PASSWORD > $logfile 2>&1 &"
+jupyter notebook $@ --no-browser --ip=${HOST} --NotebookApp.password=$PASSWORD > $logfile 2>&1 &
+#ipythonpid=$!
 
 echo
 echo -n  "Starting jupyter server, please wait... "
 seconds=0
+port=
+while [[ -z $port ]]; do
+    sleep 1
+    seconds=$(($seconds+1))
+    port=`grep $HOST $logfile | awk -F ":" '{print $NF}' | tr -d "/"`
+    if [[ seconds -gt 30 ]]; then
+        echo -e "Something went wrong\n---"
+        cat $logfile
+        echo "---"
+        fg
+        exit 1
+    fi
+done
 
 echo -en "\r"
 
-# echo "Run the following command on your local machine:"
-# echo "ssh -L $port:localhost:$port $USER@$YELLOWSTONE ssh -L $port:localhost:$port $HYDROC1 ssh -L $port:localhost:$port $HOST"
-# echo
-# echo "Log in with your token (there will be no prompt). Then"
-# echo "open a browser and go to http://localhost:$port"
+echo "Run the following command on your desktop or laptop:"
+echo "ssh -N -l $USER -L 8888:$HOST:$port $MASTER.ucar.edu"
+echo
+echo "Log in with your token (there will be no prompt). Then"
+echo "open a browser and go to http://localhost:8888."
 
+#fg > /dev/null 2>&1
 while true; do sleep 10; done
