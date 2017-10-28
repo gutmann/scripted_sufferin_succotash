@@ -14,7 +14,7 @@ def usage():
     """docstring for usage"""
     print("""
 pretty_domain_maps.py center_lat center_lon width height name rescale_shading large_output
-    
+
     center_lat = latitude coordinate of map center  [default=40]
     center_lon = longitude coordinate of map center [default=-105]
     width      = domain width E-W (km)              [default=1000]
@@ -22,7 +22,7 @@ pretty_domain_maps.py center_lat center_lon width height name rescale_shading la
     name       = map title (and filename)           [default='']
     rescale_shading     Boolean flag if present shading is rescaled for local topography
     large_output        Boolean flag if present a larger output image is created
-    
+
     """)
 
 # Command line options.
@@ -51,7 +51,7 @@ else:
 if len(sys.argv)>5:
     titlename=sys.argv[5]
 else:
-    titlename=""    
+    titlename=""
 
 if len(sys.argv)>6:
     rescale_shading=(sys.argv[6]=="rescale_shading")
@@ -126,6 +126,7 @@ if (   ((center_lat + height/222) > lats.max())
 else:
     print("Reading topo data")
     topoin=data.variables["topo"][10000:0:-1,5000:15000]
+    print(topoin.shape)
 
 print("Setting up plot data")
 nx = int((m.xmax-m.xmin)/dx)+1; ny = int((m.ymax-m.ymin)/dx)+1
@@ -158,21 +159,26 @@ if rescale_shading:
     print("Vertical Exageration = "+str(vertical_exageration))
 
 
+# print(topodat.min(), topodat.max())
 zc[zc<=colormin+20]=colormin+20
 img=shade(topodat*vertical_exageration,colordata=zc,clim=(colormin,colormax),dx=185,cmap=custom_cmap.terrain())
+# plt.savefig("image.png",dpi=300)
+
 # make oceans transparent
-img[:,:,3][topodat<=0]=0
+# img[:,:,3][topodat<=0]=0
 
 print("Drawing map")
 # draw a boundary around the map, fill the background.
 # this background will end up being the ocean color, since
 # the continents will be drawn on top.
-m.drawmapboundary(fill_color='lightblue')
+# m.drawmapboundary(fill_color='lightblue')
 
 # fill continents, set lake color
 m.fillcontinents(lake_color="blue",color=(0,0,0,0));
 
 map_img=m.imshow(img,origin="lower")
+
+# plt.savefig("mapped.png",dpi=300)
 
 # print("rescale_colors="+str(rescale_colors))
 if rescale_colors:
@@ -205,12 +211,12 @@ else:
     m.drawstates(linewidth=1)
     m.drawcountries(linewidth=2)
     m.drawrivers(color="blue",linewidth=0.2)
-    
+
 plt.title(titlename,fontsize=title_font_size)
 
 xpt,ypt = m(center_lon,center_lat)
 # if not large:
-m.plot(xpt,ypt,'ro')  # plot a red dot at the center point
+# m.plot(xpt,ypt,'ro')  # plot a red dot at the center point
 # put some text next to the dot, offset a little bit
 # (the offset is in map projection coordinates)
 # plt.text(xpt+100000,ypt+100000,'Boulder (%5.1fW,%3.1fN)' % (lonpt,latpt))

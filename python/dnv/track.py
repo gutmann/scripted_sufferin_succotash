@@ -58,17 +58,17 @@ ntracks=0
 def update_tracks(tracks, pd, p, wind, precip, time):
     # pd is the pressure depression from the timeseries pmax
     newtracks=[]
-    
+
     ny=wind.shape[0]
     nx=wind.shape[1]
-    
+
     for t in tracks[-1]:
         if verbose:print("updating track:{}".format(t.ID))
         ymin=max(t.y-window/2,0)
         ymax=min(t.y+window/2,ny)
         xmin=max(t.x-window/2,0)
         xmax=min(t.x+window/2,nx)
-        
+
         newy,newx = np.unravel_index(np.argmin(pd[ymin:ymax,xmin:xmax]), (ymax-ymin,xmax-xmin))
         wind_window=wind[ymin:ymax,xmin:xmax]
         wmax=wind_window.max()
@@ -87,13 +87,13 @@ def update_tracks(tracks, pd, p, wind, precip, time):
             xmin=max(t.x-window*1.5,0)
             xmax=min(t.x+window*1.5,nx)
             pd[ymin:ymax,xmin:xmax]=0
-    
+
     tracks.append(newtracks)
-    
+
 
 
 def get_track_stats(x,y,pmin,realp,wmax,wind, trackID, time, xmin, ymin, precip):
-    
+
     # find the average radius of winds > wind_threshold
     ny=wind.shape[0]
     npoints=np.zeros((ny,2,2))
@@ -115,63 +115,63 @@ def get_track_stats(x,y,pmin,realp,wmax,wind, trackID, time, xmin, ymin, precip)
     dists=np.sqrt((npoints[:,:,1]-(x-xmin))**2.0+(npoints[:,:,0]-(y-ymin))**2.0)
     # the radius is the mean of those distances
     radius = dists.mean()
-    
+
     # find all points that exceed the threshold so we can compute the area and the mean winds
     high_winds=np.where(wind>wind_threshold)
-    
-    return Bunch(x=x,y=y, pmin=pmin, realp=realp, wmax=wmax, 
+
+    return Bunch(x=x,y=y, pmin=pmin, realp=realp, wmax=wmax,
                  radius=radius*dx,
                  area=len(high_winds[0])*(dx**2),
-                 wmean=wind[high_winds].mean(), 
-                 w3mean=(wind[high_winds]**3).mean(), 
+                 wmean=wind[high_winds].mean(),
+                 w3mean=(wind[high_winds]**3).mean(),
                  ID=trackID, timestep=time,
                  center_x=xm+xmin, center_y=ym+ymin, precip=precip.max())
-    
+
 def find_new_tracks(tracks, pd, p, wind, precip, time):
     pmin=pd.min()
     if pmin>TC_p_threshold:return # there are no tracks to find
-    
+
     ny=pd.shape[0]
     nx=pd.shape[1]
     newtracks=[]
     global ntracks
-    
+
     while pmin<TC_p_threshold:
         y, x = np.unravel_index(np.argmin(pd),pd.shape)
         ymin=max(y-window/2,0)
         ymax=min(y+window/2,ny)
         xmin=max(x-window/2,0)
         xmax=min(x+window/2,nx)
-        
+
         realp=p[y,x]
         wmax=wind[ymin:ymax,xmin:xmax].max()
-        
+
         if wmax > wind_threshold:
             if verbose:print("Found new track:{}, {}".format(x,y))
             newtracks.append( get_track_stats(x,y,pmin,realp,wmax,wind[ymin:ymax,xmin:xmax], ntracks, time, xmin, ymin, precip[ymin:ymax,xmin:xmax]) )
             if verbose:print(newtracks[-1])
             ntracks+=1
             if verbose:print(ntracks)
-        
+
             ymin=max(y-window,0)
             ymax=min(y+window,ny)
             xmin=max(x-window,0)
             xmax=min(x+window,nx)
         pd[ymin:ymax,xmin:xmax]=0
         pmin=pd.min()
-    
+
     tracks[-1].extend(newtracks)
-    
-    
+
+
 def write_tracks(tracksequence, filename):
     with open(filename,"w") as f:
         for tracks in tracksequence:
             for t in tracks:
                 f.write(str(t)+"\n")
-        
+
 def visualize(tracks, pressure, wind, time_step, filename):
     plt.clf()
-    
+
     ax=plt.subplot(1,2,1)
     plt.imshow(wind)
     plt.clim(0,50)
@@ -189,7 +189,7 @@ def visualize(tracks, pressure, wind, time_step, filename):
                 ax.add_patch(circ)
     except:
         pass
-    
+
     ax=plt.subplot(1,2,2)
     plt.imshow(pressure)
     plt.clim(-5000,0)
@@ -204,16 +204,16 @@ def visualize(tracks, pressure, wind, time_step, filename):
                 plt.text(t.center_x,t.center_y, 'x',color="green", horizontalalignment='center', verticalalignment='center')
     except:
         pass
-    
+
     plt.tight_layout()
     plt.savefig(filename+"{:05}.png".format(time_step))
-    
+
 
 def main (filename, outputfilename, p=None, wspd=None, pr=None, vis_data=False, img_name=""):
 
     start=0
     end=None
-    
+
     # start=1060
     # end=1100
     if vis_data:
@@ -232,7 +232,7 @@ def main (filename, outputfilename, p=None, wspd=None, pr=None, vis_data=False, 
             pr = mygis.read_nc(filename,"PREC_ACC_NC", returnNCvar=True).data[start:end]
         else:
             pr = mygis.read_nc(filename,"PREC_ACC_NC").data
-            
+
     if wspd==None:
         if verbose: print("Reading U10")
         if (start != 0) and (end != None):
@@ -243,50 +243,50 @@ def main (filename, outputfilename, p=None, wspd=None, pr=None, vis_data=False, 
             u = mygis.read_nc(filename,"U10").data
             if verbose: print("Reading V10")
             v = mygis.read_nc(filename,"V10").data
-            
+
         if verbose:print("Loading wind")
         wspd=np.sqrt(u[:,:600,600:]**2 + v[:,:600,600:]**2)
         del u
         del v
         import gc
         gc.collect()
-        
+
     # subset data to a smaller working region
     # wspd = wspd[:,:600,600:]
     if verbose:print("Loading pressure")
     p=p[:,:600,600:]
     pr=pr[:,:600,600:]
-    
+
     if verbose:print("Computing initial values")
     pmax = p.max(axis=0)
     land = (pmax < land_threshold)
     land[:200,400:]=False # set Cuba etc to "ocean" to avoid breaking tracks
-    
+
     tracks=[]
     ntimes=p.shape[0]
-    
+
     if verbose: print("Ntimes = "+str(ntimes))
     for i in range(ntimes):
         if verbose:print("TIME = "+str(i))
         curp = np.ma.array(p[i]-pmax,mask=land)
-        
+
         if vis_data: visp=np.copy(curp)
 
         curpr = pr[i]
-        
+
         curw = np.ma.array(wspd[i],mask=land)
         if i>0:
             update_tracks(tracks, curp, p[i], curw, curpr, i)
         else:
             tracks.append([])
-        
+
         find_new_tracks(tracks, curp, p[i], curw, curpr, i)
         if verbose:print("")
         if vis_data:visualize(tracks[-1], visp, curw, i, img_name)
-    
+
     if verbose:print("Writing: "+outputfilename)
     write_tracks(tracks, outputfilename)
-        
+
 
 if __name__ == '__main__':
     try:

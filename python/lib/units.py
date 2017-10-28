@@ -188,7 +188,7 @@ def zt2p(z,p0=101325.0,t0=288.15,dtdz= -0.0065,zaxis=1,use_z_axis=None):
     g=9.807
     M=0.029
     R=8.314
-    if (not isinstance(t0,np.ndarray):
+    if (not isinstance(t0,np.ndarray)):
         p= p0*(t0/(t0+dtdz*z))**((g*M)/(R*dtdz))
         return p
 
