@@ -2,11 +2,14 @@
 rm -r automatic_output
 amplxe-cl -collect hotspots -result-dir automatic_output ./icar
 amplxe-cl -R gprof-cc -r automatic_output -format text -report-output gprof_style_output
-mv gprof_style_output.txt gprof_style_output
-hydrocp gprof_style_output
-for ((i=0;i<10;i++)); do echo; done
-echo RUN: prof2png gprof_style_output
-for ((i=0;i<10;i++)); do echo; done
-ssh hydro-c1.rap.ucar.edu
-scp hydro-c1.rap.ucar.edu:output.png ./output.png
-eog output.png
+
+~/src/gprof2dot.py -f axe gprof_style_output.txt | dot -Tpng -o output.png
+
+# mv gprof_style_output.txt gprof_style_output
+# hydrocp gprof_style_output
+# for ((i=0;i<10;i++)); do echo; done
+# echo RUN: prof2png gprof_style_output
+# for ((i=0;i<10;i++)); do echo; done
+# ssh hydro-c1.rap.ucar.edu
+# scp hydro-c1.rap.ucar.edu:output.png ./output.png
+# eog output.png
