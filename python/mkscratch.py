@@ -47,7 +47,8 @@ def main(newdir, verbose, quiet):
     # get the current working directory, resolving symlinks as necessary
     working_dir=os.path.realpath(os.getcwd())
 
-    scratch_dir = working_dir.replace("p/work","scratch")
+    scratch_dir = working_dir.replace("/glade/p/work/","/glade2/scratch2/")
+    scratch_dir = scratch_dir.replace("/glade2/work/","/glade2/scratch2/") # updated work directory
     scratch_dir+="/"+newdir
 
     if verbose:
