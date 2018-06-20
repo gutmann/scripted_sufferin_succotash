@@ -1,0 +1,2 @@
+#!/bin/bash
+grep -n $1 */*.f90
