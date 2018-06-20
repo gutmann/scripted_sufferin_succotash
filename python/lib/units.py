@@ -63,7 +63,7 @@ def dry_BV_frequency_squared(theta,z,bottom=0,top=None,t=None,p=None):
     g=9.81
 
     if (theta==None):
-        if t!=None and p!=None:
+        if t is not None and p is not None:
             theta=t/exner(p)
         else:
             raise ValueError("Needs either potential temperature[K] or real T[K] and P[Pa]")
@@ -142,13 +142,13 @@ def calc_tv(t,mr=None,e=None,p=None):
     RoR = 0.622 # Rdry / Rvapor
 
     # if mixing ratio was specified:
-    if mr!=None:
+    if mr is not None:
         return t*(mr+RoR)/(RoR*(1+mr))
     # if vapor pressure and barometric pressure were given:
-    if (e!=None) and (p!=None):
+    if (e is not None) and (p is not None):
         T/(1-e/p*(1-RoR))
 
-def calc_z(slp,p,t,mr):
+def calc_z(slp,p,t,mr, timeseries=False):
     """Calculate geopotential height [m] from a 3D atm field and sea level pressure
     the 3D fields must include pressure, temperature, and humidity.
 
@@ -163,15 +163,27 @@ def calc_z(slp,p,t,mr):
     based off WMO CIMO guide: http://www.wmo.int/pages/prog/www/IMOP/CIMO-Guide.html
                     Part I Chapter 3
     """
-    tv=calc_tv(t,mr=mr)
+    tv = calc_tv(t, mr=mr)
     Kp = 0.0148275 # K / gpm
-    if len(tv.shape)<=2:
-        return tv*np.log10(slp/p)/Kp
+    # if these are likely 2D data, not 3D just do a simple calculation
+    if len(tv.shape) <= 2:
+        return tv * np.log10(slp / p) / Kp
 
-    z=np.zeros(tv.shape)
-    z[0]=tv[0]*np.log10(slp/p[0])/Kp
-    for i in range(1,z.shape[0]):
-        z[i]=(tv[i]+tv[i-1])/2  * np.log10(p[i-1]/p[i])/Kp + z[i-1]
+    # for 3D data integrate up from the surface
+    z = np.zeros(tv.shape)
+    # do the simple calculation at the bottom
+    if timeseries:
+        z[:,0] = tv[:,0] * np.log10(slp / p[:,0]) / Kp
+        # now compute the elevation of each successive layer
+        for i in range(1,z.shape[1]):
+            z[:,i] = (tv[:,i] + tv[:,i-1]) / 2  * np.log10(p[:,i-1] / p[:,i]) / Kp + z[:,i-1]
+
+    else:
+        z[0] = tv[0] * np.log10(slp / p[0]) / Kp
+        # now compute the elevation of each successive layer
+        for i in range(1,z.shape[0]):
+            z[i] = (tv[i] + tv[i-1]) / 2  * np.log10(p[i-1] / p[i]) / Kp + z[i-1]
+
     return z
 
 
@@ -287,31 +299,31 @@ def calc_slp(ps,z,ts=288.15,dtdz= -0.0065,mr=None,e=None,sh=None,latitude=None,m
     # This section is for converting units
     #
     p_inhPa=False
-    if isinstance(ps,np.ndarray):
+    try:
         if ps.max()<1200:
             ps*=100
             p_inhPa=True
-    else:
+    except:
         if ps<1200: # assume ps is in Pa, not hPa
             ps*=100
             p_inhPa=True
 
-    if sh!=None:
+    if sh is not None:
         mr=sh/(1-sh)
-    if mr!=None:
+    if mr is not None:
         #assumes mr is in kg/kg
         e=mr*ps/(0.62197+mr)
 
-    if e==None:
+    if e is None:
         mr=0.01
         e=mr*ps/(0.62197+mr)
 
     T_inC=False
-    if isinstance(ts,np.ndarray):
+    try:
         if ts.min()<100:
             ts+=273.15
             T_inC=True
-    else:
+    except:
         if ts<100:
             ts+=273.15
             T_inC=True
@@ -342,9 +354,9 @@ def calc_slp(ps,z,ts=288.15,dtdz= -0.0065,mr=None,e=None,sh=None,latitude=None,m
     elif method==2:
         Kp = 0.0148275 # K / gpm
         # based off the virtual temperature instead
-        if mr!=None:
+        if mr is not None:
             tv=calc_tv(ts,mr=mr)
-        elif e!=None:
+        elif e is not None:
             tv=calc_tv(ts,e=e,p=ps)
         slp= ps*10**(Kp*Hp/tv)
 
